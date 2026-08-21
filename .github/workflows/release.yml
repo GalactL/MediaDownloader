@@ -1,0 +1,79 @@
+name: Release multiplateforme
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: MediaDownloader-v0.1.0-Windows-x64
+            readme: docs/RELEASE_WINDOWS.md
+          - os: ubuntu-latest
+            artifact: MediaDownloader-v0.1.0-Linux-x64
+            readme: docs/RELEASE_LINUX.md
+          - os: macos-15-intel
+            artifact: MediaDownloader-v0.1.0-macOS-x64
+            readme: docs/RELEASE_MACOS.md
+          - os: macos-15
+            artifact: MediaDownloader-v0.1.0-macOS-arm64
+            readme: docs/RELEASE_MACOS.md
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Télécharger les dépendances Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./tools/install-dependencies.ps1
+      - name: Configurer
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Compiler
+        run: cmake --build build --config Release --parallel
+      - name: Tester
+        run: ctest --test-dir build -C Release --output-on-failure
+      - name: Installer
+        run: cmake --install build --config Release --prefix package/${{ matrix.artifact }}
+      - name: Ajouter la notice
+        shell: bash
+        run: cp "${{ matrix.readme }}" "package/${{ matrix.artifact }}/README.txt"
+      - name: Ajouter les outils Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force "package/${{ matrix.artifact }}/tools" | Out-Null
+          Copy-Item -Recurse tools/bin "package/${{ matrix.artifact }}/tools/bin"
+      - name: Archiver Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path "package/${{ matrix.artifact }}/*" -DestinationPath "package/${{ matrix.artifact }}.zip"
+      - name: Archiver Unix
+        if: runner.os != 'Windows'
+        shell: bash
+        run: tar -C package -czf "package/${{ matrix.artifact }}.tar.gz" "${{ matrix.artifact }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: package/${{ matrix.artifact }}.*
+          if-no-files-found: error
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v3
+        with:
+          generate_release_notes: true
+          files: artifacts/*

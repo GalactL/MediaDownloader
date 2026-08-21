@@ -9,8 +9,8 @@ FFmpeg afin de respecter une taille maximale (par exemple 10 Mo pour Discord).
 
 ## État du projet
 
-Le premier MVP fournit une application Windows ouvrable par double-clic ainsi
-qu'une interface en ligne de commande stable et des événements JSON ligne par
+La version 0.1 fournit une application Windows ouvrable par double-clic ainsi
+qu'une interface en ligne de commande pour Windows, macOS et Linux, avec des événements JSON ligne par
 ligne pour une future intégration dans HUB. YouTube, TikTok et X sont pris en
 charge dans la mesure où la version installée de `yt-dlp` les prend en charge et
 où le contenu est accessible sans contourner de DRM.
@@ -29,11 +29,18 @@ Ouvrir `build/Release/MediaDownloader.exe`, puis :
 Le moteur s'exécute sans fenêtre de console. La progression, les éventuelles
 erreurs et le chemin du fichier final sont affichés dans l'application.
 
+## Plateformes de la v0.1.0
+
+- Windows x64 : interface graphique et CLI ;
+- macOS Apple Silicon et Intel : CLI ;
+- Linux x64 : CLI.
+
+La release GitHub contient une archive et une notice distinctes pour chaque cible.
+
 ## Prérequis
 
-- Windows 10 ou 11 x64
-- Visual Studio 2022 Build Tools avec le compilateur C++
-- `yt-dlp.exe`, `ffmpeg.exe` et `ffprobe.exe`
+- compilateur C++20 et CMake 3.24+ pour compiler depuis les sources
+- `yt-dlp`, `ffmpeg` et `ffprobe` (extensions `.exe` sous Windows)
 - Node.js 22 ou plus récent, ou Deno 2.3+, pour résoudre les challenges JavaScript YouTube
 
 Les trois outils sont recherchés, dans cet ordre :
@@ -50,7 +57,7 @@ Pour les installer uniquement dans le projet :
 powershell -ExecutionPolicy Bypass -File tools/install-dependencies.ps1
 ```
 
-## Compilation
+## Compilation Windows
 
 ```powershell
 node tools/build-native.mjs
@@ -64,6 +71,14 @@ La compilation génère :
 
 - `build/Release/MediaDownloader.exe` : application graphique ouvrable par double-clic ;
 - `build/Release/MediaDownloader.Cli.exe` : moteur en ligne de commande pour HUB.
+
+Sur macOS et Linux :
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+```
 
 ## Commandes
 
@@ -107,8 +122,9 @@ MediaDownloader reconnaît les domaines YouTube et ajoute silencieusement
 l'interface. Le programme ne lance pas Firefox et ne tente aucune reconnexion :
 une session Firefox valide doit déjà exister sur le compte Windows.
 
-Sans `--output`, les fichiers finaux sont placés directement dans le dossier
-Windows **Vidéos**, le même dossier que celui indexé par HUB.
+Sans `--output`, les fichiers finaux sont placés dans le dossier **Vidéos** de
+Windows ou dans `~/Videos` sur macOS et Linux. Le dossier Windows reste celui
+indexé par HUB.
 
 ## Contrat avec HUB
 

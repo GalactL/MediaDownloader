@@ -1,34 +1,36 @@
 cmake_minimum_required(VERSION 3.24)
 project(MediaDownloader VERSION 0.1.0 LANGUAGES CXX)
 
-if(NOT WIN32)
-    message(FATAL_ERROR "MediaDownloader cible actuellement Windows uniquement.")
-endif()
-
 add_library(MediaDownloaderCore
     src/Core.cpp
     src/Core.h
 )
 target_compile_features(MediaDownloaderCore PUBLIC cxx_std_20)
 target_include_directories(MediaDownloaderCore PUBLIC src)
-target_compile_definitions(MediaDownloaderCore PUBLIC NOMINMAX WIN32_LEAN_AND_MEAN)
+if(WIN32)
+    target_compile_definitions(MediaDownloaderCore PUBLIC NOMINMAX WIN32_LEAN_AND_MEAN)
+    set(MEDIADOWNLOADER_PROCESS_SOURCE src/Process.cpp)
+else()
+    set(MEDIADOWNLOADER_PROCESS_SOURCE src/ProcessPosix.cpp)
+endif()
 
 add_executable(MediaDownloaderCli
     src/Main.cpp
-    src/Process.cpp
+    ${MEDIADOWNLOADER_PROCESS_SOURCE}
     src/ChildProcess.h
 )
 set_target_properties(MediaDownloaderCli PROPERTIES OUTPUT_NAME "MediaDownloader.Cli")
 target_compile_features(MediaDownloaderCli PRIVATE cxx_std_20)
-target_link_libraries(MediaDownloaderCli PRIVATE MediaDownloaderCore shell32 ole32)
+target_link_libraries(MediaDownloaderCli PRIVATE MediaDownloaderCore)
+if(WIN32)
+    target_link_libraries(MediaDownloaderCli PRIVATE shell32 ole32)
+endif()
 
-add_executable(MediaDownloader WIN32
-    src/Gui.cpp
-    src/Process.cpp
-    src/ChildProcess.h
-)
-target_compile_features(MediaDownloader PRIVATE cxx_std_20)
-target_link_libraries(MediaDownloader PRIVATE MediaDownloaderCore comctl32 dwmapi shell32 uxtheme)
+if(WIN32)
+    add_executable(MediaDownloader WIN32 src/Gui.cpp src/Process.cpp src/ChildProcess.h)
+    target_compile_features(MediaDownloader PRIVATE cxx_std_20)
+    target_link_libraries(MediaDownloader PRIVATE MediaDownloaderCore comctl32 dwmapi shell32 uxtheme)
+endif()
 
 if(MSVC)
     target_compile_options(MediaDownloaderCore PRIVATE /W4 /permissive- /utf-8)
@@ -57,3 +59,8 @@ if(MSVC)
         PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 add_test(NAME MediaDownloaderCoreTests COMMAND MediaDownloaderTests)
+
+install(TARGETS MediaDownloaderCli RUNTIME DESTINATION .)
+if(WIN32)
+    install(TARGETS MediaDownloader RUNTIME DESTINATION .)
+endif()
