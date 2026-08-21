@@ -33,7 +33,7 @@ try {
     $ffmpeg = Get-ChildItem -LiteralPath $ffmpegExtracted -Filter 'ffmpeg.exe' -File -Recurse | Select-Object -First 1
     $ffprobe = Get-ChildItem -LiteralPath $ffmpegExtracted -Filter 'ffprobe.exe' -File -Recurse | Select-Object -First 1
     if (-not $ffmpeg -or -not $ffprobe) {
-        throw 'L’archive FFmpeg ne contient pas les exécutables attendus.'
+        throw "L'archive FFmpeg ne contient pas les exécutables attendus."
     }
 
     Copy-Item -LiteralPath $ffmpeg.FullName -Destination (Join-Path $binDirectory 'ffmpeg.exe') -Force
