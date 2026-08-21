@@ -1,0 +1,45 @@
+.hub/local.json
+build/
+dist/
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+*.log
+.env
+.env.*
+tools/bin/
+*.part
+*.ytdl
+
+# Sorties C++ et CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+*.obj
+*.pdb
+*.ilk
+*.lib
+*.exp
+*.exe
+*.dll
+
+# Sessions, cookies et données locales sensibles
+cookies.txt
+cookies-*.txt
+*.sqlite
+*.sqlite3
+*.db
+*.pem
+*.key
+*.pfx
+*.p12
+
+# Archives et fichiers temporaires
+*.zip
+*.7z
+*.tar
+*.gz
+*.tmp
+*.bak

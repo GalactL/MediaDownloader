@@ -1,0 +1,283 @@
+#include "Core.h"
+
+#include <algorithm>
+#include <charconv>
+#include <cctype>
+#include <cmath>
+#include <cwctype>
+#include <limits>
+#include <stdexcept>
+#include <windows.h>
+
+namespace media_downloader
+{
+    namespace
+    {
+        std::wstring Lower(std::wstring value)
+        {
+            std::transform(value.begin(), value.end(), value.begin(),
+                [](wchar_t character) { return static_cast<wchar_t>(std::towlower(character)); });
+            return value;
+        }
+
+        std::optional<double> ParsePositiveDouble(std::wstring const& value)
+        {
+            try
+            {
+                size_t consumed{};
+                double parsed = std::stod(value, &consumed);
+                if (consumed != value.size() || !std::isfinite(parsed) || parsed <= 0.0) return std::nullopt;
+                return parsed;
+            }
+            catch (...) { return std::nullopt; }
+        }
+
+        bool IsResolution(std::wstring const& value)
+        {
+            if (value.empty()) return false;
+            return std::all_of(value.begin(), value.end(), [](wchar_t character) { return std::iswdigit(character) != 0; });
+        }
+
+        bool IsSupportedBrowser(std::wstring const& value)
+        {
+            static std::vector<std::wstring> const browsers{
+                L"auto", L"brave", L"chrome", L"chromium", L"edge", L"firefox", L"opera", L"vivaldi"
+            };
+            return std::find(browsers.begin(), browsers.end(), value) != browsers.end();
+        }
+    }
+
+    ParseResult ParseArguments(std::vector<std::wstring> const& arguments)
+    {
+        Options result;
+        if (arguments.empty() || arguments[0] == L"help" || arguments[0] == L"--help" || arguments[0] == L"-h")
+        {
+            result.command = Command::Help;
+            return { result, {} };
+        }
+
+        auto command = Lower(arguments[0]);
+        if (command == L"doctor") result.command = Command::Doctor;
+        else if (command == L"probe") result.command = Command::Probe;
+        else if (command == L"download") result.command = Command::Download;
+        else return { std::nullopt, L"Commande inconnue : " + arguments[0] };
+
+        for (size_t index = 1; index < arguments.size(); ++index)
+        {
+            auto const& name = arguments[index];
+            if (name == L"--overwrite")
+            {
+                result.overwrite = true;
+                continue;
+            }
+            if (index + 1 >= arguments.size()) return { std::nullopt, L"Valeur manquante après " + name };
+            auto const& value = arguments[++index];
+            if (name == L"--url") result.url = value;
+            else if (name == L"--output") result.outputDirectory = value;
+            else if (name == L"--quality") result.quality = Lower(value);
+            else if (name == L"--format") result.format = Lower(value);
+            else if (name == L"--title") result.title = value;
+            else if (name == L"--cookies-from-browser") result.cookiesFromBrowser = Lower(value);
+            else if (name == L"--max-size-mb")
+            {
+                auto parsed = ParsePositiveDouble(value);
+                if (!parsed) return { std::nullopt, L"La taille maximale doit être un nombre strictement positif." };
+                result.maxSizeMb = *parsed;
+            }
+            else if (name == L"--yt-dlp") result.ytDlp = value;
+            else if (name == L"--ffmpeg") result.ffmpeg = value;
+            else if (name == L"--ffprobe") result.ffprobe = value;
+            else return { std::nullopt, L"Option inconnue : " + name };
+        }
+
+        if ((result.command == Command::Probe || result.command == Command::Download) && result.url.empty())
+            return { std::nullopt, L"L'option --url est obligatoire." };
+        if (!result.url.empty() && !IsSupportedUrl(result.url))
+            return { std::nullopt, L"Seules les URL HTTP et HTTPS sont acceptées." };
+        if (result.quality != L"best" && !IsResolution(result.quality))
+            return { std::nullopt, L"La qualité doit être best ou une hauteur telle que 720 ou 1080." };
+        if (result.format != L"mp4" && result.format != L"mkv" && result.format != L"webm")
+            return { std::nullopt, L"Le format doit être mp4, mkv ou webm." };
+        if (result.maxSizeMb && result.format != L"mp4")
+            return { std::nullopt, L"La limitation de taille produit actuellement un fichier MP4." };
+        if (result.title.size() > 180)
+            return { std::nullopt, L"Le titre personnalisé est limité à 180 caractères." };
+        if (result.cookiesFromBrowser && !IsSupportedBrowser(*result.cookiesFromBrowser))
+            return { std::nullopt, L"Navigateur non pris en charge pour l'authentification." };
+        return { result, {} };
+    }
+
+    bool IsSupportedUrl(std::wstring_view value)
+    {
+        auto lower = Lower(std::wstring(value));
+        return lower.starts_with(L"https://") || lower.starts_with(L"http://");
+    }
+
+    bool IsYouTubeUrl(std::wstring_view value)
+    {
+        auto lower = Lower(std::wstring(value));
+        auto scheme = lower.find(L"://");
+        if (scheme == std::wstring::npos) return false;
+        auto authorityStart = scheme + 3;
+        auto authorityEnd = lower.find_first_of(L"/?#", authorityStart);
+        auto authority = lower.substr(authorityStart, authorityEnd - authorityStart);
+        auto at = authority.rfind(L'@');
+        if (at != std::wstring::npos) authority.erase(0, at + 1);
+        auto colon = authority.find(L':');
+        if (colon != std::wstring::npos) authority.resize(colon);
+        auto isDomain = [&authority](std::wstring_view domain)
+        {
+            return authority == domain || (authority.size() > domain.size() &&
+                authority.ends_with(domain) && authority[authority.size() - domain.size() - 1] == L'.');
+        };
+        return isDomain(L"youtube.com") || isDomain(L"youtu.be") || isDomain(L"youtube-nocookie.com");
+    }
+
+    std::wstring BuildFormatSelector(std::wstring const& quality)
+    {
+        if (quality == L"best") return L"bestvideo+bestaudio/best";
+        return L"bestvideo[height<=" + quality + L"]+bestaudio/best[height<=" + quality + L"]/best";
+    }
+
+    std::wstring SanitizeFileName(std::wstring_view value)
+    {
+        std::wstring result;
+        result.reserve(std::min<size_t>(value.size(), 140));
+        for (wchar_t character : value)
+        {
+            if (result.size() >= 140) break;
+            bool invalid = character < 32 || character == L'<' || character == L'>' || character == L':' ||
+                character == L'"' || character == L'/' || character == L'\\' || character == L'|' ||
+                character == L'?' || character == L'*';
+            result.push_back(invalid ? L'_' : character);
+        }
+        auto first = result.find_first_not_of(L" .");
+        if (first == std::wstring::npos) result.clear();
+        else result.erase(0, first);
+        while (!result.empty() && (result.back() == L' ' || result.back() == L'.')) result.pop_back();
+        if (result.empty()) result = L"video";
+
+        auto upper = result;
+        std::transform(upper.begin(), upper.end(), upper.begin(), ::towupper);
+        auto base = upper.substr(0, upper.find(L'.'));
+        static std::vector<std::wstring> const reserved{
+            L"CON", L"PRN", L"AUX", L"NUL", L"COM1", L"COM2", L"COM3", L"COM4", L"COM5",
+            L"COM6", L"COM7", L"COM8", L"COM9", L"LPT1", L"LPT2", L"LPT3", L"LPT4",
+            L"LPT5", L"LPT6", L"LPT7", L"LPT8", L"LPT9"
+        };
+        if (std::find(reserved.begin(), reserved.end(), base) != reserved.end()) result.insert(result.begin(), L'_');
+        return result;
+    }
+
+    std::string SummarizeDownloadFailure(std::string_view output)
+    {
+        std::string text(output);
+        auto lower = text;
+        std::transform(lower.begin(), lower.end(), lower.begin(),
+            [](unsigned char character) { return static_cast<char>(std::tolower(character)); });
+
+        if (lower.find("could not copy") != std::string::npos && lower.find("cookie") != std::string::npos)
+            return "Impossible de lire les cookies du navigateur. Fermez complètement le navigateur sélectionné, puis réessayez.";
+        if (lower.find("failed to decrypt with dpapi") != std::string::npos ||
+            ((lower.find("decrypt") != std::string::npos || lower.find("dpapi") != std::string::npos) &&
+                lower.find("cookie") != std::string::npos))
+            return "Windows n'a pas pu déchiffrer les cookies de ce navigateur Chromium. Utilisez de préférence Firefox connecté à YouTube, puis fermez-le avant de réessayer.";
+        if (lower.find("sign in to confirm your age") != std::string::npos ||
+            lower.find("confirm your age") != std::string::npos)
+            return "YouTube n'a pas reconnu une session autorisée pour cette vidéo. Vérifiez le navigateur sélectionné et l'âge du compte.";
+        if (lower.find("sign in to confirm you're not a bot") != std::string::npos ||
+            lower.find("sign in to confirm you’re not a bot") != std::string::npos)
+            return "YouTube demande une session connectée valide. Sélectionnez le navigateur où YouTube est ouvert avec votre compte.";
+        if (lower.find("requested format is not available") != std::string::npos)
+            return "La qualité ou le format demandé n'est pas disponible pour cette vidéo. Essayez la qualité Best.";
+        if (lower.find("video unavailable") != std::string::npos)
+            return "Cette vidéo est indisponible pour le compte ou la région actuellement utilisés.";
+        if (lower.find("challenge solving failed") != std::string::npos || lower.find("page needs to be reloaded") != std::string::npos)
+            return "Le challenge JavaScript de YouTube n'a pas pu être résolu. Vérifiez qu'un runtime Node ou Deno récent est disponible.";
+
+        std::string lastError;
+        size_t start{};
+        while (start <= text.size())
+        {
+            auto end = text.find('\n', start);
+            auto line = text.substr(start, end == std::string::npos ? std::string::npos : end - start);
+            if (!line.empty() && line.back() == '\r') line.pop_back();
+            if (line.starts_with("ERROR:")) lastError = line.substr(6);
+            if (end == std::string::npos) break;
+            start = end + 1;
+        }
+        auto first = lastError.find_first_not_of(" \t");
+        if (first != std::string::npos) lastError.erase(0, first);
+        return lastError.empty() ? "yt-dlp n'a pas pu télécharger cette vidéo." : lastError;
+    }
+
+    std::optional<EncodePlan> CalculateEncodePlan(double durationSeconds, double maxSizeMb)
+    {
+        if (!std::isfinite(durationSeconds) || !std::isfinite(maxSizeMb) || durationSeconds <= 0.0 || maxSizeMb <= 0.0)
+            return std::nullopt;
+
+        // MiB correspond à la taille affichée par Windows. Une réserve de 3 % couvre le conteneur.
+        auto targetBytesDouble = maxSizeMb * 1024.0 * 1024.0 * 0.97;
+        if (targetBytesDouble > static_cast<double>(std::numeric_limits<std::uint64_t>::max())) return std::nullopt;
+        auto totalKbps = targetBytesDouble * 8.0 / durationSeconds / 1000.0;
+
+        std::uint32_t audioKbps = totalKbps >= 320.0 ? 128u : (totalKbps >= 200.0 ? 96u : 48u);
+        constexpr std::uint32_t minimumVideoKbps = 80;
+        if (totalKbps <= static_cast<double>(audioKbps + minimumVideoKbps)) return std::nullopt;
+
+        return EncodePlan{
+            static_cast<std::uint64_t>(std::floor(targetBytesDouble)),
+            audioKbps,
+            static_cast<std::uint32_t>(std::floor(totalKbps - audioKbps))
+        };
+    }
+
+    std::string JsonEscape(std::string_view value)
+    {
+        std::string output;
+        output.reserve(value.size() + 8);
+        constexpr char hex[] = "0123456789abcdef";
+        for (unsigned char character : value)
+        {
+            switch (character)
+            {
+            case '"': output += "\\\""; break;
+            case '\\': output += "\\\\"; break;
+            case '\b': output += "\\b"; break;
+            case '\f': output += "\\f"; break;
+            case '\n': output += "\\n"; break;
+            case '\r': output += "\\r"; break;
+            case '\t': output += "\\t"; break;
+            default:
+                if (character < 0x20)
+                {
+                    output += "\\u00";
+                    output += hex[(character >> 4) & 0x0f];
+                    output += hex[character & 0x0f];
+                }
+                else output.push_back(static_cast<char>(character));
+            }
+        }
+        return output;
+    }
+
+    std::string WideToUtf8(std::wstring_view value)
+    {
+        if (value.empty()) return {};
+        auto count = WideCharToMultiByte(CP_UTF8, 0, value.data(), static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr);
+        if (count <= 0) throw std::runtime_error("Conversion UTF-8 impossible");
+        std::string output(static_cast<size_t>(count), '\0');
+        WideCharToMultiByte(CP_UTF8, 0, value.data(), static_cast<int>(value.size()), output.data(), count, nullptr, nullptr);
+        return output;
+    }
+
+    std::wstring Utf8ToWide(std::string_view value)
+    {
+        if (value.empty()) return {};
+        auto count = MultiByteToWideChar(CP_UTF8, 0, value.data(), static_cast<int>(value.size()), nullptr, 0);
+        if (count <= 0) throw std::runtime_error("Conversion UTF-16 impossible");
+        std::wstring output(static_cast<size_t>(count), L'\0');
+        MultiByteToWideChar(CP_UTF8, 0, value.data(), static_cast<int>(value.size()), output.data(), count);
+        return output;
+    }
+}
