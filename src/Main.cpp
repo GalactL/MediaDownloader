@@ -1,10 +1,19 @@
 #include "Core.h"
 #include "ChildProcess.h"
 
+#ifdef _WIN32
 #include <windows.h>
 #include <shlobj.h>
+#else
+#include <csignal>
+#include <unistd.h>
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
+#endif
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -23,9 +32,23 @@ using namespace media_downloader;
 
 namespace
 {
+#ifdef _WIN32
+    constexpr wchar_t YtDlpName[] = L"yt-dlp.exe";
+    constexpr wchar_t FfmpegName[] = L"ffmpeg.exe";
+    constexpr wchar_t FfprobeName[] = L"ffprobe.exe";
+    constexpr wchar_t DenoName[] = L"deno.exe";
+    constexpr wchar_t NodeName[] = L"node.exe";
+#else
+    constexpr wchar_t YtDlpName[] = L"yt-dlp";
+    constexpr wchar_t FfmpegName[] = L"ffmpeg";
+    constexpr wchar_t FfprobeName[] = L"ffprobe";
+    constexpr wchar_t DenoName[] = L"deno";
+    constexpr wchar_t NodeName[] = L"node";
+#endif
     std::atomic_bool g_cancelRequested{};
     std::mutex g_outputMutex;
 
+#ifdef _WIN32
     BOOL WINAPI ConsoleHandler(DWORD event)
     {
         if (event == CTRL_C_EVENT || event == CTRL_BREAK_EVENT || event == CTRL_CLOSE_EVENT)
@@ -35,6 +58,9 @@ namespace
         }
         return FALSE;
     }
+#else
+    void ConsoleHandler(int) { g_cancelRequested = true; }
+#endif
 
     void Emit(std::string const& json)
     {
@@ -64,14 +90,28 @@ namespace
 
     std::filesystem::path ExecutableDirectory()
     {
+#ifdef _WIN32
         std::wstring buffer(32768, L'\0');
         auto length = GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
         buffer.resize(length);
         return std::filesystem::path(buffer).parent_path();
+#elif defined(__APPLE__)
+        uint32_t size{};
+        _NSGetExecutablePath(nullptr, &size);
+        std::string buffer(size, '\0');
+        if (_NSGetExecutablePath(buffer.data(), &size) != 0) return std::filesystem::current_path();
+        return std::filesystem::weakly_canonical(buffer).parent_path();
+#else
+        std::array<char, 4096> buffer{};
+        auto length = readlink("/proc/self/exe", buffer.data(), buffer.size() - 1);
+        if (length <= 0) return std::filesystem::current_path();
+        return std::filesystem::path(std::string(buffer.data(), static_cast<size_t>(length))).parent_path();
+#endif
     }
 
     std::optional<std::filesystem::path> FromEnvironment(wchar_t const* name)
     {
+#ifdef _WIN32
         auto required = GetEnvironmentVariableW(name, nullptr, 0);
         if (required == 0) return std::nullopt;
         std::wstring value(required, L'\0');
@@ -79,15 +119,35 @@ namespace
         if (!value.empty() && value.back() == L'\0') value.pop_back();
         if (!value.empty() && std::filesystem::is_regular_file(value)) return std::filesystem::path(value);
         return std::nullopt;
+#else
+        auto utf8Name = WideToUtf8(name);
+        auto value = std::getenv(utf8Name.c_str());
+        if (value && std::filesystem::is_regular_file(value)) return std::filesystem::path(value);
+        return std::nullopt;
+#endif
     }
 
     std::optional<std::filesystem::path> FindOnPath(std::wstring const& filename)
     {
+#ifdef _WIN32
         std::wstring buffer(32768, L'\0');
         auto length = SearchPathW(nullptr, filename.c_str(), nullptr, static_cast<DWORD>(buffer.size()), buffer.data(), nullptr);
         if (length == 0 || length >= buffer.size()) return std::nullopt;
         buffer.resize(length);
         return std::filesystem::path(buffer);
+#else
+        auto path = std::getenv("PATH");
+        if (!path) return std::nullopt;
+        std::stringstream entries(path);
+        std::string directory;
+        auto utf8Filename = WideToUtf8(filename);
+        while (std::getline(entries, directory, ':'))
+        {
+            auto candidate = std::filesystem::path(directory) / utf8Filename;
+            if (access(candidate.c_str(), X_OK) == 0) return std::filesystem::absolute(candidate);
+        }
+        return std::nullopt;
+#endif
     }
 
     std::optional<std::filesystem::path> FindTool(
@@ -110,12 +170,20 @@ namespace
 
     std::filesystem::path VideosDirectory()
     {
+#ifdef _WIN32
         PWSTR raw{};
         if (FAILED(SHGetKnownFolderPath(FOLDERID_Videos, KF_FLAG_CREATE, nullptr, &raw)))
             throw std::runtime_error("Le dossier Windows Vidéos est indisponible");
         std::filesystem::path result(raw);
         CoTaskMemFree(raw);
         return result;
+#else
+        auto home = std::getenv("HOME");
+        if (!home) throw std::runtime_error("Le dossier personnel est indisponible");
+        auto result = std::filesystem::path(home) / "Videos";
+        std::filesystem::create_directories(result);
+        return result;
+#endif
     }
 
     std::filesystem::path UniqueDestination(std::filesystem::path desired, bool overwrite)
@@ -180,13 +248,13 @@ namespace
 
     std::optional<std::filesystem::path> AppendJavaScriptRuntimeArguments(std::vector<std::wstring>& arguments)
     {
-        auto deno = FindTool(std::nullopt, L"MEDIADOWNLOADER_DENO", L"deno.exe");
+        auto deno = FindTool(std::nullopt, L"MEDIADOWNLOADER_DENO", DenoName);
         if (deno)
         {
             arguments.insert(arguments.end(), { L"--js-runtimes", L"deno:" + deno->wstring() });
             return deno;
         }
-        auto node = FindTool(std::nullopt, L"MEDIADOWNLOADER_NODE", L"node.exe");
+        auto node = FindTool(std::nullopt, L"MEDIADOWNLOADER_NODE", NodeName);
         if (node)
         {
             arguments.insert(arguments.end(), { L"--js-runtimes", L"node:" + node->wstring() });
@@ -220,7 +288,12 @@ namespace
     TemporaryDirectory CreateTemporaryDirectory(std::filesystem::path const& output)
     {
         auto ticks = std::chrono::steady_clock::now().time_since_epoch().count();
-        auto path = output / (L".mediadownloader-" + std::to_wstring(GetCurrentProcessId()) + L"-" + std::to_wstring(ticks));
+#ifdef _WIN32
+        auto processId = GetCurrentProcessId();
+#else
+        auto processId = getpid();
+#endif
+        auto path = output / (L".mediadownloader-" + std::to_wstring(processId) + L"-" + std::to_wstring(ticks));
         std::filesystem::create_directories(path);
         return { path };
     }
@@ -266,7 +339,13 @@ namespace
             }
             if (pass == 1)
             {
-                arguments.insert(arguments.end(), { L"-an", L"-f", L"null", L"NUL" });
+                arguments.insert(arguments.end(), { L"-an", L"-f", L"null",
+#ifdef _WIN32
+                    L"NUL"
+#else
+                    L"/dev/null"
+#endif
+                });
             }
             else
             {
@@ -295,9 +374,9 @@ namespace
 
     int RunDoctor(Options const& options)
     {
-        auto ytDlp = FindTool(options.ytDlp, L"MEDIADOWNLOADER_YTDLP", L"yt-dlp.exe");
-        auto ffmpeg = FindTool(options.ffmpeg, L"MEDIADOWNLOADER_FFMPEG", L"ffmpeg.exe");
-        auto ffprobe = FindTool(options.ffprobe, L"MEDIADOWNLOADER_FFPROBE", L"ffprobe.exe");
+        auto ytDlp = FindTool(options.ytDlp, L"MEDIADOWNLOADER_YTDLP", YtDlpName);
+        auto ffmpeg = FindTool(options.ffmpeg, L"MEDIADOWNLOADER_FFMPEG", FfmpegName);
+        auto ffprobe = FindTool(options.ffprobe, L"MEDIADOWNLOADER_FFPROBE", FfprobeName);
         std::vector<std::wstring> runtimeArguments;
         auto jsRuntime = AppendJavaScriptRuntimeArguments(runtimeArguments);
         auto toolJson = [](char const* name, auto const& path)
@@ -312,8 +391,8 @@ namespace
 
     int RunProbe(Options const& options)
     {
-        auto ytDlp = FindTool(options.ytDlp, L"MEDIADOWNLOADER_YTDLP", L"yt-dlp.exe");
-        if (!ytDlp) { EmitError("tool_missing", "yt-dlp.exe est introuvable"); return 3; }
+        auto ytDlp = FindTool(options.ytDlp, L"MEDIADOWNLOADER_YTDLP", YtDlpName);
+        if (!ytDlp) { EmitError("tool_missing", "yt-dlp est introuvable"); return 3; }
         std::vector<std::wstring> arguments{ L"--dump-single-json", L"--no-playlist", L"--no-warnings", L"--quiet" };
         AppendJavaScriptRuntimeArguments(arguments);
         AppendAuthenticationArguments(arguments, options);
@@ -333,11 +412,11 @@ namespace
 
     int RunDownload(Options const& options)
     {
-        auto ytDlp = FindTool(options.ytDlp, L"MEDIADOWNLOADER_YTDLP", L"yt-dlp.exe");
-        if (!ytDlp) { EmitError("tool_missing", "yt-dlp.exe est introuvable"); return 3; }
+        auto ytDlp = FindTool(options.ytDlp, L"MEDIADOWNLOADER_YTDLP", YtDlpName);
+        if (!ytDlp) { EmitError("tool_missing", "yt-dlp est introuvable"); return 3; }
 
-        auto ffmpeg = FindTool(options.ffmpeg, L"MEDIADOWNLOADER_FFMPEG", L"ffmpeg.exe");
-        auto ffprobe = FindTool(options.ffprobe, L"MEDIADOWNLOADER_FFPROBE", L"ffprobe.exe");
+        auto ffmpeg = FindTool(options.ffmpeg, L"MEDIADOWNLOADER_FFMPEG", FfmpegName);
+        auto ffprobe = FindTool(options.ffprobe, L"MEDIADOWNLOADER_FFPROBE", FfprobeName);
         if (!ffmpeg)
         {
             EmitError("tool_missing", "ffmpeg.exe est requis pour assembler les flux vidéo et audio");
@@ -443,6 +522,7 @@ namespace
     }
 }
 
+#ifdef _WIN32
 int wmain(int argc, wchar_t* argv[])
 {
     SetConsoleOutputCP(CP_UTF8);
@@ -483,3 +563,39 @@ int wmain(int argc, wchar_t* argv[])
     CoUninitialize();
     return exitCode;
 }
+#else
+int main(int argc, char* argv[])
+{
+    std::signal(SIGINT, ConsoleHandler);
+    std::signal(SIGTERM, ConsoleHandler);
+    std::vector<std::wstring> arguments;
+    for (int index = 1; index < argc; ++index) arguments.emplace_back(Utf8ToWide(argv[index]));
+    auto parsed = ParseArguments(arguments);
+    if (!parsed.options)
+    {
+        EmitError("invalid_arguments", WideToUtf8(parsed.error));
+        return 2;
+    }
+    try
+    {
+        switch (parsed.options->command)
+        {
+        case Command::Help: PrintHelp(); return 0;
+        case Command::Doctor: return RunDoctor(*parsed.options);
+        case Command::Probe: return RunProbe(*parsed.options);
+        case Command::Download: return RunDownload(*parsed.options);
+        }
+    }
+    catch (std::exception const& error)
+    {
+        EmitError(g_cancelRequested ? "cancelled" : "processing_failed", error.what());
+        return 4;
+    }
+    catch (...)
+    {
+        EmitError("processing_failed", "Une erreur inattendue est survenue");
+        return 4;
+    }
+    return 0;
+}
+#endif

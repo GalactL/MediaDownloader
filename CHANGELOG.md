@@ -18,3 +18,6 @@
 - Détection automatique des liens YouTube et utilisation exclusive de la session Firefox locale.
 - Suppression du choix manuel de navigateur dans l'interface.
 - Activation automatique de Node ou Deno pour les challenges JavaScript YouTube.
+- Portage du moteur CLI vers macOS et Linux.
+- Ajout de quatre archives de release : Windows x64, Linux x64, macOS Intel et macOS Apple Silicon.
+- Ajout d'une notice d'installation propre à chaque plateforme.

@@ -7,7 +7,12 @@
 #include <cwctype>
 #include <limits>
 #include <stdexcept>
+#ifdef _WIN32
 #include <windows.h>
+#else
+#include <codecvt>
+#include <locale>
+#endif
 
 namespace media_downloader
 {
@@ -264,20 +269,30 @@ namespace media_downloader
     std::string WideToUtf8(std::wstring_view value)
     {
         if (value.empty()) return {};
+#ifdef _WIN32
         auto count = WideCharToMultiByte(CP_UTF8, 0, value.data(), static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr);
         if (count <= 0) throw std::runtime_error("Conversion UTF-8 impossible");
         std::string output(static_cast<size_t>(count), '\0');
         WideCharToMultiByte(CP_UTF8, 0, value.data(), static_cast<int>(value.size()), output.data(), count, nullptr, nullptr);
         return output;
+#else
+        std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+        return converter.to_bytes(value.data(), value.data() + value.size());
+#endif
     }
 
     std::wstring Utf8ToWide(std::string_view value)
     {
         if (value.empty()) return {};
+#ifdef _WIN32
         auto count = MultiByteToWideChar(CP_UTF8, 0, value.data(), static_cast<int>(value.size()), nullptr, 0);
         if (count <= 0) throw std::runtime_error("Conversion UTF-16 impossible");
         std::wstring output(static_cast<size_t>(count), L'\0');
         MultiByteToWideChar(CP_UTF8, 0, value.data(), static_cast<int>(value.size()), output.data(), count);
         return output;
+#else
+        std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+        return converter.from_bytes(value.data(), value.data() + value.size());
+#endif
     }
 }
