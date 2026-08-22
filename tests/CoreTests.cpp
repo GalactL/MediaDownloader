@@ -1,6 +1,10 @@
 #include "Core.h"
+#include "TemporaryFiles.h"
 
+#include <chrono>
 #include <cmath>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 
 using namespace media_downloader;
@@ -73,6 +77,29 @@ int main()
     Check(SummarizeDownloadFailure("noise\nERROR: panne précise\n") == "panne précise", "repli sur la dernière erreur yt-dlp");
     Check(SummarizeDownloadFailure("WARNING: n challenge solving failed\nERROR: The page needs to be reloaded") ==
         "Le challenge JavaScript de YouTube n'a pas pu être résolu. Vérifiez qu'un runtime Node ou Deno récent est disponible.", "diagnostic challenge JavaScript");
+
+    std::uint64_t temporaryPid{};
+    Check(TryParseTemporaryDirectoryName(L".mediadownloader-42-123456", temporaryPid) && temporaryPid == 42,
+        "nom de dossier temporaire reconnu");
+    Check(!TryParseTemporaryDirectoryName(L".mediadownloader-important", temporaryPid), "nom utilisateur similaire ignoré");
+    Check(!TryParseTemporaryDirectoryName(L".mediadownloader-42-123-extra", temporaryPid), "suffixe temporaire invalide ignoré");
+
+    auto testRoot = std::filesystem::temp_directory_path() /
+        ("mediadownloader-cleanup-tests-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    auto orphan = testRoot / ".mediadownloader-101-1";
+    auto active = testRoot / ".mediadownloader-202-2";
+    auto unrelated = testRoot / ".mediadownloader-not-ours";
+    std::filesystem::create_directories(orphan);
+    std::filesystem::create_directories(active);
+    std::filesystem::create_directories(unrelated);
+    std::ofstream(orphan / "partial.file") << "test";
+    auto cleanup = CleanupOrphanedTemporaryDirectories(testRoot, [](std::uint64_t pid) { return pid == 202; });
+    Check(!std::filesystem::exists(orphan), "dossier orphelin supprimé");
+    Check(std::filesystem::exists(active), "dossier d'une instance active conservé");
+    Check(std::filesystem::exists(unrelated), "dossier non conforme conservé");
+    Check(cleanup.removed.size() == 1 && cleanup.failures.empty(), "résultat de nettoyage cohérent");
+    std::error_code cleanupError;
+    std::filesystem::remove_all(testRoot, cleanupError);
 
     if (failures == 0) std::cout << "Tous les tests sont passes.\n";
     return failures == 0 ? 0 : 1;
