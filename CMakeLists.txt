@@ -4,6 +4,8 @@ project(MediaDownloader VERSION 0.1.0 LANGUAGES CXX)
 add_library(MediaDownloaderCore
     src/Core.cpp
     src/Core.h
+    src/TemporaryFiles.cpp
+    src/TemporaryFiles.h
 )
 target_compile_features(MediaDownloaderCore PUBLIC cxx_std_20)
 target_include_directories(MediaDownloaderCore PUBLIC src)

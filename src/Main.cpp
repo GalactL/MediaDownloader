@@ -1,5 +1,6 @@
 #include "Core.h"
 #include "ChildProcess.h"
+#include "TemporaryFiles.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -281,6 +282,8 @@ namespace
             {
                 std::error_code error;
                 std::filesystem::remove_all(path, error);
+                if (error) EmitLog("warning", "Impossible de supprimer le dossier temporaire " +
+                    WideToUtf8(path.wstring()) + " : " + error.message());
             }
         }
     };
@@ -430,6 +433,11 @@ namespace
 
         auto output = options.outputDirectory.empty() ? VideosDirectory() : std::filesystem::absolute(options.outputDirectory);
         std::filesystem::create_directories(output);
+        auto cleanup = CleanupOrphanedTemporaryDirectories(output);
+        for (auto const& removed : cleanup.removed)
+            EmitLog("info", "Dossier temporaire orphelin supprimé : " + WideToUtf8(removed.wstring()));
+        for (auto const& [path, error] : cleanup.failures)
+            EmitLog("warning", "Impossible de nettoyer " + WideToUtf8(path.wstring()) + " : " + error);
         auto temporary = CreateTemporaryDirectory(output);
         Emit("{\"type\":\"started\",\"outputDirectory\":\"" + JsonEscape(WideToUtf8(output.wstring())) + "\"}");
 
