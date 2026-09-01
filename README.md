@@ -29,7 +29,7 @@ Ouvrir `build/Release/MediaDownloader.exe`, puis :
 Le moteur s'exécute sans fenêtre de console. La progression, les éventuelles
 erreurs et le chemin du fichier final sont affichés dans l'application.
 
-## Plateformes de la v0.1.0
+## Plateformes de la v0.2.0
 
 - Windows x64 : interface graphique et CLI ;
 - macOS Apple Silicon et Intel : CLI ;
@@ -105,6 +105,15 @@ Téléchargement limité à 10 Mo :
 ```powershell
 MediaDownloader.Cli.exe download --url "https://..." --quality 1080 --max-size-mb 10
 ```
+
+Téléchargement d'un extrait de 30 à 95,5 secondes :
+
+```powershell
+MediaDownloader.Cli.exe download --url "https://..." --start-time 30 --end-time 95.5
+```
+
+Les deux bornes doivent être fournies ensemble. La compression et la limite de
+taille sont calculées à partir de la durée du fichier extrait.
 
 Titre personnalisé et session YouTube connectée :
 

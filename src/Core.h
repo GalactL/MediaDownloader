@@ -27,6 +27,8 @@ namespace media_downloader
         std::wstring title;
         std::optional<std::wstring> cookiesFromBrowser{ L"auto" };
         std::optional<double> maxSizeMb;
+        std::optional<double> startTimeSeconds;
+        std::optional<double> endTimeSeconds;
         std::optional<std::filesystem::path> ytDlp;
         std::optional<std::filesystem::path> ffmpeg;
         std::optional<std::filesystem::path> ffprobe;
@@ -50,6 +52,7 @@ namespace media_downloader
     bool IsSupportedUrl(std::wstring_view value);
     bool IsYouTubeUrl(std::wstring_view value);
     std::wstring BuildFormatSelector(std::wstring const& quality);
+    std::wstring BuildDownloadSection(double startTimeSeconds, double endTimeSeconds);
     std::wstring SanitizeFileName(std::wstring_view value);
     std::string SummarizeDownloadFailure(std::string_view output);
     std::optional<EncodePlan> CalculateEncodePlan(double durationSeconds, double maxSizeMb);

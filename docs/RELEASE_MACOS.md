@@ -1,4 +1,4 @@
-MediaDownloader v0.1.0 — macOS
+MediaDownloader v0.2.0 — macOS
 
 Cette première version fournit le CLI. Installez les dépendances avec Homebrew :
   brew install yt-dlp ffmpeg node

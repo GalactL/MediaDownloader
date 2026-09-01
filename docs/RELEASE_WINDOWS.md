@@ -1,4 +1,4 @@
-MediaDownloader v0.1.0 — Windows x64
+MediaDownloader v0.2.0 — Windows x64
 
 Contenu :
 - MediaDownloader.exe : interface graphique.
