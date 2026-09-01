@@ -14,9 +14,15 @@ MediaDownloader.Cli.exe download
   --quality <best|hauteur>
   --format mp4
   --title <titre facultatif>
+  --start-time <début en secondes facultatif>
+  --end-time <fin en secondes facultative>
   --max-size-mb <taille facultative>
   --cookies-from-browser <navigateur facultatif>
 ```
+
+Les options temporelles doivent être transmises ensemble. Les valeurs sont des
+nombres finis supérieurs ou égaux à zéro et `end-time` doit être strictement
+supérieur à `start-time`.
 
 L'authentification accepte `edge`, `chrome`, `firefox`, `brave`, `opera` et
 `vivaldi`. Elle doit rester facultative et n'être activée que pour les contenus

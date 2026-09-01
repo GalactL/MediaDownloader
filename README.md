@@ -106,6 +106,15 @@ Téléchargement limité à 10 Mo :
 MediaDownloader.Cli.exe download --url "https://..." --quality 1080 --max-size-mb 10
 ```
 
+Téléchargement d'un extrait de 30 à 95,5 secondes :
+
+```powershell
+MediaDownloader.Cli.exe download --url "https://..." --start-time 30 --end-time 95.5
+```
+
+Les deux bornes doivent être fournies ensemble. La compression et la limite de
+taille sont calculées à partir de la durée du fichier extrait.
+
 Titre personnalisé et session YouTube connectée :
 
 ```powershell

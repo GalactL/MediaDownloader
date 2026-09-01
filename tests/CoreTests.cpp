@@ -67,6 +67,41 @@ int main()
     Check(ParseArguments({ L"download", L"--url", L"https://youtube.test/v", L"--cookies-from-browser", L"auto" }).options.has_value(), "authentification automatique acceptée");
     Check(!ParseArguments({ L"download", L"--url", L"https://youtube.test/v", L"--cookies-from-browser", L"inconnu" }).options.has_value(), "navigateur inconnu refusé");
 
+    auto rangeFromZero = ParseArguments({ L"download", L"--url", L"https://example.test/v", L"--start-time", L"0", L"--end-time", L"30" });
+    Check(rangeFromZero.options && rangeFromZero.options->startTimeSeconds == 0.0 && rangeFromZero.options->endTimeSeconds == 30.0,
+        "plage 0 à 30 valide");
+    auto decimalRange = ParseArguments({ L"download", L"--url", L"https://example.test/v", L"--start-time", L"30", L"--end-time", L"95.5" });
+    Check(decimalRange.options && decimalRange.options->startTimeSeconds == 30.0 && decimalRange.options->endTimeSeconds == 95.5,
+        "plage décimale 30 à 95.5 valide");
+    Check(BuildDownloadSection(30.0, 95.5) == L"*30-95.5", "syntaxe de plage yt-dlp");
+    Check(!ParseArguments({ L"download", L"--url", L"https://example.test/v", L"--end-time", L"30" }).options,
+        "début absent invalide");
+    Check(!ParseArguments({ L"download", L"--url", L"https://example.test/v", L"--start-time", L"30" }).options,
+        "fin absente invalide");
+    Check(!ParseArguments({ L"download", L"--url", L"https://example.test/v", L"--start-time", L"-1", L"--end-time", L"30" }).options,
+        "début négatif invalide");
+    Check(!ParseArguments({ L"download", L"--url", L"https://example.test/v", L"--start-time", L"30", L"--end-time", L"30" }).options,
+        "fin égale au début invalide");
+    Check(!ParseArguments({ L"download", L"--url", L"https://example.test/v", L"--start-time", L"30", L"--end-time", L"20" }).options,
+        "fin inférieure au début invalide");
+    for (auto invalid : { L"NaN", L"inf", L"texte" })
+    {
+        Check(!ParseArguments({ L"download", L"--url", L"https://example.test/v", L"--start-time", invalid, L"--end-time", L"30" }).options,
+            "début non fini ou textuel invalide");
+        Check(!ParseArguments({ L"download", L"--url", L"https://example.test/v", L"--start-time", L"0", L"--end-time", invalid }).options,
+            "fin non finie ou textuelle invalide");
+    }
+    auto normalDownload = ParseArguments({ L"download", L"--url", L"https://example.test/v", L"--quality", L"1080" });
+    Check(normalDownload.options && !normalDownload.options->startTimeSeconds && !normalDownload.options->endTimeSeconds,
+        "téléchargement normal sans timecode inchangé");
+    auto compatibleRange = ParseArguments({
+        L"download", L"--url", L"https://example.test/v", L"--start-time", L"30", L"--end-time", L"95.5",
+        L"--quality", L"720", L"--format", L"mp4", L"--title", L"Extrait", L"--max-size-mb", L"10",
+        L"--cookies-from-browser", L"firefox", L"--output", L"output", L"--overwrite",
+        L"--yt-dlp", L"yt-dlp", L"--ffmpeg", L"ffmpeg", L"--ffprobe", L"ffprobe"
+    });
+    Check(compatibleRange.options.has_value(), "plage compatible avec toutes les options existantes");
+
     Check(JsonEscape("a\"b\\c\n") == "a\\\"b\\\\c\\n", "échappement JSON");
     Check(SummarizeDownloadFailure("ERROR: Could not copy Chrome cookie database") ==
         "Impossible de lire les cookies du navigateur. Fermez complètement le navigateur sélectionné, puis réessayez.", "diagnostic navigateur ouvert");

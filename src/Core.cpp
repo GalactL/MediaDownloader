@@ -6,6 +6,9 @@
 #include <cmath>
 #include <cwctype>
 #include <limits>
+#include <iomanip>
+#include <locale>
+#include <sstream>
 #include <stdexcept>
 #ifdef _WIN32
 #include <windows.h>
@@ -32,6 +35,18 @@ namespace media_downloader
                 size_t consumed{};
                 double parsed = std::stod(value, &consumed);
                 if (consumed != value.size() || !std::isfinite(parsed) || parsed <= 0.0) return std::nullopt;
+                return parsed;
+            }
+            catch (...) { return std::nullopt; }
+        }
+
+        std::optional<double> ParseNonNegativeDouble(std::wstring const& value)
+        {
+            try
+            {
+                size_t consumed{};
+                double parsed = std::stod(value, &consumed);
+                if (consumed != value.size() || !std::isfinite(parsed) || parsed < 0.0) return std::nullopt;
                 return parsed;
             }
             catch (...) { return std::nullopt; }
@@ -82,6 +97,18 @@ namespace media_downloader
             else if (name == L"--quality") result.quality = Lower(value);
             else if (name == L"--format") result.format = Lower(value);
             else if (name == L"--title") result.title = value;
+            else if (name == L"--start-time")
+            {
+                auto parsed = ParseNonNegativeDouble(value);
+                if (!parsed) return { std::nullopt, L"Le début de la plage doit être un nombre fini supérieur ou égal à 0." };
+                result.startTimeSeconds = *parsed;
+            }
+            else if (name == L"--end-time")
+            {
+                auto parsed = ParseNonNegativeDouble(value);
+                if (!parsed) return { std::nullopt, L"La fin de la plage doit être un nombre fini supérieur ou égal à 0." };
+                result.endTimeSeconds = *parsed;
+            }
             else if (name == L"--cookies-from-browser") result.cookiesFromBrowser = Lower(value);
             else if (name == L"--max-size-mb")
             {
@@ -107,6 +134,10 @@ namespace media_downloader
             return { std::nullopt, L"La limitation de taille produit actuellement un fichier MP4." };
         if (result.title.size() > 180)
             return { std::nullopt, L"Le titre personnalisé est limité à 180 caractères." };
+        if (result.startTimeSeconds.has_value() != result.endTimeSeconds.has_value())
+            return { std::nullopt, L"Les options --start-time et --end-time doivent être fournies ensemble." };
+        if (result.startTimeSeconds && *result.endTimeSeconds <= *result.startTimeSeconds)
+            return { std::nullopt, L"La fin de la plage doit être strictement supérieure au début." };
         if (result.cookiesFromBrowser && !IsSupportedBrowser(*result.cookiesFromBrowser))
             return { std::nullopt, L"Navigateur non pris en charge pour l'authentification." };
         return { result, {} };
@@ -142,6 +173,18 @@ namespace media_downloader
     {
         if (quality == L"best") return L"bestvideo+bestaudio/best";
         return L"bestvideo[height<=" + quality + L"]+bestaudio/best[height<=" + quality + L"]/best";
+    }
+
+    std::wstring BuildDownloadSection(double startTimeSeconds, double endTimeSeconds)
+    {
+        auto format = [](double value)
+        {
+            std::wostringstream output;
+            output.imbue(std::locale::classic());
+            output << std::setprecision(std::numeric_limits<double>::max_digits10) << value;
+            return output.str();
+        };
+        return L"*" + format(startTimeSeconds) + L"-" + format(endTimeSeconds);
     }
 
     std::wstring SanitizeFileName(std::wstring_view value)

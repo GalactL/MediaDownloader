@@ -4,6 +4,7 @@
 
 - Nettoyage automatique et sûr des dossiers temporaires `.mediadownloader-*` orphelins.
 - Journalisation des échecs de suppression des fichiers temporaires.
+- Prise en charge des plages temporelles dans le CLI avec `--start-time` et `--end-time`.
 
 ## v0.1.0
 

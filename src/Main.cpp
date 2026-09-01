@@ -453,6 +453,13 @@ namespace
         if (!AppendJavaScriptRuntimeArguments(arguments))
             EmitLog("warning", "Aucun runtime JavaScript compatible n'a été trouvé ; certains liens YouTube peuvent échouer.");
         AppendAuthenticationArguments(arguments, options);
+        if (options.startTimeSeconds && options.endTimeSeconds)
+        {
+            arguments.insert(arguments.end(), {
+                L"--download-sections", BuildDownloadSection(*options.startTimeSeconds, *options.endTimeSeconds),
+                L"--force-keyframes-at-cuts"
+            });
+        }
         arguments.push_back(options.url);
         auto download = RunProcess(*ytDlp, arguments, temporary.path, [&](std::string const& line)
         {
@@ -520,6 +527,8 @@ namespace
             "  --quality best|720|1080    Qualite ou hauteur maximale\n"
             "  --format mp4|mkv|webm      Conteneur final (mp4 par defaut)\n"
             "  --title TITRE               Nom personnalise du fichier final\n"
+            "  --start-time SECONDES       Debut facultatif de la plage\n"
+            "  --end-time SECONDES         Fin facultative de la plage\n"
             "  --max-size-mb N            Taille maximale, en Mio\n"
             "  --cookies-from-browser NOM Utiliser auto, Firefox, Edge, Chrome…\n"
             "  --output DOSSIER           Dossier cible (Videos par defaut)\n"
