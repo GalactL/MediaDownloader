@@ -29,7 +29,7 @@ Ouvrir `build/Release/MediaDownloader.exe`, puis :
 Le moteur s'exécute sans fenêtre de console. La progression, les éventuelles
 erreurs et le chemin du fichier final sont affichés dans l'application.
 
-## Plateformes de la v0.1.0
+## Plateformes de la v0.2.0
 
 - Windows x64 : interface graphique et CLI ;
 - macOS Apple Silicon et Intel : CLI ;

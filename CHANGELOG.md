@@ -1,6 +1,6 @@
 # Changelog
 
-## À venir
+## v0.2.0
 
 - Nettoyage automatique et sûr des dossiers temporaires `.mediadownloader-*` orphelins.
 - Journalisation des échecs de suppression des fichiers temporaires.
