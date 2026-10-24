@@ -1,7 +1,7 @@
 # MediaDownloader
 
-Moteur natif de téléchargement et de conversion vidéo destiné à être intégré à
-l'onglet **Vidéos** de HUB.
+Outil natif et indépendant de téléchargement et de conversion vidéo : un CLI, une
+interface graphique Windows et un hôte de messagerie native pour Firefox.
 
 Le programme accepte une URL HTTP(S), télécharge la meilleure source compatible
 avec la qualité demandée à l'aide de `yt-dlp`, puis peut réencoder la vidéo avec
@@ -11,7 +11,7 @@ FFmpeg afin de respecter une taille maximale (par exemple 10 Mo pour Discord).
 
 La version 0.1 fournit une application Windows ouvrable par double-clic ainsi
 qu'une interface en ligne de commande pour Windows, macOS et Linux, avec des événements JSON ligne par
-ligne pour une future intégration dans HUB. YouTube, TikTok et X sont pris en
+ligne exploitables par toute application appelante. YouTube, TikTok et X sont pris en
 charge dans la mesure où la version installée de `yt-dlp` les prend en charge et
 où le contenu est accessible sans contourner de DRM.
 
@@ -70,7 +70,7 @@ possible depuis un terminal développeur Visual Studio.
 La compilation génère :
 
 - `build/Release/MediaDownloader.exe` : application graphique ouvrable par double-clic ;
-- `build/Release/MediaDownloader.Cli.exe` : moteur en ligne de commande pour HUB.
+- `build/Release/MediaDownloader.Cli.exe` : moteur en ligne de commande.
 
 Sur macOS et Linux :
 
@@ -132,10 +132,10 @@ l'interface. Le programme ne lance pas Firefox et ne tente aucune reconnexion :
 une session Firefox valide doit déjà exister sur le compte Windows.
 
 Sans `--output`, les fichiers finaux sont placés dans le dossier **Vidéos** de
-Windows ou dans `~/Videos` sur macOS et Linux. Le dossier Windows reste celui
-indexé par HUB.
+Windows ou dans `~/Videos` sur macOS et Linux. Le dossier Windows est celui
+indexé par la médiathèque Windows.
 
-## Contrat avec HUB
+## Protocole
 
 La sortie standard contient exclusivement des objets JSON, un par ligne. Les
 messages de diagnostic non structurés des outils externes sont convertis en
@@ -149,6 +149,22 @@ messages de diagnostic non structurés des outils externes sont convertis en
 
 Les codes de sortie sont `0` en cas de réussite, `2` pour une erreur de saisie,
 `3` lorsqu'un outil manque et `4` lorsqu'un traitement échoue.
+Contrat complet : [docs/CLI_PROTOCOL.md](docs/CLI_PROTOCOL.md).
+
+## Hôte Firefox (messagerie native)
+
+`MediaDownloader.Cli host` dialogue avec une extension Firefox sur stdin/stdout
+(messages JSON préfixés par leur longueur). Protocole :
+[docs/NATIVE_HOST_PROTOCOL.md](docs/NATIVE_HOST_PROTOCOL.md).
+
+Installation (enregistre le manifeste pour Firefox) :
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools/install-native-host.ps1
+powershell -ExecutionPolicy Bypass -File tools/install-native-host.ps1 -Uninstall
+```
+
+Sur macOS et Linux : `tools/install-native-host.sh [--uninstall] [chemin du CLI]`.
 
 ## Tests
 
