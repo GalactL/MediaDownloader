@@ -1,5 +1,9 @@
 # Changelog
 
+## Non publié
+
+- Suppression de l'interface graphique Win32 (`MediaDownloader.exe`) : l'extension Firefox la remplace. `MediaDownloader.Cli.exe` reste livré avec `tools/bin`.
+
 ## v0.2.0
 
 - Nettoyage automatique et sûr des dossiers temporaires `.mediadownloader-*` orphelins.

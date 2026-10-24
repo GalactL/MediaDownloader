@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A native C++20 engine that downloads videos with `yt-dlp` and optionally re-encodes them with FFmpeg to fit a size limit (e.g. 10 MB for Discord). It is an independent tool with three front ends over one engine: the CLI (any caller can launch it as a child process and parse its stdout), a Win32 GUI (Windows only, spawns the CLI), and a Firefox native-messaging host (`MediaDownloader.Cli host`).
+A native C++20 engine that downloads videos with `yt-dlp` and optionally re-encodes them with FFmpeg to fit a size limit (e.g. 10 MB for Discord). It is an independent tool with two front ends over one engine: the CLI (any caller can launch it as a child process and parse its stdout) and a Firefox native-messaging host (`MediaDownloader.Cli host`).
 
 User-facing strings, docs, README and CHANGELOG are written in French; keep them in French. Commit messages are in English.
 
@@ -16,7 +16,7 @@ cmake --build build --parallel
 ctest --test-dir build -C Release --output-on-failure
 ```
 
-On Windows, `node tools/build-native.mjs` does a fresh configure + Release build (it de-duplicates the `Path`/`PATH` env vars that break MSBuild); `--engine-only` builds just the CLI and tests. `tools/install-dependencies.ps1` downloads `yt-dlp`, `ffmpeg`, `ffprobe` into `tools/bin/` (gitignored), which CMake copies next to the GUI exe.
+On Windows, `node tools/build-native.mjs` does a fresh configure + Release build (it de-duplicates the `Path`/`PATH` env vars that break MSBuild); `--engine-only` builds just the CLI and tests. `tools/install-dependencies.ps1` downloads `yt-dlp`, `ffmpeg`, `ffprobe` into `tools/bin/` (gitignored), which CMake copies next to `MediaDownloader.Cli`.
 
 Tests are a single hand-rolled executable, `tests/CoreTests.cpp` (no framework: a `Check(cond, msg)` helper, non-zero exit on any failure). To run it directly: `./build/MediaDownloaderTests`. There is no way to run a single case; add new checks to `main()` there. Tests only cover `MediaDownloaderCore` (pure logic), never real downloads.
 
@@ -27,7 +27,6 @@ No linter is configured; MSVC builds use `/W4 /permissive- /utf-8`.
 CMake targets:
 - `MediaDownloaderCore` (static lib): `Core.cpp` (argument parsing, URL validation, yt-dlp format selector, encode bitrate plan, filename sanitizing, JSON escaping, UTF-8/wide conversion) and `TemporaryFiles.cpp` (orphaned temp dir cleanup). Platform-independent and the only thing tested.
 - `MediaDownloaderCli` (output name `MediaDownloader.Cli`): `Main.cpp` is only the CLI front end (argument dispatch, `EventSink` printing JSON lines to stdout). The pipeline (`doctor`, `probe`, `download`, tool discovery, download → probe duration → two-pass encode → move) lives in `Engine.cpp`/`Engine.h`: `Engine` emits typed events to an `EventSink`. `Host.cpp` implements the `host` command (length-prefixed JSON on stdin/stdout, one job at a time) on top of `Engine`; see `docs/NATIVE_HOST_PROTOCOL.md`.
-- `MediaDownloader` (Windows only, `Gui.cpp`): Win32 window that runs `MediaDownloader.Cli.exe` from its own directory and reacts to its JSON events.
 
 Process spawning is behind `ChildProcess.h` (`RunProcess`), with `Process.cpp` for Windows and `ProcessPosix.cpp` for macOS/Linux, selected in CMake. It merges stderr into the line callback and supports cancellation via an `atomic_bool`.
 

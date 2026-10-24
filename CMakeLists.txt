@@ -35,26 +35,19 @@ set_target_properties(MediaDownloaderCli PROPERTIES OUTPUT_NAME "MediaDownloader
 target_compile_features(MediaDownloaderCli PRIVATE cxx_std_20)
 target_link_libraries(MediaDownloaderCli PRIVATE MediaDownloaderEngine)
 
-if(WIN32)
-    add_executable(MediaDownloader WIN32 src/Gui.cpp src/Process.cpp src/ChildProcess.h)
-    target_compile_features(MediaDownloader PRIVATE cxx_std_20)
-    target_link_libraries(MediaDownloader PRIVATE MediaDownloaderCore comctl32 dwmapi shell32 uxtheme)
-endif()
-
 if(MSVC)
     target_compile_options(MediaDownloaderCore PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MediaDownloaderEngine PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MediaDownloaderCli PRIVATE /W4 /permissive- /utf-8)
-    target_compile_options(MediaDownloader PRIVATE /W4 /permissive- /utf-8)
 endif()
 
 foreach(tool yt-dlp.exe ffmpeg.exe ffprobe.exe deno.exe)
     if(EXISTS "${CMAKE_SOURCE_DIR}/tools/bin/${tool}")
-        add_custom_command(TARGET MediaDownloader POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:MediaDownloader>/tools/bin"
+        add_custom_command(TARGET MediaDownloaderCli POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:MediaDownloaderCli>/tools/bin"
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 "${CMAKE_SOURCE_DIR}/tools/bin/${tool}"
-                "$<TARGET_FILE_DIR:MediaDownloader>/tools/bin/${tool}"
+                "$<TARGET_FILE_DIR:MediaDownloaderCli>/tools/bin/${tool}"
         )
     endif()
 endforeach()
@@ -65,7 +58,7 @@ target_compile_features(MediaDownloaderTests PRIVATE cxx_std_20)
 target_link_libraries(MediaDownloaderTests PRIVATE MediaDownloaderCore)
 if(MSVC)
     target_compile_options(MediaDownloaderTests PRIVATE /W4 /permissive- /utf-8)
-    set_property(TARGET MediaDownloaderCore MediaDownloaderEngine MediaDownloaderCli MediaDownloader MediaDownloaderTests
+    set_property(TARGET MediaDownloaderCore MediaDownloaderEngine MediaDownloaderCli MediaDownloaderTests
         PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 add_test(NAME MediaDownloaderCoreTests COMMAND MediaDownloaderTests)
@@ -90,9 +83,6 @@ add_test(NAME MediaDownloaderContractTests COMMAND MediaDownloaderContractTests)
 set_tests_properties(MediaDownloaderContractTests PROPERTIES SKIP_RETURN_CODE 77)
 
 install(TARGETS MediaDownloaderCli RUNTIME DESTINATION .)
-if(WIN32)
-    install(TARGETS MediaDownloader RUNTIME DESTINATION .)
-endif()
 
 add_executable(MediaDownloaderHostTests tests/HostTests.cpp)
 add_dependencies(MediaDownloaderHostTests MediaDownloaderCli)

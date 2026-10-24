@@ -1,7 +1,7 @@
 # MediaDownloader
 
-Outil natif et indépendant de téléchargement et de conversion vidéo : un CLI, une
-interface graphique Windows et un hôte de messagerie native pour Firefox.
+Outil natif et indépendant de téléchargement et de conversion vidéo : un CLI et un
+hôte de messagerie native pour Firefox.
 
 Le programme accepte une URL HTTP(S), télécharge la meilleure source compatible
 avec la qualité demandée à l'aide de `yt-dlp`, puis peut réencoder la vidéo avec
@@ -9,29 +9,14 @@ FFmpeg afin de respecter une taille maximale (par exemple 10 Mo pour Discord).
 
 ## État du projet
 
-La version 0.1 fournit une application Windows ouvrable par double-clic ainsi
-qu'une interface en ligne de commande pour Windows, macOS et Linux, avec des événements JSON ligne par
+La version 0.2 fournit une interface en ligne de commande pour Windows, macOS et Linux, avec des événements JSON ligne par
 ligne exploitables par toute application appelante. YouTube, TikTok et X sont pris en
 charge dans la mesure où la version installée de `yt-dlp` les prend en charge et
 où le contenu est accessible sans contourner de DRM.
 
-## Interface graphique
-
-Ouvrir `build/Release/MediaDownloader.exe`, puis :
-
-1. coller le lien de la vidéo ;
-2. choisir éventuellement un titre personnalisé pour le fichier ;
-3. choisir la qualité et le format ;
-4. conserver le préréglage Discord à 10 Mo ou désactiver la limite ;
-5. cliquer sur **Télécharger**. Pour YouTube, la session Firefox locale est
-   utilisée automatiquement, notamment pour les vidéos exigeant une confirmation d'âge.
-
-Le moteur s'exécute sans fenêtre de console. La progression, les éventuelles
-erreurs et le chemin du fichier final sont affichés dans l'application.
-
 ## Plateformes de la v0.2.0
 
-- Windows x64 : interface graphique et CLI ;
+- Windows x64 : CLI et hôte de messagerie native ;
 - macOS Apple Silicon et Intel : CLI ;
 - Linux x64 : CLI.
 
@@ -69,8 +54,7 @@ possible depuis un terminal développeur Visual Studio.
 
 La compilation génère :
 
-- `build/Release/MediaDownloader.exe` : application graphique ouvrable par double-clic ;
-- `build/Release/MediaDownloader.Cli.exe` : moteur en ligne de commande.
+- `build/Release/MediaDownloader.Cli.exe` : moteur en ligne de commande et hôte de messagerie native.
 
 Sur macOS et Linux :
 
