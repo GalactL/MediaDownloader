@@ -2,6 +2,12 @@
 
 ## Non publié
 
+- Détection automatique du lancement par Firefox : plus de script d'enveloppe, le manifeste pointe vers `MediaDownloader.Cli`.
+- Commande `install-host` : écrit le manifeste de messagerie native (et la clé de registre sous Windows).
+- Extension Firefox (`extension/`) avec menu dans la page : qualité, taille maximale, extrait, progression et annulation.
+- Deno inclus dans `tools/bin` des archives de release.
+- Empaquetage de `mediadownloader.xpi` dans chaque archive et signature Mozilla (canal non répertorié) lorsque les secrets sont définis.
+- Installation en trois étapes : décompresser, `install-host`, glisser le `.xpi` dans Firefox.
 - Suppression de l'interface graphique Win32 (`MediaDownloader.exe`) : l'extension Firefox la remplace. `MediaDownloader.Cli.exe` reste livré avec `tools/bin`.
 
 ## v0.2.0

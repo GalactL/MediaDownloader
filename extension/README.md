@@ -8,6 +8,12 @@ s'ajoutent en modifiant `content_scripts[0].matches` dans `manifest.json`.
 Manifest V2 avec page d'événements (`persistent: false`) : Firefox la garde active tant que
 le port `connectNative` est ouvert, et c'est le plus simple pour `runtime.connectNative`.
 
+## Installation
+
+Release : voir l'étape 3 de l'installation dans le `README.md` racine (glisser
+`mediadownloader.xpi` dans Firefox, après `MediaDownloader.Cli install-host`). Signature :
+`docs/EXTENSION_SIGNATURE.md`. Le fichier `.xpi` contient `extension/` sans `test/` ni `README.md`.
+
 ## Chargement temporaire
 
 1. Compiler le projet puis exécuter `MediaDownloader.Cli install-host` (enregistre l'hôte

@@ -1,7 +1,7 @@
 # MediaDownloader
 
-Outil natif et indépendant de téléchargement et de conversion vidéo : un CLI et un
-hôte de messagerie native pour Firefox.
+Outil natif et indépendant de téléchargement et de conversion vidéo : un CLI, un
+hôte de messagerie native et une extension Firefox (menu dans la page).
 
 Le programme accepte une URL HTTP(S), télécharge la meilleure source compatible
 avec la qualité demandée à l'aide de `yt-dlp`, puis peut réencoder la vidéo avec
@@ -9,18 +9,36 @@ FFmpeg afin de respecter une taille maximale (par exemple 10 Mo pour Discord).
 
 ## État du projet
 
-La version 0.2 fournit une interface en ligne de commande pour Windows, macOS et Linux, avec des événements JSON ligne par
-ligne exploitables par toute application appelante. YouTube, TikTok et X sont pris en
+La version 0.2 fournit un CLI pour Windows, macOS et Linux, avec des événements JSON ligne par
+ligne exploitables par toute application appelante (l'utilisation depuis HUB est inchangée),
+ainsi que l'extension Firefox et son hôte natif. YouTube, TikTok et X sont pris en
 charge dans la mesure où la version installée de `yt-dlp` les prend en charge et
 où le contenu est accessible sans contourner de DRM.
 
 ## Plateformes de la v0.2.0
 
-- Windows x64 : CLI et hôte de messagerie native ;
-- macOS Apple Silicon et Intel : CLI ;
-- Linux x64 : CLI.
+- Windows x64, macOS Apple Silicon et Intel, Linux x64 : CLI, hôte de messagerie native et extension Firefox.
 
 La release GitHub contient une archive et une notice distinctes pour chaque cible.
+
+## Installation (release)
+
+1. Décompresser l'archive.
+2. Exécuter `MediaDownloader.Cli install-host` (`MediaDownloader.Cli.exe install-host` sous Windows).
+3. Glisser `mediadownloader.xpi` dans une fenêtre Firefox.
+
+Contenu de l'archive :
+
+```text
+MediaDownloader.Cli(.exe)
+mediadownloader.xpi
+tools/bin/   yt-dlp, ffmpeg, ffprobe, deno (Windows) ; deno seul (macOS, Linux)
+README.txt
+```
+
+Sous macOS et Linux, `yt-dlp` et FFmpeg doivent être installés séparément (voir `README.txt`).
+Sous Windows, ne pas déplacer l'exécutable après `install-host` : le manifeste
+contient son chemin. Signature de l'extension : [docs/EXTENSION_SIGNATURE.md](docs/EXTENSION_SIGNATURE.md).
 
 ## Prérequis
 
@@ -55,6 +73,8 @@ possible depuis un terminal développeur Visual Studio.
 La compilation génère :
 
 - `build/Release/MediaDownloader.Cli.exe` : moteur en ligne de commande et hôte de messagerie native.
+
+L'extension (`extension/`, JavaScript pur) ne se compile pas : voir [extension/README.md](extension/README.md).
 
 Sur macOS et Linux :
 
@@ -141,11 +161,18 @@ Contrat complet : [docs/CLI_PROTOCOL.md](docs/CLI_PROTOCOL.md).
 (messages JSON préfixés par leur longueur). Protocole :
 [docs/NATIVE_HOST_PROTOCOL.md](docs/NATIVE_HOST_PROTOCOL.md).
 
-Installation (écrit le manifeste pour Firefox ; sous Windows, enregistre aussi la clé de registre) :
+Firefox lance directement l'exécutable : `MediaDownloader.Cli` reconnaît ce lancement
+(chemin du manifeste ou identifiant d'extension en premier argument) et passe en mode `host`.
+
+`MediaDownloader.Cli install-host` écrit le manifeste pour Firefox (sous Windows, il
+enregistre aussi la clé de registre `HKCU`). Il se relance après un déplacement de l'exécutable.
 
 ```text
 MediaDownloader.Cli install-host
 ```
+
+L'extension affiche un bouton flottant sur les pages YouTube ; le menu permet de choisir
+la qualité, la taille maximale et un extrait.
 
 ## Tests
 
