@@ -44,11 +44,12 @@
   const clip = el("input", { type: "checkbox" });
   const startInput = el("input", { type: "text", placeholder: "0 ou 1:30", disabled: true });
   const endInput = el("input", { type: "text", placeholder: "60 ou 2:00", disabled: true });
-  const openFolder = el("button", { className: "btn secondary", type: "button", textContent: "Ouvrir le dossier", hidden: true });
-  const download = el("button", { className: "btn", type: "button", textContent: "Télécharger" });
+  const openFolder = el("button", { className: "icon", type: "button", textContent: "📁", title: "Ouvrir le dossier", ariaLabel: "Ouvrir le dossier", hidden: true });
+  // Progress fills the button from behind; the state text sits on top of it.
+  const fill = el("span", { className: "fill" });
+  const label = el("span", { className: "label", textContent: "Télécharger" });
+  const download = el("button", { className: "btn dl", type: "button" }, [fill, label]);
   const cancel = el("button", { className: "btn secondary", type: "button", textContent: "Annuler", hidden: true });
-  const bar = el("progress", { max: 100, value: 0, hidden: true });
-  const barText = el("div", { className: "progress-text", hidden: true });
   const message = el("div", { className: "message", role: "status" });
   const panel = el("div", { className: "panel", hidden: true }, [
     title,
@@ -61,7 +62,7 @@
       el("label", { textContent: "Fin (s)" }, [endInput]),
     ]),
     el("div", { className: "actions" }, [download, cancel]),
-    bar, barText, message, openFolder,
+    el("div", { className: "status" }, [message, openFolder]),
   ]);
   shadow.append(style, fab, panel);
 
@@ -83,9 +84,9 @@
   function setRunning(value) {
     running = value;
     download.disabled = value;
+    download.classList.toggle("running", value);
     cancel.hidden = !value;
-    bar.hidden = barText.hidden = !value;
-    if (!value) bar.value = 0;
+    if (!value) { fill.style.width = "0"; label.textContent = "Télécharger"; }
   }
 
   function probe() {
@@ -119,18 +120,18 @@
     if (Number.isNaN(size)) return say("La taille maximale doit être comprise entre 0 et " + lib.MAX_SIZE_MB + " Mo.", "error");
     openFolder.hidden = true;
     setRunning(true);
-    bar.removeAttribute("value"); // indeterminate until first progress
-    barText.textContent = "Démarrage…";
+    fill.style.width = "0";
+    label.textContent = "Démarrage…";
     say("");
     request(lib.buildDownloadRequest({
       url: lib.canonicalUrl(location.href), quality: quality.value, maxSizeMb: size, start: startTime, end: endTime, name: nameInput.value,
     }), (reply) => {
       if (reply.type === "progress") {
-        bar.value = Number(reply.percent) || 0;
-        barText.textContent = lib.progressText(reply.stage, reply.percent, reply.pass);
+        fill.style.width = Math.min(100, Math.max(0, Number(reply.percent) || 0)) + "%";
+        label.textContent = lib.progressText(reply.stage, reply.percent, reply.pass);
       } else if (reply.type === "completed") {
         setRunning(false);
-        say("Téléchargement terminé.", "ok");
+        say("Terminé", "ok");
         openFolder.hidden = false;
       } else if (reply.type === "error") {
         setRunning(false);

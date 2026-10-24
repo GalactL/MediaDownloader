@@ -29,11 +29,17 @@ button.btn {
 }
 button.btn.secondary { background: #52525e; }
 button.btn:disabled { opacity: .5; cursor: default; }
-progress { width: 100%; margin-top: 12px; }
-.progress-text { margin-top: 2px; font-size: 12px; }
 .message { margin-top: 8px; word-break: break-word; }
 .message.error { color: #ff9aa2; }
 .message.ok { color: #86de74; }
 label.check { display: flex; align-items: center; gap: 6px; }
 label.check input { width: auto; margin: 0; }
 input:disabled { opacity: .5; }
+button.dl { position: relative; overflow: hidden; }
+button.dl .fill { position: absolute; inset: 0 auto 0 0; width: 0; background: #0a84ff; transition: width .2s; }
+button.dl .label { position: relative; }
+button.dl.running { background: #0a3d80; }
+button.dl:disabled.running { opacity: 1; }
+.status { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.status .message { margin: 0; flex: 0 1 auto; }
+button.icon { padding: 2px 4px; border: 0; background: none; font-size: 16px; cursor: pointer; }
