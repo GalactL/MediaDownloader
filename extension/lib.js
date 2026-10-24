@@ -51,7 +51,7 @@
       all.map((h) => ({ value: String(h), label: labels[h] || h + "p" })));
   }
 
-  // Host error code -> French text; unknown codes keep the host's own (French) message.
+  // Host error code -> French text. Engine codes relay raw yt-dlp output, so they are always mapped.
   const ERRORS = {
     busy: "Un téléchargement est déjà en cours.",
     cancelled: "Téléchargement annulé.",
@@ -60,6 +60,9 @@
     no_folder: "Aucun dossier à ouvrir.",
     open_failed: "Impossible d'ouvrir le dossier.",
     processing_failed: "Le téléchargement a échoué.",
+    download_failed: "Le téléchargement a échoué.",
+    probe_failed: "Impossible d'analyser cette vidéo.",
+    tool_missing: "Un outil requis (yt-dlp ou FFmpeg) est introuvable.",
   };
   function errorText(code, fallback) {
     return ERRORS[code] || fallback || "Une erreur est survenue.";

@@ -77,6 +77,7 @@
   // State
   let probedUrl = null;   // page URL already probed (or being probed)
   let running = false;
+  let nameEdited = false;
   let currentUrl = location.href;
 
   function setRunning(value) {
@@ -98,7 +99,7 @@
       if (reply.type === "probe" && reply.data) {
         title.textContent = String(reply.data.title || "Vidéo");
         setQualities(reply.data.heights);
-        nameInput.value = String(reply.data.title || "");
+        if (!nameEdited) nameInput.value = String(reply.data.title || ""); // never overwrite what the user typed
       } else if (reply.type === "error") {
         title.textContent = "MediaDownloader";
         probedUrl = null; // retry on next open
@@ -142,6 +143,7 @@
     panel.hidden = !panel.hidden;
     if (!panel.hidden && !running && probedUrl !== location.href) probe();
   });
+  nameInput.addEventListener("input", () => { nameEdited = true; });
   clip.addEventListener("change", () => { startInput.disabled = endInput.disabled = !clip.checked; });
   openFolder.addEventListener("click", () => request({ type: "openFolder" }, (reply) => {
     if (reply.type === "error") say(lib.errorText(reply.code, reply.message), "error");
@@ -158,6 +160,8 @@
       currentUrl = location.href;
       if (!running) {
         probedUrl = null;
+        nameInput.value = "";
+        nameEdited = false;
         title.textContent = "MediaDownloader";
         say("");
         if (!panel.hidden && visible) probe();
