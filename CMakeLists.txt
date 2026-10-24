@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(MediaDownloader VERSION 0.2.0 LANGUAGES CXX)
+project(MediaDownloader VERSION 0.3.0 LANGUAGES CXX)
 
 add_library(MediaDownloaderCore
     src/Core.cpp

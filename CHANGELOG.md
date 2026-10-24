@@ -2,6 +2,8 @@
 
 ## Non publié
 
+## v0.3.0 (2026-10-24)
+
 - Détection automatique du lancement par Firefox : plus de script d'enveloppe, le manifeste pointe vers `MediaDownloader.Cli`.
 - Commande `install-host` : écrit le manifeste de messagerie native (et la clé de registre sous Windows).
 - Extension Firefox (`extension/`) avec menu dans la page : qualité, taille maximale, extrait, progression et annulation.
