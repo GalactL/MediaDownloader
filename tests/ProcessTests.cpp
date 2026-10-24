@@ -83,6 +83,22 @@ int main()
         Check(grandchild > 0 && IsGone(grandchild), "grandchild is gone after cancel");
     }
 
+    {
+        // The child must see EOF on stdin, leaving our own stdin data untouched.
+        int fds[2]{};
+        if (pipe(fds) != 0) return 1;
+        (void)!write(fds[1], "XYZ", 3);
+        int const savedStdin = dup(STDIN_FILENO);
+        dup2(fds[0], STDIN_FILENO);
+        auto result = RunProcess("/bin/sh", { L"-c", L"cat" }, "", nullptr, never);
+        char buffer[4]{};
+        auto got = read(STDIN_FILENO, buffer, 3);
+        dup2(savedStdin, STDIN_FILENO);
+        close(savedStdin); close(fds[0]); close(fds[1]);
+        Check(result.output.empty(), "child stdin is /dev/null");
+        Check(got == 3 && std::string(buffer, 3) == "XYZ", "parent stdin data is not consumed by the child");
+    }
+
     if (failures == 0) std::cout << "All process tests passed\n";
     return failures == 0 ? 0 : 1;
 }

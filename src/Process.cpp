@@ -92,7 +92,11 @@ namespace media_downloader
         startup.dwFlags = STARTF_USESTDHANDLES;
         startup.hStdOutput = writePipe.value;
         startup.hStdError = writePipe.value;
-        startup.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+        // Children must not share our stdin: in host mode it carries the framed protocol.
+        SECURITY_ATTRIBUTES nullAttributes{ sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE };
+        Handle nullInput(CreateFileW(L"NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, &nullAttributes,
+            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+        startup.hStdInput = nullInput.value;
         PROCESS_INFORMATION process{};
 
         // KILL_ON_JOB_CLOSE: yt-dlp's ffmpeg children die with the job, even if this process crashes.
@@ -118,6 +122,7 @@ namespace media_downloader
         Handle processHandle(process.hProcess);
         Handle threadHandle(process.hThread);
         writePipe = Handle();
+        nullInput = Handle();
         // Assign while suspended so no grandchild can escape the job. If it fails (e.g. an outer job without
         // nesting support), cancellation falls back to TerminateProcess on the direct child only.
         bool const inJob = job.value != INVALID_HANDLE_VALUE && AssignProcessToJobObject(job.value, processHandle.value);

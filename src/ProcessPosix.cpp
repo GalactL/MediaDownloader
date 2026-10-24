@@ -5,6 +5,7 @@
 #include <cerrno>
 #include <chrono>
 #include <csignal>
+#include <fcntl.h>
 #include <stdexcept>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -38,9 +39,13 @@ namespace media_downloader
         int descriptors[2]{};
         if (pipe(descriptors) != 0) throw std::runtime_error("Impossible de créer le canal du processus externe");
 
+        // Children must not share our stdin: in host mode it carries the framed protocol.
+        int const nullInput = open("/dev/null", O_RDONLY | O_CLOEXEC);
+
         auto child = fork();
         if (child < 0)
         {
+            if (nullInput >= 0) close(nullInput);
             close(descriptors[0]); close(descriptors[1]);
             throw std::runtime_error("Impossible de lancer le processus externe");
         }
@@ -48,6 +53,7 @@ namespace media_downloader
         {
             setpgid(0, 0);
             close(descriptors[0]);
+            if (nullInput >= 0) dup2(nullInput, STDIN_FILENO);
             dup2(descriptors[1], STDOUT_FILENO);
             dup2(descriptors[1], STDERR_FILENO);
             close(descriptors[1]);
@@ -58,6 +64,7 @@ namespace media_downloader
 
         setpgid(child, child); // the child does it too: whichever runs first wins, so kill(-child) is never early
         close(descriptors[1]);
+        if (nullInput >= 0) close(nullInput);
         std::string output;
         std::string pending;
         std::atomic_bool readerDone{ false };

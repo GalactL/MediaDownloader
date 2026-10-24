@@ -59,6 +59,9 @@ La réponse `probe` est compacte :
 - Un seul travail à la fois : un second `probe` ou `download` reçoit `busy`.
 - `cancel` arrête yt-dlp et FFmpeg, supprime le dossier temporaire et produit
   l'erreur `cancelled`. Sans travail en cours, `cancel` est ignoré.
+- `doctor` est traité immédiatement, même pendant un travail.
+- Une requête trop grande reçoit `message_too_large`, sans `id`.
+- Un `id` qui n'est pas une chaîne est ignoré.
 - Message mal formé ou de type inconnu : `invalid_message`.
 - Fin de stdin (EOF) : le travail éventuel est annulé et l'hôte se termine avec le
   code `0`.
@@ -67,8 +70,8 @@ La réponse `probe` est compacte :
 
 | Code | Signification |
 |---|---|
-| `invalid_message` | JSON mal formé, type inconnu ou champ de mauvais type |
-| `invalid_arguments` | validation des arguments échouée (comme le CLI) |
+| `invalid_message` | JSON mal formé ou type inconnu |
+| `invalid_arguments` | champ de mauvais type ou validation des arguments échouée (comme le CLI) |
 | `busy` | un travail est déjà en cours |
 | `message_too_large` | réponse supérieure à 1 Mio |
 | `cancelled` | travail annulé par `cancel` |
@@ -84,7 +87,7 @@ dépendance manquante) ; voir [CLI_PROTOCOL.md](CLI_PROTOCOL.md).
 <- {"type":"progress","id":"7","stage":"download","percent":42.0}
 <- {"type":"completed","id":"7","path":"C:\\Users\\Moi\\Videos\\v.mp4","bytes":9853214}
 -> {"type":"download","id":"8","url":"https://example.com/w"}
-<- {"type":"error","id":"8","code":"busy","message":"Un travail est déjà en cours."}
+<- {"type":"error","id":"8","code":"busy","message":"Un traitement est déjà en cours."}
 ```
 
 (Chaque ligne représente un message encadré par sa longueur.)
