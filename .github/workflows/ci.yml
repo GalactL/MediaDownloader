@@ -26,6 +26,17 @@ jobs:
         run: cmake --build build --config Release --parallel
       - name: Tester
         run: ctest --test-dir build -C Release --output-on-failure
+      - name: Lancer yt-dlp via le moteur
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          & build\Release\tools\bin\yt-dlp.exe --version
+          Write-Host "yt-dlp direct: exit $LASTEXITCODE"
+          $out = (& build\Release\MediaDownloader.Cli.exe probe --url https://www.w3schools.com/html/mov_bbb.mp4 2>&1 | Out-String)
+          Write-Host $out
+          if ($out -match 'PYI-') { Write-Host 'PyInstaller error detected'; exit 1 }
+          exit 0
 
   extension:
     runs-on: ubuntu-latest
