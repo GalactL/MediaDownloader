@@ -1,5 +1,6 @@
 #include "Core.h"
 #include "Engine.h"
+#include "Host.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -50,48 +51,10 @@ namespace
         Emit("{\"type\":\"error\",\"code\":\"" + JsonEscape(code) + "\",\"message\":\"" + JsonEscape(message) + "\"}");
     }
 
-    std::string ToolJson(char const* name, DoctorTool const& tool)
-    {
-        return std::string("\"") + name + "\":{\"found\":" + (tool.found ? "true" : "false") +
-            (tool.found ? ",\"path\":\"" + JsonEscape(tool.path) + "\"}" : "}");
-    }
-
-    // Serializes engine events as one JSON object per line (HUB protocol).
     class JsonSink : public EventSink
     {
     public:
-        void On(Event const& event) override
-        {
-            std::visit([](auto const& e)
-            {
-                using T = std::decay_t<decltype(e)>;
-                if constexpr (std::is_same_v<T, StartedEvent>)
-                    Emit("{\"type\":\"started\",\"outputDirectory\":\"" + JsonEscape(e.outputDirectory) + "\"}");
-                else if constexpr (std::is_same_v<T, LogEvent>)
-                    Emit("{\"type\":\"log\",\"level\":\"" + JsonEscape(e.level) + "\",\"message\":\"" + JsonEscape(e.message) + "\"}");
-                else if constexpr (std::is_same_v<T, ProgressEvent>)
-                {
-                    std::ostringstream json;
-                    json << "{\"type\":\"progress\",\"stage\":\"" << e.stage << "\",\"percent\":"
-                         << std::fixed << std::setprecision(1) << e.percent;
-                    if (e.pass > 0) json << ",\"pass\":" << e.pass;
-                    json << '}';
-                    Emit(json.str());
-                }
-                else if constexpr (std::is_same_v<T, EncodingPlanEvent>)
-                    Emit("{\"type\":\"encodingPlan\",\"durationSeconds\":" + std::to_string(e.durationSeconds) +
-                        ",\"videoKbps\":" + std::to_string(e.videoKbps) + ",\"audioKbps\":" + std::to_string(e.audioKbps) + "}");
-                else if constexpr (std::is_same_v<T, CompletedEvent>)
-                    Emit("{\"type\":\"completed\",\"path\":\"" + JsonEscape(e.path) + "\",\"bytes\":" + std::to_string(e.bytes) + "}");
-                else if constexpr (std::is_same_v<T, ErrorEvent>)
-                    EmitError(e.code, e.message);
-                else if constexpr (std::is_same_v<T, DoctorEvent>)
-                    Emit("{\"type\":\"doctor\",\"tools\":{" + ToolJson("yt-dlp", e.ytDlp) + ',' + ToolJson("ffmpeg", e.ffmpeg) + ',' +
-                        ToolJson("ffprobe", e.ffprobe) + ',' + ToolJson("javascript-runtime", e.javascriptRuntime) + "}}");
-                else if constexpr (std::is_same_v<T, ProbeEvent>)
-                    Emit("{\"type\":\"probe\",\"data\":" + e.json + "}");
-            }, event);
-        }
+        void On(Event const& event) override { Emit(SerializeEvent(event)); }
     };
 
     JsonSink g_sink;
@@ -104,7 +67,8 @@ namespace
             "Usage:\n"
             "  MediaDownloader doctor [chemins des outils]\n"
             "  MediaDownloader probe --url URL\n"
-            "  MediaDownloader download --url URL [options]\n\n"
+            "  MediaDownloader download --url URL [options]\n"
+            "  MediaDownloader host   Messagerie native Firefox (stdin/stdout)\n\n"
             "Options:\n"
             "  --quality best|720|1080    Qualite ou hauteur maximale\n"
             "  --format mp4|mkv|webm      Conteneur final (mp4 par defaut)\n"
@@ -147,6 +111,7 @@ int wmain(int argc, wchar_t* argv[])
         case Command::Doctor: exitCode = g_engine.Doctor(*parsed.options); break;
         case Command::Probe: exitCode = g_engine.Probe(*parsed.options); break;
         case Command::Download: exitCode = g_engine.Download(*parsed.options); break;
+        case Command::Host: exitCode = RunHost(); break;
         }
     }
     catch (std::exception const& error)
@@ -183,6 +148,7 @@ int main(int argc, char* argv[])
         case Command::Doctor: return g_engine.Doctor(*parsed.options);
         case Command::Probe: return g_engine.Probe(*parsed.options);
         case Command::Download: return g_engine.Download(*parsed.options);
+        case Command::Host: return RunHost();
         }
     }
     catch (std::exception const& error)

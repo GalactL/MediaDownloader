@@ -1,5 +1,6 @@
 #!/bin/sh
-# Fake yt-dlp for ContractTests. Behaviour via FAKE_YTDLP_MODE=ok|fail, FAKE_SOURCE_BYTES.
+# Fake yt-dlp for ContractTests. Behaviour via FAKE_YTDLP_MODE=ok|fail|hang (hang writes its pid to FAKE_YTDLP_PID_FILE),
+# FAKE_SOURCE_BYTES, FAKE_YTDLP_PROBE_JSON.
 # Record argv (one line per call) when FAKE_ARGV_LOG is set.
 if [ -n "$FAKE_ARGV_LOG" ]; then
   { printf '%s' "$0"; for a in "$@"; do printf ' %s' "$a"; done; echo; } >> "$FAKE_ARGV_LOG"
@@ -15,8 +16,13 @@ if [ "$mode" = fail ]; then
   echo "ERROR: [fake] boom: unable to download"
   exit 1
 fi
+if [ "$mode" = hang ]; then
+  [ -n "$FAKE_YTDLP_PID_FILE" ] && echo $$ > "$FAKE_YTDLP_PID_FILE"
+  exec sleep 30
+fi
 if [ -n "$probe" ]; then
-  echo '{"id":"abc","title":"Fake Title","duration":10}'
+  if [ -n "$FAKE_YTDLP_PROBE_JSON" ]; then echo "$FAKE_YTDLP_PROBE_JSON"
+  else echo '{"id":"abc","title":"Fake Title","duration":10}'; fi
   exit 0
 fi
 dir=${out%/*}

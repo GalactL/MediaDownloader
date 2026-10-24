@@ -10,6 +10,10 @@ for a in "$@"; do
   last=$a
 done
 [ "$FAKE_FFMPEG_MODE" = fail ] && exit 1
+if [ "$FAKE_FFMPEG_MODE" = hang ]; then
+  [ -n "$FAKE_FFMPEG_PID_FILE" ] && echo $$ > "$FAKE_FFMPEG_PID_FILE"
+  exec sleep 30
+fi
 echo "out_time_us=5000000"
 echo "progress=continue"
 [ "$pass" = 2 ] && [ "$FAKE_FFMPEG_MODE" != nofile ] && head -c "${FAKE_ENCODED_BYTES:-1024}" /dev/zero > "$last"

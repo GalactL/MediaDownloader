@@ -127,7 +127,7 @@ namespace
         {
             auto r = Run(args);
             Check(r.code == 0, "help exits 0");
-            for (auto const* s : { "doctor", "probe", "download", "--url", "--quality", "--format", "--title",
+            for (auto const* s : { "doctor", "probe", "download", "host", "--url", "--quality", "--format", "--title",
                 "--start-time", "--end-time", "--max-size-mb", "--cookies-from-browser", "--output",
                 "--overwrite", "--yt-dlp", "--ffmpeg", "--ffprobe" })
                 Check(Has(r, s), std::string("help mentions ") + s);

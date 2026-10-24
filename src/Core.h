@@ -14,7 +14,8 @@ namespace media_downloader
         Help,
         Doctor,
         Probe,
-        Download
+        Download,
+        Host
     };
 
     struct Options

@@ -19,6 +19,8 @@ endif()
 add_library(MediaDownloaderEngine
     src/Engine.cpp
     src/Engine.h
+    src/Host.cpp
+    src/Host.h
     ${MEDIADOWNLOADER_PROCESS_SOURCE}
     src/ChildProcess.h
 )
@@ -91,3 +93,17 @@ install(TARGETS MediaDownloaderCli RUNTIME DESTINATION .)
 if(WIN32)
     install(TARGETS MediaDownloader RUNTIME DESTINATION .)
 endif()
+
+add_executable(MediaDownloaderHostTests tests/HostTests.cpp)
+add_dependencies(MediaDownloaderHostTests MediaDownloaderCli)
+target_compile_features(MediaDownloaderHostTests PRIVATE cxx_std_20)
+target_link_libraries(MediaDownloaderHostTests PRIVATE MediaDownloaderEngine)
+target_compile_definitions(MediaDownloaderHostTests PRIVATE
+    MD_CLI_PATH="$<TARGET_FILE:MediaDownloaderCli>"
+    MD_FAKE_TOOLS_DIR="${CMAKE_SOURCE_DIR}/tests/fake-tools")
+if(MSVC)
+    target_compile_options(MediaDownloaderHostTests PRIVATE /W4 /permissive- /utf-8)
+    set_property(TARGET MediaDownloaderHostTests PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
+add_test(NAME MediaDownloaderHostTests COMMAND MediaDownloaderHostTests)
+set_tests_properties(MediaDownloaderHostTests PROPERTIES SKIP_RETURN_CODE 77)
