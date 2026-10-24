@@ -24,7 +24,7 @@
 namespace fs = std::filesystem;
 static int g_failures = 0;
 
-static void Check(bool condition, std::string const& message)
+[[maybe_unused]] static void Check(bool condition, std::string const& message)
 {
     if (!condition) { ++g_failures; std::cerr << "FAIL: " << message << '\n'; }
 }
