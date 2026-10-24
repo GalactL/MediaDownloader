@@ -47,7 +47,13 @@ try {
 
     Write-Host "Téléchargement de Deno $denoVersion…"
     Invoke-WebRequest -UseBasicParsing -Uri $denoUrl -OutFile $denoArchive
-    $expected = ((Invoke-WebRequest -UseBasicParsing -Uri "$denoUrl.sha256sum").Content.ToString().Trim() -split '\s+')[0]
+    $denoSumFile = Join-Path $temporaryDirectory "$denoAsset.sha256sum"
+    Invoke-WebRequest -UseBasicParsing -Uri "$denoUrl.sha256sum" -OutFile $denoSumFile
+    # Accepte "hash  fichier" et le format Get-FileHash ("Hash : ...")
+    $expected = [regex]::Match((Get-Content -LiteralPath $denoSumFile -Raw), '(?im)^\s*(?:Hash\s*:\s*)?([0-9a-f]{64})\b').Groups[1].Value
+    if (-not $expected) {
+        throw "Impossible de lire la somme SHA-256 de Deno dans le fichier $denoAsset.sha256sum."
+    }
     if ((Get-FileHash -LiteralPath $denoArchive -Algorithm SHA256).Hash -ne $expected) {
         throw "La somme SHA-256 de Deno ne correspond pas."
     }
