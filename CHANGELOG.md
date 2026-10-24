@@ -2,6 +2,10 @@
 
 ## Non publié
 
+## v0.3.2 (2026-10-24)
+
+- Correction de la saisie clavier dans le menu de l'extension (les raccourcis de YouTube ne captent plus les touches tapées dans les champs).
+
 ## v0.3.1 (2026-10-24)
 
 - Correction de la vérification de somme de contrôle de Deno sur Windows (la release v0.3.0 n'a pas été publiée avec ses archives).
