@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "MediaDownloader",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Télécharge la vidéo de la page avec MediaDownloader (yt-dlp et FFmpeg).",
   "browser_specific_settings": {
     "gecko": {
