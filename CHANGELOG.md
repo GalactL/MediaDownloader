@@ -2,6 +2,10 @@
 
 ## Non publié
 
+## v0.3.1 (2026-10-24)
+
+- Correction de la vérification de somme de contrôle de Deno sur Windows (la release v0.3.0 n'a pas été publiée avec ses archives).
+
 ## v0.3.0 (2026-10-24)
 
 - Détection automatique du lancement par Firefox : plus de script d'enveloppe, le manifeste pointe vers `MediaDownloader.Cli`.
