@@ -1,7 +1,7 @@
 # MediaDownloader
 
-Outil natif et indépendant de téléchargement et de conversion vidéo : un CLI, une
-interface graphique Windows et un hôte de messagerie native pour Firefox.
+Outil natif et indépendant de téléchargement et de conversion vidéo : un CLI, un
+hôte de messagerie native et une extension Firefox (menu dans la page).
 
 Le programme accepte une URL HTTP(S), télécharge la meilleure source compatible
 avec la qualité demandée à l'aide de `yt-dlp`, puis peut réencoder la vidéo avec
@@ -9,33 +9,36 @@ FFmpeg afin de respecter une taille maximale (par exemple 10 Mo pour Discord).
 
 ## État du projet
 
-La version 0.1 fournit une application Windows ouvrable par double-clic ainsi
-qu'une interface en ligne de commande pour Windows, macOS et Linux, avec des événements JSON ligne par
-ligne exploitables par toute application appelante. YouTube, TikTok et X sont pris en
+La version 0.2 fournit un CLI pour Windows, macOS et Linux, avec des événements JSON ligne par
+ligne exploitables par toute application appelante (l'utilisation depuis HUB est inchangée),
+ainsi que l'extension Firefox et son hôte natif. YouTube, TikTok et X sont pris en
 charge dans la mesure où la version installée de `yt-dlp` les prend en charge et
 où le contenu est accessible sans contourner de DRM.
 
-## Interface graphique
-
-Ouvrir `build/Release/MediaDownloader.exe`, puis :
-
-1. coller le lien de la vidéo ;
-2. choisir éventuellement un titre personnalisé pour le fichier ;
-3. choisir la qualité et le format ;
-4. conserver le préréglage Discord à 10 Mo ou désactiver la limite ;
-5. cliquer sur **Télécharger**. Pour YouTube, la session Firefox locale est
-   utilisée automatiquement, notamment pour les vidéos exigeant une confirmation d'âge.
-
-Le moteur s'exécute sans fenêtre de console. La progression, les éventuelles
-erreurs et le chemin du fichier final sont affichés dans l'application.
-
 ## Plateformes de la v0.2.0
 
-- Windows x64 : interface graphique et CLI ;
-- macOS Apple Silicon et Intel : CLI ;
-- Linux x64 : CLI.
+- Windows x64, macOS Apple Silicon et Intel, Linux x64 : CLI, hôte de messagerie native et extension Firefox.
 
 La release GitHub contient une archive et une notice distinctes pour chaque cible.
+
+## Installation (release)
+
+1. Décompresser l'archive.
+2. Exécuter `MediaDownloader.Cli install-host` (`MediaDownloader.Cli.exe install-host` sous Windows).
+3. Glisser `mediadownloader.xpi` dans une fenêtre Firefox.
+
+Contenu de l'archive :
+
+```text
+MediaDownloader.Cli(.exe)
+mediadownloader.xpi
+tools/bin/   yt-dlp, ffmpeg, ffprobe, deno (Windows, Linux) ; deno seul (macOS)
+README.txt
+```
+
+Sous Linux, l'archive est autonome : `yt-dlp`, `ffmpeg` (build statique GPL de BtbN/FFmpeg-Builds, redistribué sous licence GPL ; sources et licence : https://github.com/BtbN/FFmpeg-Builds et https://ffmpeg.org/legal.html), `ffprobe` et `deno` sont dans `tools/bin`. Sous macOS, `yt-dlp` et FFmpeg doivent être installés séparément, par exemple avec Homebrew (voir `README.txt`).
+Sous Windows, ne pas déplacer l'exécutable après `install-host` : le manifeste
+contient son chemin. Signature de l'extension : [docs/EXTENSION_SIGNATURE.md](docs/EXTENSION_SIGNATURE.md).
 
 ## Prérequis
 
@@ -69,8 +72,9 @@ possible depuis un terminal développeur Visual Studio.
 
 La compilation génère :
 
-- `build/Release/MediaDownloader.exe` : application graphique ouvrable par double-clic ;
-- `build/Release/MediaDownloader.Cli.exe` : moteur en ligne de commande.
+- `build/Release/MediaDownloader.Cli.exe` : moteur en ligne de commande et hôte de messagerie native.
+
+L'extension (`extension/`, JavaScript pur) ne se compile pas : voir [extension/README.md](extension/README.md).
 
 Sur macOS et Linux :
 
@@ -157,14 +161,18 @@ Contrat complet : [docs/CLI_PROTOCOL.md](docs/CLI_PROTOCOL.md).
 (messages JSON préfixés par leur longueur). Protocole :
 [docs/NATIVE_HOST_PROTOCOL.md](docs/NATIVE_HOST_PROTOCOL.md).
 
-Installation (enregistre le manifeste pour Firefox) :
+Firefox lance directement l'exécutable : `MediaDownloader.Cli` reconnaît ce lancement
+(chemin du manifeste ou identifiant d'extension en premier argument) et passe en mode `host`.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File tools/install-native-host.ps1
-powershell -ExecutionPolicy Bypass -File tools/install-native-host.ps1 -Uninstall
+`MediaDownloader.Cli install-host` écrit le manifeste pour Firefox (sous Windows, il
+enregistre aussi la clé de registre `HKCU`). Il se relance après un déplacement de l'exécutable.
+
+```text
+MediaDownloader.Cli install-host
 ```
 
-Sur macOS et Linux : `tools/install-native-host.sh [--uninstall] [chemin du CLI]`.
+L'extension affiche un bouton flottant sur les pages YouTube ; le menu permet de choisir
+la qualité, la taille maximale et un extrait.
 
 ## Tests
 

@@ -8,8 +8,42 @@ on:
 permissions:
   contents: write
 
+env:
+  # Garder synchronisé avec tools/install-dependencies.ps1
+  DENO_VERSION: "2.5.6"
+  # Build FFmpeg statique GPL embarqué dans l'archive Linux (BtbN/FFmpeg-Builds)
+  FFMPEG_ASSET: ffmpeg-n8.1-latest-linux64-gpl-8.1.tar.xz
+
 jobs:
+  extension:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Empaqueter et signer l'extension
+        shell: bash
+        env:
+          WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
+          WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+        run: |
+          set -euo pipefail
+          mkdir -p ext-src out
+          cp -r extension/. ext-src/
+          rm -rf ext-src/test ext-src/README.md
+          if [ -n "$WEB_EXT_API_KEY" ] && [ -n "$WEB_EXT_API_SECRET" ]; then
+            npx --yes web-ext@8.3.0 sign --channel=unlisted --source-dir ext-src --artifacts-dir signed
+            cp signed/*.xpi out/mediadownloader.xpi
+          else
+            echo "::warning::AMO_JWT_ISSUER/AMO_JWT_SECRET absents : mediadownloader.xpi n'est PAS signé (Firefox stable le refusera)."
+            (cd ext-src && zip -r -X ../out/mediadownloader.xpi .)
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mediadownloader-xpi
+          path: out/mediadownloader.xpi
+          if-no-files-found: error
+
   build:
+    needs: extension
     strategy:
       fail-fast: false
       matrix:
@@ -19,12 +53,15 @@ jobs:
             readme: docs/RELEASE_WINDOWS.md
           - os: ubuntu-latest
             artifact: MediaDownloader-v0.2.0-Linux-x64
+            deno: x86_64-unknown-linux-gnu
             readme: docs/RELEASE_LINUX.md
           - os: macos-15-intel
             artifact: MediaDownloader-v0.2.0-macOS-x64
+            deno: x86_64-apple-darwin
             readme: docs/RELEASE_MACOS.md
           - os: macos-15
             artifact: MediaDownloader-v0.2.0-macOS-arm64
+            deno: aarch64-apple-darwin
             readme: docs/RELEASE_MACOS.md
     runs-on: ${{ matrix.os }}
     steps:
@@ -41,6 +78,13 @@ jobs:
         run: ctest --test-dir build -C Release --output-on-failure
       - name: Installer
         run: cmake --install build --config Release --prefix package/${{ matrix.artifact }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: mediadownloader-xpi
+          path: xpi
+      - name: Ajouter l'extension Firefox
+        shell: bash
+        run: cp xpi/mediadownloader.xpi "package/${{ matrix.artifact }}/mediadownloader.xpi"
       - name: Ajouter la notice
         shell: bash
         run: cp "${{ matrix.readme }}" "package/${{ matrix.artifact }}/README.txt"
@@ -50,6 +94,39 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force "package/${{ matrix.artifact }}/tools" | Out-Null
           Copy-Item -Recurse tools/bin "package/${{ matrix.artifact }}/tools/bin"
+      - name: Ajouter Deno
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          asset="deno-${{ matrix.deno }}.zip"
+          url="https://github.com/denoland/deno/releases/download/v${DENO_VERSION}"
+          curl -fsSL -o "$RUNNER_TEMP/$asset" "$url/$asset"
+          curl -fsSL -o "$RUNNER_TEMP/$asset.sha256sum" "$url/$asset.sha256sum"
+          (cd "$RUNNER_TEMP" && shasum -a 256 -c "$asset.sha256sum")
+          mkdir -p "package/${{ matrix.artifact }}/tools/bin"
+          unzip -o "$RUNNER_TEMP/$asset" deno -d "package/${{ matrix.artifact }}/tools/bin"
+          chmod +x "package/${{ matrix.artifact }}/tools/bin/deno"
+      - name: Ajouter yt-dlp et FFmpeg (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          bin="package/${{ matrix.artifact }}/tools/bin"
+          mkdir -p "$bin"
+          # yt-dlp : binaire autonome officiel, vérifié via SHA2-256SUMS de la même release
+          ytdlp="https://github.com/yt-dlp/yt-dlp/releases/latest/download"
+          curl -fsSL -o "$RUNNER_TEMP/yt-dlp_linux" "$ytdlp/yt-dlp_linux"
+          curl -fsSL -o "$RUNNER_TEMP/SHA2-256SUMS" "$ytdlp/SHA2-256SUMS"
+          (cd "$RUNNER_TEMP" && grep -E ' yt-dlp_linux$' SHA2-256SUMS | sha256sum -c -)
+          install -m 755 "$RUNNER_TEMP/yt-dlp_linux" "$bin/yt-dlp"
+          # FFmpeg : build statique GPL (BtbN), branche stable n8.1
+          ff="https://github.com/BtbN/FFmpeg-Builds/releases/download/latest"
+          curl -fsSL -o "$RUNNER_TEMP/$FFMPEG_ASSET" "$ff/$FFMPEG_ASSET"
+          curl -fsSL -o "$RUNNER_TEMP/checksums.sha256" "$ff/checksums.sha256"
+          (cd "$RUNNER_TEMP" && grep -F "  $FFMPEG_ASSET" checksums.sha256 | sha256sum -c -)
+          tar -xJf "$RUNNER_TEMP/$FFMPEG_ASSET" -C "$bin" --strip-components=2 --wildcards '*/bin/ffmpeg' '*/bin/ffprobe'
+          chmod +x "$bin/ffmpeg" "$bin/ffprobe"
       - name: Archiver Windows
         if: runner.os == 'Windows'
         shell: pwsh

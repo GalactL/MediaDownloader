@@ -136,6 +136,31 @@ int main()
     std::error_code cleanupError;
     std::filesystem::remove_all(testRoot, cleanupError);
 
+    Check(IsNativeHostLaunch({ L"C:\\x\\media_downloader.json", L"mediadownloader@localhost" }), "lancement Firefox : manifeste + id");
+    Check(IsNativeHostLaunch({ L"/home/u/.mozilla/native-messaging-hosts/media_downloader.json" }), "lancement Firefox : manifeste seul");
+    Check(IsNativeHostLaunch({ L"mediadownloader@localhost" }), "lancement Firefox : id seul");
+    Check(IsNativeHostLaunch({ L"{12345678-1234-1234-1234-123456789abc}" }), "lancement Firefox : id uuid");
+    Check(!IsNativeHostLaunch({}), "aucun argument : pas l'hôte");
+    Check(!IsNativeHostLaunch({ L"download", L"--url", L"https://example.test/a@b.json" }), "download : pas l'hôte");
+    Check(!IsNativeHostLaunch({ L"host" }) && !IsNativeHostLaunch({ L"doctor" }) && !IsNativeHostLaunch({ L"--help" }), "commandes connues : pas l'hôte");
+    Check(!IsNativeHostLaunch({ L"n'importe-quoi" }), "mot inconnu : pas l'hôte");
+
+    {
+        auto manifest = BuildNativeManifest("C:\\Program Files\\MD\\MediaDownloader.Cli.exe", "mediadownloader@localhost");
+        Check(manifest.find("\"name\": \"media_downloader\"") != std::string::npos, "manifeste : nom");
+        Check(manifest.find("\"path\": \"C:\\\\Program Files\\\\MD\\\\MediaDownloader.Cli.exe\"") != std::string::npos, "manifeste : antislashs Windows échappés");
+        Check(manifest.find("\"type\": \"stdio\"") != std::string::npos, "manifeste : stdio");
+        Check(manifest.find("\"allowed_extensions\": [\"mediadownloader@localhost\"]") != std::string::npos, "manifeste : allowed_extensions");
+        Check(BuildNativeManifest("/a\"b", "x@y").find("/a\\\"b") != std::string::npos, "manifeste : guillemet échappé");
+        std::filesystem::path home{ "/home/u" }, exeDir{ "/opt/md" };
+        Check(NativeManifestPath(HostPlatform::Linux, home, exeDir) == home / ".mozilla/native-messaging-hosts/media_downloader.json", "chemin manifeste Linux");
+        Check(NativeManifestPath(HostPlatform::MacOS, home, exeDir) == home / "Library/Application Support/Mozilla/NativeMessagingHosts/media_downloader.json", "chemin manifeste macOS");
+        Check(NativeManifestPath(HostPlatform::Windows, home, exeDir) == exeDir / "native-host/media_downloader.json", "chemin manifeste Windows");
+        auto parsed = ParseArguments({ L"install-host" });
+        Check(parsed.options && parsed.options->command == Command::InstallHost, "install-host reconnu");
+        Check(!ParseArguments({ L"install-host", L"--x" }).options, "install-host refuse les arguments");
+    }
+
     if (failures == 0) std::cout << "Tous les tests sont passes.\n";
     return failures == 0 ? 0 : 1;
 }

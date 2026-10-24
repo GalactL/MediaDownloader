@@ -1,11 +1,19 @@
 MediaDownloader v0.2.0 — Windows x64
 
-Contenu :
-- MediaDownloader.exe : interface graphique.
-- MediaDownloader.Cli.exe : interface en ligne de commande.
+Contenu de l'archive :
+- MediaDownloader.Cli.exe : CLI et hôte de messagerie native.
+- mediadownloader.xpi : extension Firefox.
+- tools/bin : yt-dlp, ffmpeg, ffprobe et deno (moteur JavaScript pour YouTube).
+- README.txt : cette notice.
 
-yt-dlp et FFmpeg sont inclus dans tools/bin. Node.js 22+ ou Deno 2.3+ est
-recommandé pour YouTube. Firefox connecté à YouTube est utilisé automatiquement
+Installation :
+  1. Décompresser l'archive.
+  2. Exécuter : MediaDownloader.Cli.exe install-host
+  3. Glisser mediadownloader.xpi dans une fenêtre Firefox.
+
+Ne déplacez pas l'exécutable après l'étape 2 ; sinon relancez-la.
+
+ Firefox connecté à YouTube est utilisé automatiquement
 lorsque la vidéo exige une session valide.
 
-Lancez MediaDownloader.exe par double-clic.
+Signature de l'extension : voir docs/EXTENSION_SIGNATURE.md.

@@ -15,8 +15,11 @@ namespace media_downloader
         Doctor,
         Probe,
         Download,
-        Host
+        Host,
+        InstallHost
     };
+
+    enum class HostPlatform { Windows, MacOS, Linux };
 
     struct Options
     {
@@ -50,6 +53,11 @@ namespace media_downloader
     };
 
     ParseResult ParseArguments(std::vector<std::wstring> const& arguments);
+    bool IsNativeHostLaunch(std::vector<std::wstring> const& arguments);
+    // Manifeste Firefox de messagerie native (UTF-8) ; `exePath` est l'exécutable lui-même.
+    std::string BuildNativeManifest(std::string_view exePath, std::string_view extensionId);
+    // Emplacement du manifeste : Windows à côté de l'exécutable, sinon sous le dossier personnel.
+    std::filesystem::path NativeManifestPath(HostPlatform platform, std::filesystem::path const& home, std::filesystem::path const& exeDirectory);
     bool IsSupportedUrl(std::wstring_view value);
     bool IsYouTubeUrl(std::wstring_view value);
     std::wstring BuildFormatSelector(std::wstring const& quality);

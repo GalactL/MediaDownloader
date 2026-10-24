@@ -127,7 +127,7 @@ namespace
         {
             auto r = Run(args);
             Check(r.code == 0, "help exits 0");
-            for (auto const* s : { "doctor", "probe", "download", "host", "--url", "--quality", "--format", "--title",
+            for (auto const* s : { "doctor", "probe", "download", "host", "install-host", "--url", "--quality", "--format", "--title",
                 "--start-time", "--end-time", "--max-size-mb", "--cookies-from-browser", "--output",
                 "--overwrite", "--yt-dlp", "--ffmpeg", "--ffprobe" })
                 Check(Has(r, s), std::string("help mentions ") + s);
@@ -244,6 +244,26 @@ namespace
         r = Run({ "download", "--url", "https://example.com/v", "--output", out.string(), "--title", "My: Clip?" });
         Check(r.code == 0 && Has(r, "/My") && Has(r, ".mp4\",\"bytes\""), "--title renames output: " + r.lines.back());
         Check(NoTempDirs(out), "temp dir removed after all runs");
+    }
+
+    void TestInstallHost()
+    {
+        auto r = Run({ "install-host" });
+        auto manifest = g_home / (
+#ifdef __APPLE__
+            "Library/Application Support/Mozilla/NativeMessagingHosts/media_downloader.json"
+#else
+            ".mozilla/native-messaging-hosts/media_downloader.json"
+#endif
+        );
+        Check(r.code == 0 && r.out.empty(), "install-host exits 0 with empty stdout");
+        std::ifstream file(manifest);
+        std::ostringstream all; all << file.rdbuf();
+        auto text = all.str();
+        Check(text.find("\"path\": \"" + fs::path(MD_CLI_PATH).string() + "\"") != std::string::npos, "install-host manifest points to the CLI");
+        Check(text.find("mediadownloader@localhost") != std::string::npos, "install-host manifest has allowed_extensions");
+        r = Run({ "install-host", "--bogus" });
+        Check(r.code == 2, "install-host rejects extra arguments");
     }
 
     void TestDefaultOutput()
@@ -466,6 +486,7 @@ int main()
     TestDoctor();
     TestProbe();
     TestDownloadPlain();
+    TestInstallHost();
     TestDefaultOutput();
     TestDownloadEncode();
     TestDownloadFailure();

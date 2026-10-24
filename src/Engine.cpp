@@ -17,6 +17,8 @@
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
+#include <fstream>
+#include <iostream>
 #include <sstream>
 #include <regex>
 
@@ -49,26 +51,28 @@ namespace
     constexpr wchar_t DenoName[] = L"deno";
     constexpr wchar_t NodeName[] = L"node";
 #endif
-    std::filesystem::path ExecutableDirectory()
+    std::filesystem::path ExecutablePath()
     {
 #ifdef _WIN32
         std::wstring buffer(32768, L'\0');
         auto length = GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
         buffer.resize(length);
-        return std::filesystem::path(buffer).parent_path();
+        return std::filesystem::path(buffer);
 #elif defined(__APPLE__)
         uint32_t size{};
         _NSGetExecutablePath(nullptr, &size);
         std::string buffer(size, '\0');
-        if (_NSGetExecutablePath(buffer.data(), &size) != 0) return std::filesystem::current_path();
-        return std::filesystem::weakly_canonical(buffer).parent_path();
+        if (_NSGetExecutablePath(buffer.data(), &size) != 0) return std::filesystem::current_path() / "MediaDownloader.Cli";
+        return std::filesystem::weakly_canonical(buffer);
 #else
         std::array<char, 4096> buffer{};
         auto length = readlink("/proc/self/exe", buffer.data(), buffer.size() - 1);
-        if (length <= 0) return std::filesystem::current_path();
-        return std::filesystem::path(std::string(buffer.data(), static_cast<size_t>(length))).parent_path();
+        if (length <= 0) return std::filesystem::current_path() / "MediaDownloader.Cli";
+        return std::filesystem::path(std::string(buffer.data(), static_cast<size_t>(length)));
 #endif
     }
+
+    std::filesystem::path ExecutableDirectory() { return ExecutablePath().parent_path(); }
 
     std::optional<std::filesystem::path> FromEnvironment(wchar_t const* name)
     {
@@ -476,4 +480,47 @@ namespace
 int Engine::Doctor(Options const& options) { return RunDoctor(Ctx{ sink_, cancel_ }, options); }
 int Engine::Probe(Options const& options) { return RunProbe(Ctx{ sink_, cancel_ }, options); }
 int Engine::Download(Options const& options) { return RunDownload(Ctx{ sink_, cancel_ }, options); }
+
+int Engine::InstallHost()
+{
+    // Chemin provisoire : remplacé par l'identifiant de l'extension à l'étape 2.
+    constexpr char ExtensionId[] = "mediadownloader@localhost";
+    auto exe = ExecutablePath();
+    std::filesystem::path home;
+#ifdef _WIN32
+    constexpr auto platform = HostPlatform::Windows;
+#else
+    if (auto value = std::getenv("HOME")) home = value;
+    if (home.empty()) throw std::runtime_error("Le dossier personnel est indisponible");
+#ifdef __APPLE__
+    constexpr auto platform = HostPlatform::MacOS;
+#else
+    constexpr auto platform = HostPlatform::Linux;
+#endif
+#endif
+    auto manifest = NativeManifestPath(platform, home, exe.parent_path());
+    std::error_code error;
+    std::filesystem::create_directories(manifest.parent_path(), error);
+    if (error) throw std::runtime_error("Impossible de créer le dossier du manifeste : " + error.message());
+    {
+        std::ofstream file(manifest, std::ios::binary | std::ios::trunc);
+        auto utf8 = exe.u8string();
+        file << BuildNativeManifest(std::string(utf8.begin(), utf8.end()), ExtensionId);
+        file.flush();
+        if (!file) throw std::runtime_error("Impossible d'écrire le manifeste : " + WideToUtf8(manifest.wstring()));
+    }
+#ifdef _WIN32
+    HKEY key{};
+    auto value = manifest.wstring();
+    if (RegCreateKeyExW(HKEY_CURRENT_USER, L"Software\\Mozilla\\NativeMessagingHosts\\media_downloader", 0, nullptr, 0,
+            KEY_SET_VALUE, nullptr, &key, nullptr) != ERROR_SUCCESS)
+        throw std::runtime_error("Impossible de créer la clé de registre de l'hôte natif");
+    auto status = RegSetValueExW(key, nullptr, 0, REG_SZ, reinterpret_cast<BYTE const*>(value.c_str()),
+        static_cast<DWORD>((value.size() + 1) * sizeof(wchar_t)));
+    RegCloseKey(key);
+    if (status != ERROR_SUCCESS) throw std::runtime_error("Impossible d'écrire la clé de registre de l'hôte natif");
+#endif
+    std::cerr << "Hôte natif installé : " << WideToUtf8(manifest.wstring()) << std::endl;
+    return 0;
+}
 }
