@@ -13,22 +13,35 @@ result_cache_policy: read-only
 execution_mode: delegated-control-plane
 orchestrator_product_writes: forbidden
 implementation_policy: workers-only
-task_review_policy: claude-only
+task_review_policy: cross-provider-in-hybrid
 post_pr_policy: manual
 model_selection: ask-once
-model_policy: claude-heavy
+model_policy: hybrid
 claude_models:
   fast: haiku
   standard: sonnet
   deep: opus
+codex_models:
+  economy: gpt-6-luna
+  standard: gpt-6.1-sol
+  frontier: gpt-6-astra
+allow_codex_default_model: false
+codex_frontier_policy: escalation-or-exceptional
+codex_mcp_policy: required-only
+hybrid_review_policy: opposite-provider
+codex_bin: codex
 capability_routing: enabled
 capability_preflight: live
 web_comp_policy: auto
 web_comp_image_model: gpt-image-2.5-flare
 web_comp_edit_model: gpt-image-2.5-sunburst
 claude_capabilities: []
+codex_capabilities:
+  - cua_repl
+  - node_repl
 budget:
   max_worker_dispatches: 10
+  max_codex_dispatches: 12
   max_review_dispatches: 14
   max_model_escalations: 3
   max_pr_repair_cycles: 3
