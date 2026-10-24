@@ -63,7 +63,9 @@ test_commands:
   - cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
   - cmake --build build --config Release --parallel
   - ctest --test-dir build -C Release --output-on-failure
-check_commands: []
+  - node --test extension/test/lib.test.js
+check_commands:
+  - for f in extension/*.js; do node --check "$f"; done
 ui_commands: []
 verification_catalog: []
 ---
