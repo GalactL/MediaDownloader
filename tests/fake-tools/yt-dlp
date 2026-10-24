@@ -1,0 +1,27 @@
+#!/bin/sh
+# Fake yt-dlp for ContractTests. Behaviour via FAKE_YTDLP_MODE=ok|fail, FAKE_SOURCE_BYTES.
+mode=${FAKE_YTDLP_MODE:-ok}
+out=
+for a in "$@"; do
+  [ "$prev" = "--output" ] && out=$a
+  [ "$a" = "--dump-single-json" ] && probe=1
+  prev=$a
+done
+if [ "$mode" = fail ]; then
+  echo "ERROR: [fake] boom: unable to download"
+  exit 1
+fi
+if [ -n "$probe" ]; then
+  echo '{"id":"abc","title":"Fake Title","duration":10}'
+  exit 0
+fi
+dir=${out%/*}
+file="$dir/Fake Title [abc].mp4"
+echo "[info] abc: Downloading 1 format(s)"
+echo "[download] Destination: $file"
+echo "[download]   0.0% of 1.00MiB at 1.00MiB/s ETA 00:01"
+echo "[download]  42.0% of 1.00MiB at 1.00MiB/s ETA 00:01"
+echo "[download] 100.0% of 1.00MiB at 1.00MiB/s ETA 00:00"
+head -c "${FAKE_SOURCE_BYTES:-2048}" /dev/zero > "$file"
+echo "__MD_FILE__:$file"
+exit 0

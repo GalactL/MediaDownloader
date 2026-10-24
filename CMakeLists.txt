@@ -68,6 +68,18 @@ if(NOT WIN32)
     add_test(NAME MediaDownloaderProcessTests COMMAND MediaDownloaderProcessTests)
 endif()
 
+add_executable(MediaDownloaderContractTests tests/ContractTests.cpp)
+add_dependencies(MediaDownloaderContractTests MediaDownloaderCli)
+target_compile_features(MediaDownloaderContractTests PRIVATE cxx_std_20)
+target_compile_definitions(MediaDownloaderContractTests PRIVATE
+    MD_CLI_PATH="$<TARGET_FILE:MediaDownloaderCli>"
+    MD_FAKE_TOOLS_DIR="${CMAKE_SOURCE_DIR}/tests/fake-tools")
+if(MSVC)
+    target_compile_options(MediaDownloaderContractTests PRIVATE /W4 /permissive- /utf-8)
+    set_property(TARGET MediaDownloaderContractTests PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
+add_test(NAME MediaDownloaderContractTests COMMAND MediaDownloaderContractTests)
+
 install(TARGETS MediaDownloaderCli RUNTIME DESTINATION .)
 if(WIN32)
     install(TARGETS MediaDownloader RUNTIME DESTINATION .)

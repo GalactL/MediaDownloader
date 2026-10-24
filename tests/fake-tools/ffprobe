@@ -1,0 +1,3 @@
+#!/bin/sh
+# Fake ffprobe: prints the duration only (FAKE_DURATION seconds, default 10).
+echo "${FAKE_DURATION:-10}.000000"
