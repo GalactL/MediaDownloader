@@ -1,7 +1,7 @@
 MediaDownloader v0.2.0 — macOS
 
-Cette première version fournit le CLI. Installez les dépendances avec Homebrew :
-  brew install yt-dlp ffmpeg node
+Cette version fournit le CLI et Deno (dans tools/bin). Installez le reste avec Homebrew :
+  brew install yt-dlp ffmpeg
 
 Firefox connecté à YouTube est utilisé automatiquement lorsque la vidéo exige
 une session valide.

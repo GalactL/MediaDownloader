@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+env:
+  # Garder synchronisé avec tools/install-dependencies.ps1
+  DENO_VERSION: "2.5.6"
+
 jobs:
   build:
     strategy:
@@ -19,12 +23,15 @@ jobs:
             readme: docs/RELEASE_WINDOWS.md
           - os: ubuntu-latest
             artifact: MediaDownloader-v0.2.0-Linux-x64
+            deno: x86_64-unknown-linux-gnu
             readme: docs/RELEASE_LINUX.md
           - os: macos-15-intel
             artifact: MediaDownloader-v0.2.0-macOS-x64
+            deno: x86_64-apple-darwin
             readme: docs/RELEASE_MACOS.md
           - os: macos-15
             artifact: MediaDownloader-v0.2.0-macOS-arm64
+            deno: aarch64-apple-darwin
             readme: docs/RELEASE_MACOS.md
     runs-on: ${{ matrix.os }}
     steps:
@@ -50,6 +57,19 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force "package/${{ matrix.artifact }}/tools" | Out-Null
           Copy-Item -Recurse tools/bin "package/${{ matrix.artifact }}/tools/bin"
+      - name: Ajouter Deno
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          asset="deno-${{ matrix.deno }}.zip"
+          url="https://github.com/denoland/deno/releases/download/v${DENO_VERSION}"
+          curl -fsSL -o "$RUNNER_TEMP/$asset" "$url/$asset"
+          curl -fsSL -o "$RUNNER_TEMP/$asset.sha256sum" "$url/$asset.sha256sum"
+          (cd "$RUNNER_TEMP" && shasum -a 256 -c "$asset.sha256sum")
+          mkdir -p "package/${{ matrix.artifact }}/tools/bin"
+          unzip -o "$RUNNER_TEMP/$asset" deno -d "package/${{ matrix.artifact }}/tools/bin"
+          chmod +x "package/${{ matrix.artifact }}/tools/bin/deno"
       - name: Archiver Windows
         if: runner.os == 'Windows'
         shell: pwsh

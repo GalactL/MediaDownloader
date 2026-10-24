@@ -1,7 +1,7 @@
 MediaDownloader v0.2.0 — Linux x64
 
-Cette première version fournit le CLI. Installez yt-dlp, FFmpeg et Node.js ou
-Deno avec le gestionnaire de paquets de votre distribution. Firefox connecté à
+Cette version fournit le CLI et Deno (dans tools/bin). Installez yt-dlp et FFmpeg
+avec le gestionnaire de paquets de votre distribution. Firefox connecté à
 YouTube est utilisé automatiquement lorsque la vidéo exige une session valide.
 
 Rendez le programme exécutable si nécessaire :

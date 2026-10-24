@@ -39,6 +39,21 @@ try {
     Copy-Item -LiteralPath $ffmpeg.FullName -Destination (Join-Path $binDirectory 'ffmpeg.exe') -Force
     Copy-Item -LiteralPath $ffprobe.FullName -Destination (Join-Path $binDirectory 'ffprobe.exe') -Force
 
+    # Garder la version synchronisée avec .github/workflows/release.yml
+    $denoVersion = '2.5.6'
+    $denoAsset = 'deno-x86_64-pc-windows-msvc.zip'
+    $denoUrl = "https://github.com/denoland/deno/releases/download/v$denoVersion/$denoAsset"
+    $denoArchive = Join-Path $temporaryDirectory $denoAsset
+
+    Write-Host "Téléchargement de Deno $denoVersion…"
+    Invoke-WebRequest -UseBasicParsing -Uri $denoUrl -OutFile $denoArchive
+    $expected = ((Invoke-WebRequest -UseBasicParsing -Uri "$denoUrl.sha256sum").Content.ToString().Trim() -split '\s+')[0]
+    if ((Get-FileHash -LiteralPath $denoArchive -Algorithm SHA256).Hash -ne $expected) {
+        throw "La somme SHA-256 de Deno ne correspond pas."
+    }
+    Expand-Archive -LiteralPath $denoArchive -DestinationPath $temporaryDirectory -Force
+    Copy-Item -LiteralPath (Join-Path $temporaryDirectory 'deno.exe') -Destination (Join-Path $binDirectory 'deno.exe') -Force
+
     Write-Host "Dépendances installées localement dans $binDirectory"
 }
 finally {
