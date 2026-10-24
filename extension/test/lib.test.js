@@ -26,7 +26,8 @@ test("parseMaxSize", () => {
   assert.equal(lib.parseMaxSize(""), null);
   assert.equal(lib.parseMaxSize("10"), 10);
   assert.equal(lib.parseMaxSize("2,5"), 2.5);
-  for (const bad of ["0", "-3", "x"]) assert.ok(Number.isNaN(lib.parseMaxSize(bad)), bad);
+  assert.equal(lib.parseMaxSize("20"), 20);
+  for (const bad of ["0", "-3", "x", "20.5", "100"]) assert.ok(Number.isNaN(lib.parseMaxSize(bad)), bad);
 });
 
 test("buildDownloadRequest", () => {
@@ -36,9 +37,22 @@ test("buildDownloadRequest", () => {
     { type: "download", url: "u", quality: "720", maxSizeMb: 10, startTime: 0, endTime: 30 });
 });
 
+test("2K and 4K are always offered", () => {
+  const options = lib.qualityOptions([720]);
+  assert.deepEqual(options.map((o) => o.value), ["best", "2160", "1440", "720"]);
+  assert.equal(options[1].label, "4K (2160p)");
+});
+
+test("custom name and errorText", () => {
+  assert.equal(lib.buildDownloadRequest({ url: "u", name: " Mon clip " }).title, "Mon clip");
+  assert.ok(!("title" in lib.buildDownloadRequest({ url: "u", name: "  " })));
+  assert.equal(lib.errorText("busy"), "Un téléchargement est déjà en cours.");
+  assert.equal(lib.errorText("dependency_missing", "Outil manquant."), "Outil manquant.");
+});
+
 test("qualityOptions", () => {
-  assert.deepEqual(lib.qualityOptions([360, 1080, 720, 720]).map((o) => o.value), ["best", "1080", "720", "360"]);
-  assert.deepEqual(lib.qualityOptions(undefined).map((o) => o.value), ["best"]);
+  assert.deepEqual(lib.qualityOptions([360, 1080, 720, 720]).map((o) => o.value), ["best", "2160", "1440", "1080", "720", "360"]);
+  assert.deepEqual(lib.qualityOptions(undefined).map((o) => o.value), ["best", "2160", "1440"]);
 });
 
 test("isVideoPage and canonicalUrl", () => {

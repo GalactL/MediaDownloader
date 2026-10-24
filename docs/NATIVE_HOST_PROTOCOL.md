@@ -45,6 +45,7 @@ Chaque requête peut contenir une chaîne `id`, recopiée dans toutes les répon
 | `{"type":"probe"}` | `url`, `cookiesFromBrowser` facultatif |
 | `{"type":"download"}` | `url`, puis facultatifs : `quality`, `format`, `title`, `startTime`, `endTime`, `maxSizeMb`, `cookiesFromBrowser`, `outputDirectory`, `overwrite` |
 | `{"type":"cancel"}` | aucun |
+| `{"type":"openFolder"}` | aucun : ouvre le dossier de sortie du dernier téléchargement dans le gestionnaire de fichiers |
 
 La validation est celle du CLI : `startTime` et `endTime` vont ensemble,
 `endTime` > `startTime`, seules les URL `http(s)` sont acceptées. Sinon l'hôte
@@ -54,6 +55,8 @@ répond `invalid_arguments`.
 
 Ce sont les événements du CLI (`started`, `log`, `progress`, `encodingPlan`,
 `completed`, `error`, `doctor`) avec le champ `id` ajouté juste après `type`.
+
+`openFolder` répond `{"type":"opened","id":"…"}`. Aucun chemin n'est accepté du client : seul le dernier dossier de sortie est ouvrable, sinon `no_folder`.
 
 La réponse `probe` est compacte :
 
@@ -82,6 +85,8 @@ La réponse `probe` est compacte :
 | `busy` | un travail est déjà en cours |
 | `message_too_large` | réponse supérieure à 1 Mio |
 | `cancelled` | travail annulé par `cancel` |
+| `no_folder` | `openFolder` sans téléchargement préalable |
+| `open_failed` | le gestionnaire de fichiers n'a pas pu s'ouvrir |
 
 Les autres codes d'`error` sont ceux du CLI (par exemple `processing_failed`,
 dépendance manquante) ; voir [CLI_PROTOCOL.md](CLI_PROTOCOL.md).

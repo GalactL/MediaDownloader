@@ -20,7 +20,7 @@
     const reply = message.message;
     const handler = handlers.get(reply.id);
     if (!handler) return;
-    if (["completed", "error", "probe"].includes(reply.type)) handlers.delete(reply.id);
+    if (["completed", "error", "probe", "opened"].includes(reply.type)) handlers.delete(reply.id);
     handler(reply);
   });
 
@@ -39,10 +39,12 @@
   const fab = el("button", { className: "fab", type: "button", title: "MediaDownloader", textContent: "⬇" });
   const title = el("p", { className: "title", textContent: "MediaDownloader" });
   const quality = el("select");
-  const maxSize = el("input", { type: "text", inputMode: "decimal", placeholder: "Illimitée" });
-  const presetSize = el("button", { className: "btn secondary", type: "button", textContent: "10 Mo" });
-  const startInput = el("input", { type: "text", placeholder: "0 ou 1:30" });
-  const endInput = el("input", { type: "text", placeholder: "60 ou 2:00" });
+  const nameInput = el("input", { type: "text", placeholder: "Titre de la vidéo" });
+  const maxSize = el("input", { type: "text", inputMode: "decimal", value: String(lib.MAX_SIZE_MB) });
+  const clip = el("input", { type: "checkbox" });
+  const startInput = el("input", { type: "text", placeholder: "0 ou 1:30", disabled: true });
+  const endInput = el("input", { type: "text", placeholder: "60 ou 2:00", disabled: true });
+  const openFolder = el("button", { className: "btn secondary", type: "button", textContent: "Ouvrir le dossier", hidden: true });
   const download = el("button", { className: "btn", type: "button", textContent: "Télécharger" });
   const cancel = el("button", { className: "btn secondary", type: "button", textContent: "Annuler", hidden: true });
   const bar = el("progress", { max: 100, value: 0, hidden: true });
@@ -51,14 +53,15 @@
   const panel = el("div", { className: "panel", hidden: true }, [
     title,
     el("label", { textContent: "Qualité" }, [quality]),
-    el("label", { textContent: "Taille maximale (Mo)" }, [maxSize]),
-    el("div", { className: "actions" }, [presetSize]),
+    el("label", { textContent: "Nom de la vidéo" }, [nameInput]),
+    el("label", { textContent: "Taille maximale (Mo, 20 max)" }, [maxSize]),
+    el("label", { className: "check" }, [clip, " Découper la vidéo"]),
     el("div", { className: "row" }, [
       el("label", { textContent: "Début (s)" }, [startInput]),
       el("label", { textContent: "Fin (s)" }, [endInput]),
     ]),
     el("div", { className: "actions" }, [download, cancel]),
-    bar, barText, message,
+    bar, barText, message, openFolder,
   ]);
   shadow.append(style, fab, panel);
 
@@ -95,37 +98,42 @@
       if (reply.type === "probe" && reply.data) {
         title.textContent = String(reply.data.title || "Vidéo");
         setQualities(reply.data.heights);
+        nameInput.value = String(reply.data.title || "");
       } else if (reply.type === "error") {
         title.textContent = "MediaDownloader";
         probedUrl = null; // retry on next open
-        say(reply.message || "Échec de l'analyse.", "error");
+        say(lib.errorText(reply.code, reply.message), "error");
       }
     });
   }
 
   function start() {
-    const startTime = lib.parseTime(startInput.value);
-    const endTime = lib.parseTime(endInput.value);
+    // Timecodes are ignored while the box is unchecked; once checked, start and end are both required.
+    const startTime = clip.checked ? lib.parseTime(startInput.value) : null;
+    const endTime = clip.checked ? lib.parseTime(endInput.value) : null;
     const size = lib.parseMaxSize(maxSize.value);
-    const rangeError = lib.validateRange(startTime, endTime);
+    const rangeError = clip.checked && (startTime === null || endTime === null) && !Number.isNaN(startTime) && !Number.isNaN(endTime)
+      ? "Renseignez le début et la fin du découpage." : lib.validateRange(startTime, endTime);
     if (rangeError) return say(rangeError, "error");
-    if (Number.isNaN(size)) return say("La taille maximale doit être un nombre strictement positif.", "error");
+    if (Number.isNaN(size)) return say("La taille maximale doit être comprise entre 0 et " + lib.MAX_SIZE_MB + " Mo.", "error");
+    openFolder.hidden = true;
     setRunning(true);
     bar.removeAttribute("value"); // indeterminate until first progress
     barText.textContent = "Démarrage…";
     say("");
     request(lib.buildDownloadRequest({
-      url: lib.canonicalUrl(location.href), quality: quality.value, maxSizeMb: size, start: startTime, end: endTime,
+      url: lib.canonicalUrl(location.href), quality: quality.value, maxSizeMb: size, start: startTime, end: endTime, name: nameInput.value,
     }), (reply) => {
       if (reply.type === "progress") {
         bar.value = Number(reply.percent) || 0;
         barText.textContent = lib.progressText(reply.stage, reply.percent, reply.pass);
       } else if (reply.type === "completed") {
         setRunning(false);
-        say("Terminé : " + reply.path, "ok");
+        say("Téléchargement terminé.", "ok");
+        openFolder.hidden = false;
       } else if (reply.type === "error") {
         setRunning(false);
-        say(reply.message || "Échec du téléchargement.", "error"); // includes the host's `busy` and `cancelled` messages
+        say(lib.errorText(reply.code, reply.message), "error");
       }
     });
   }
@@ -134,7 +142,10 @@
     panel.hidden = !panel.hidden;
     if (!panel.hidden && !running && probedUrl !== location.href) probe();
   });
-  presetSize.addEventListener("click", () => { maxSize.value = "10"; });
+  clip.addEventListener("change", () => { startInput.disabled = endInput.disabled = !clip.checked; });
+  openFolder.addEventListener("click", () => request({ type: "openFolder" }, (reply) => {
+    if (reply.type === "error") say(lib.errorText(reply.code, reply.message), "error");
+  }));
   download.addEventListener("click", start);
   cancel.addEventListener("click", () => request({ type: "cancel" }, () => {}));
 

@@ -34,6 +34,8 @@ int main()
     Check(!IsYouTubeUrl(L"https://youtube.com.example.test/video"), "faux domaine YouTube refusé");
 
     Check(BuildFormatSelector(L"best") == L"bestvideo+bestaudio/best", "sélecteur best");
+    Check(BuildFormatSelector(L"2160") == L"bestvideo[height<=2160]+bestaudio/best[height<=2160]/best", "sélecteur 4K");
+    Check(BuildFormatSelector(L"1440") == L"bestvideo[height<=1440]+bestaudio/best[height<=1440]/best", "sélecteur 2K");
     Check(BuildFormatSelector(L"1080") == L"bestvideo[height<=1080]+bestaudio/best[height<=1080]/best", "sélecteur 1080p avec repli direct");
     Check(SanitizeFileName(L" Mon titre: test? ") == L"Mon titre_ test_", "nettoyage du titre Windows");
     Check(SanitizeFileName(L"CON") == L"_CON", "nom Windows réservé");

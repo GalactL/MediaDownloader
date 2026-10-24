@@ -1,8 +1,8 @@
 "use strict";
 
 const HOST_NAME = "media_downloader";
-const FORWARDED_TYPES = new Set(["probe", "download", "cancel", "doctor"]);
-const TERMINAL_TYPES = new Set(["completed", "error", "probe", "doctor"]);
+const FORWARDED_TYPES = new Set(["probe", "download", "cancel", "doctor", "openFolder"]);
+const TERMINAL_TYPES = new Set(["completed", "error", "probe", "doctor", "opened"]);
 
 let port = null;
 let counter = 0;

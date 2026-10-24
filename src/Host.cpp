@@ -1,4 +1,6 @@
 #include "Host.h"
+#include "ChildProcess.h"
+#include "Core.h"
 
 #ifdef _WIN32
 #include <fcntl.h>
@@ -14,6 +16,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <functional>
 #include <iomanip>
 #include <locale>
@@ -332,13 +335,15 @@ namespace media_downloader
         class HostSink : public EventSink
         {
         public:
-            HostSink(Output& output, std::optional<std::string> id, std::function<void()> onTerminal = {})
-                : output_(output), id_(std::move(id)), onTerminal_(std::move(onTerminal)) {}
+            HostSink(Output& output, std::optional<std::string> id, std::function<void()> onTerminal = {},
+                std::function<void(std::string const&)> onStarted = {})
+                : output_(output), id_(std::move(id)), onTerminal_(std::move(onTerminal)), onStarted_(std::move(onStarted)) {}
 
             void On(Event const& event) override
             {
                 bool terminal = std::holds_alternative<CompletedEvent>(event) || std::holds_alternative<ErrorEvent>(event) ||
                     std::holds_alternative<ProbeEvent>(event);
+                if (auto const* started = std::get_if<StartedEvent>(&event); started && onStarted_) onStarted_(started->outputDirectory);
                 std::string json;
                 if (auto const* probe = std::get_if<ProbeEvent>(&event))
                 {
@@ -355,7 +360,25 @@ namespace media_downloader
             Output& output_;
             std::optional<std::string> id_;
             std::function<void()> onTerminal_;
+            std::function<void(std::string const&)> onStarted_;
         };
+
+        // Opens a folder in the system file manager. execv-based RunProcess needs absolute paths.
+        bool OpenFolder(std::string const& directory)
+        {
+            std::filesystem::path opener;
+#ifdef _WIN32
+            wchar_t const* root = _wgetenv(L"SystemRoot");
+            opener = std::filesystem::path(root ? root : L"C:\\Windows") / L"explorer.exe";
+#elif defined(__APPLE__)
+            opener = "/usr/bin/open";
+#else
+            opener = "/usr/bin/xdg-open";
+#endif
+            std::atomic_bool never{};
+            auto result = RunProcess(opener, { Utf8ToWide(directory) }, std::filesystem::path(Utf8ToWide(directory)), [](std::string const&) {}, never);
+            return result.exitCode == 0 || opener.filename() == "explorer.exe"; // explorer returns 1 even on success
+        }
 
         // ---- requests ----------------------------------------------------------------------------------
 
@@ -460,10 +483,13 @@ namespace media_downloader
         Output output(stdout);
         std::atomic_bool cancel{}, busy{}, finished{};
         std::thread worker;
+        std::mutex folderMutex;
+        std::string lastFolder; // output directory of the latest download: the only folder a client can ask to open
 
         auto runJob = [&](Options const& options, std::optional<std::string> id, bool inlineJob)
         {
-            HostSink sink(output, id, [&busy, inlineJob] { if (!inlineJob) busy = false; });
+            HostSink sink(output, id, [&busy, inlineJob] { if (!inlineJob) busy = false; },
+                [&](std::string const& directory) { std::lock_guard<std::mutex> lock(folderMutex); lastFolder = directory; });
             Engine engine(sink, cancel);
             auto report = [&sink](char const* code, char const* message)
             {
@@ -530,6 +556,15 @@ namespace media_downloader
             {
                 if (busy) cancel = true;
                 return true;
+            }
+            if (type == "openFolder")
+            {
+                std::string folder;
+                { std::lock_guard<std::mutex> lock(folderMutex); folder = lastFolder; }
+                if (folder.empty()) output.Send(ErrorJson("no_folder", "Aucun dossier de téléchargement à ouvrir."), id);
+                else if (!OpenFolder(folder)) output.Send(ErrorJson("open_failed", "Impossible d'ouvrir le dossier."), id);
+                else output.Send("{\"type\":\"opened\"}", id);
+                return !output.Failed();
             }
             if (type != "doctor" && type != "probe" && type != "download")
             {

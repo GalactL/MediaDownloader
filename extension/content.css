@@ -34,3 +34,6 @@ progress { width: 100%; margin-top: 12px; }
 .message { margin-top: 8px; word-break: break-word; }
 .message.error { color: #ff9aa2; }
 .message.ok { color: #86de74; }
+label.check { display: flex; align-items: center; gap: 6px; }
+label.check input { width: auto; margin: 0; }
+input:disabled { opacity: .5; }
