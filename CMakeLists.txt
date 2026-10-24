@@ -79,6 +79,7 @@ if(MSVC)
     set_property(TARGET MediaDownloaderContractTests PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 add_test(NAME MediaDownloaderContractTests COMMAND MediaDownloaderContractTests)
+set_tests_properties(MediaDownloaderContractTests PROPERTIES SKIP_RETURN_CODE 77)
 
 install(TARGETS MediaDownloaderCli RUNTIME DESTINATION .)
 if(WIN32)

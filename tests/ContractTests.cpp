@@ -30,12 +30,12 @@ static void Check(bool condition, std::string const& message)
 }
 
 #ifdef _WIN32
-int main() { std::cout << "ContractTests ignores: POSIX shell fake tools required\n"; return 0; }
+int main() { std::cout << "ContractTests skipped: POSIX shell fake tools required\n"; return 77; }
 #else
 
 namespace
 {
-    struct Result { int code{}; std::string out; std::vector<std::string> lines; };
+    struct Result { int code{}; std::string out; std::vector<std::string> lines; std::string argv; };
 
     std::string Q(std::string const& s)
     {
@@ -44,15 +44,17 @@ namespace
         return r + "'";
     }
 
-    fs::path g_tmp, g_home;
+    fs::path g_tmp, g_home, g_argvLog;
     int g_counter{};
 
     // env: extra KEY=VALUE assignments applied after the defaults (later wins).
     Result Run(std::vector<std::string> const& args, std::vector<std::string> const& env = {})
     {
         fs::path tools = MD_FAKE_TOOLS_DIR;
+        std::error_code ignored;
+        fs::remove(g_argvLog, ignored);
         std::string cmd = "cd " + Q(g_tmp.string()) + " && env -i HOME=" + Q(g_home.string()) +
-            " PATH=/usr/bin:/bin" +
+            " PATH=/usr/bin:/bin FAKE_ARGV_LOG=" + Q(g_argvLog.string()) +
             " MEDIADOWNLOADER_YTDLP=" + Q((tools / "yt-dlp").string()) +
             " MEDIADOWNLOADER_FFMPEG=" + Q((tools / "ffmpeg").string()) +
             " MEDIADOWNLOADER_FFPROBE=" + Q((tools / "ffprobe").string()) +
@@ -70,6 +72,7 @@ namespace
         while ((count = fread(buffer, 1, sizeof buffer, pipe)) > 0) result.out.append(buffer, count);
         auto status = pclose(pipe);
         result.code = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+        { std::ifstream log(g_argvLog); std::ostringstream all; all << log.rdbuf(); result.argv = all.str(); }
         std::istringstream stream(result.out);
         for (std::string line; std::getline(stream, line);) result.lines.push_back(line);
         return result;
@@ -177,8 +180,9 @@ namespace
             { "PATH=" + empty.string(), "MEDIADOWNLOADER_YTDLP=/nonexistent/yt-dlp" });
         Check(r.code == 3 && Has(r, "\"code\":\"tool_missing\""), "probe without yt-dlp: tool_missing exit 3");
 
-        // Quirk: --max-size-mb with ffprobe absent is not rejected up front (the ffprobe check is
-        // unreachable); it fails later with processing_failed.
+        // KNOWN QUIRK (fix in T2, then tighten to exit 3 + tool_missing): with --max-size-mb and ffprobe
+        // absent, Main.cpp dereferences an empty optional (UB) because the up-front check tests ffmpeg
+        // twice. Today it happens to fail at runtime, so only assert "fails with 3 or 4".
         r = Run({ "download", "--url", url, "--output", out.string(), "--max-size-mb", "10" },
             { "PATH=" + empty.string(), "MEDIADOWNLOADER_FFPROBE=/nonexistent/ffprobe" });
         Check(r.code == 4 || r.code == 3, "missing ffprobe with size limit fails");
@@ -305,6 +309,145 @@ namespace
         Check(Has(r, "boom"), "failure message carries yt-dlp error text");
         Check(NoTempDirs(out) && CountFiles(out) == 0, "failure leaves nothing behind");
     }
+
+    // The argv log has one line per tool call: "<tool path> <args...>".
+    std::string ToolLine(Result const& r, std::string const& toolPath)
+    {
+        std::istringstream stream(r.argv);
+        for (std::string line; std::getline(stream, line);)
+            if (line.starts_with(toolPath + " ")) return line;
+        return {};
+    }
+
+    bool Contains(std::string const& haystack, std::string const& needle) { return haystack.find(needle) != std::string::npos; }
+
+    void TestArguments()
+    {
+        fs::path tools = MD_FAKE_TOOLS_DIR;
+        auto ytdlp = (tools / "yt-dlp").string(), ffmpeg = (tools / "ffmpeg").string();
+        auto out = NewDir("out");
+        std::string url = "https://example.com/v";
+
+        auto r = Run({ "download", "--url", url, "--output", out.string() });
+        auto y = ToolLine(r, ytdlp);
+        Check(Contains(y, " --format bestvideo+bestaudio/best "), "default quality selector: " + y);
+        Check(Contains(y, " --merge-output-format mp4 "), "default merge format mp4");
+        Check(Contains(y, " --ffmpeg-location " + tools.string() + " "), "ffmpeg-location is the ffmpeg directory");
+        Check(Contains(y, " --js-runtimes deno:" + (tools / "deno").string() + " "), "JS runtime passed to yt-dlp");
+        Check(Contains(y, " --newline --no-color --no-playlist --windows-filenames --no-overwrites "), "fixed yt-dlp flags");
+        Check(Contains(y, " --print after_move:__MD_FILE__:%(filepath)s"), "after_move print template");
+        Check(!Contains(y, "--cookies-from-browser"), "no cookies on non-YouTube URL with auto");
+        Check(!Contains(y, "--download-sections") && !Contains(y, "--force-keyframes-at-cuts"), "no section flags without a range");
+        Check(y.size() > url.size() && y.substr(y.size() - url.size()) == url, "URL is the last yt-dlp argument");
+
+        r = Run({ "download", "--url", url, "--output", out.string(), "--quality", "720", "--format", "mkv" });
+        y = ToolLine(r, ytdlp);
+        Check(Contains(y, " --format bestvideo[height<=720]+bestaudio/best[height<=720]/best "), "720 quality selector: " + y);
+        Check(Contains(y, " --merge-output-format mkv "), "mkv merge format");
+
+        // Cookies.
+        std::string yt = "https://www.youtube.com/watch?v=abc";
+        r = Run({ "download", "--url", yt, "--output", out.string() });
+        Check(Contains(ToolLine(r, ytdlp), " --cookies-from-browser firefox "), "auto + YouTube gives firefox");
+        r = Run({ "download", "--url", "https://notyoutube.com.evil.example/v", "--output", out.string() });
+        Check(!Contains(ToolLine(r, ytdlp), "--cookies-from-browser"), "look-alike host gets no cookies");
+        r = Run({ "download", "--url", url, "--output", out.string(), "--cookies-from-browser", "Chrome" });
+        Check(Contains(ToolLine(r, ytdlp), " --cookies-from-browser chrome "), "explicit browser passes through (lowercased)");
+        r = Run({ "probe", "--url", yt });
+        y = ToolLine(r, ytdlp);
+        Check(Contains(y, "--dump-single-json --no-playlist --no-warnings --quiet") && Contains(y, " --cookies-from-browser firefox "),
+            "probe args and YouTube cookies: " + y);
+        r = Run({ "probe", "--url", url, "--cookies-from-browser", "edge" });
+        Check(Contains(ToolLine(r, ytdlp), " --cookies-from-browser edge "), "probe explicit browser");
+
+        // Clip range.
+        r = Run({ "download", "--url", url, "--output", out.string(), "--start-time", "10", "--end-time", "20" });
+        y = ToolLine(r, ytdlp);
+        Check(Contains(y, " --download-sections *10-20 --force-keyframes-at-cuts "), "clip flags: " + y);
+        Check(r.code == 0 && r.lines.back().find("\"bytes\":2048}") != std::string::npos, "clip download completes");
+
+        // Encoding: scale filter only when a height is requested.
+        r = Run({ "download", "--url", url, "--output", out.string(), "--max-size-mb", "10", "--quality", "720" });
+        Check(Contains(r.argv, ffmpeg + " -y -i ") && Contains(r.argv, " -vf scale=-2:min(ih\\,720) "), "ffmpeg scale filter for 720: " + r.argv);
+        Check(Contains(r.argv, " -c:v libx264 ") && Contains(r.argv, " -pass 1 ") && Contains(r.argv, " -pass 2 "), "two-pass libx264");
+        r = Run({ "download", "--url", url, "--output", out.string(), "--max-size-mb", "10" });
+        Check(!Contains(r.argv, "scale="), "no scale filter for best");
+
+        // Clip + size limit: the plan uses the duration ffprobe reports for the downloaded file.
+        r = Run({ "download", "--url", url, "--output", out.string(), "--max-size-mb", "10", "--start-time", "10", "--end-time", "15" },
+            { "FAKE_DURATION=5", "FAKE_ENCODED_BYTES=4096" });
+        Check(r.code == 0, "clip + max-size exits 0: " + r.out);
+        Check(Has(r, "{\"type\":\"encodingPlan\",\"durationSeconds\":5.000000,"), "encodingPlan uses probed clip duration: " + r.out);
+        Check(Contains(ToolLine(r, ytdlp), " --download-sections *10-15 "), "clip + max-size passes the section");
+    }
+
+    void TestToolFlags()
+    {
+        fs::path tools = MD_FAKE_TOOLS_DIR;
+        auto alt = NewDir("alt");
+        for (auto const* n : { "yt-dlp", "ffmpeg", "ffprobe" }) fs::copy_file(tools / n, alt / n);
+        auto out = NewDir("out");
+        auto r = Run({ "download", "--url", "https://example.com/v", "--output", out.string(), "--max-size-mb", "10",
+            "--yt-dlp", (alt / "yt-dlp").string(), "--ffmpeg", (alt / "ffmpeg").string(), "--ffprobe", (alt / "ffprobe").string() });
+        Check(r.code == 0, "download with explicit tool flags exits 0: " + r.out);
+        for (auto const* n : { "yt-dlp", "ffmpeg", "ffprobe" })
+        {
+            Check(!ToolLine(r, (alt / n).string()).empty(), std::string("--") + n + " flag selects the tool");
+            Check(ToolLine(r, (tools / n).string()).empty(), std::string("env ") + n + " is not used when the flag is given");
+        }
+        Check(Contains(ToolLine(r, (alt / "yt-dlp").string()), " --ffmpeg-location " + alt.string() + " "), "ffmpeg-location follows --ffmpeg");
+
+        r = Run({ "doctor", "--yt-dlp", (alt / "yt-dlp").string() });
+        Check(Has(r, "\"yt-dlp\":{\"found\":true,\"path\":\"" + (alt / "yt-dlp").string() + "\"}"), "doctor honours --yt-dlp: " + r.out);
+        r = Run({ "probe", "--url", "https://example.com/v", "--yt-dlp", (alt / "yt-dlp").string() });
+        Check(!ToolLine(r, (alt / "yt-dlp").string()).empty(), "probe honours --yt-dlp");
+    }
+
+    void TestOrphanCleanup()
+    {
+        auto out = NewDir("out");
+        auto dead = out / ".mediadownloader-999999999-1";
+        auto live = out / (".mediadownloader-" + std::to_string(getpid()) + "-1");
+        auto unrelated = out / ".mediadownloader-notapid-1";
+        for (auto const& d : { dead, live, unrelated }) { fs::create_directories(d); std::ofstream(d / "x.part") << "x"; }
+        auto r = Run({ "download", "--url", "https://example.com/v", "--output", out.string() });
+        Check(r.code == 0, "download with orphans exits 0");
+        Check(!fs::exists(dead), "dead-pid temp dir removed");
+        Check(fs::exists(live), "live-pid temp dir kept");
+        Check(fs::exists(unrelated), "temp dir with unparsable name kept");
+        Check(Has(r, "{\"type\":\"log\",\"level\":\"info\",\"message\":\"Dossier temporaire orphelin supprimé : " + dead.string() + "\"}"),
+            "info log for removed orphan: " + r.out);
+        Check(IndexOf(r, "orphelin") < IndexOf(r, "\"type\":\"started\""), "orphan log precedes started");
+    }
+
+    void TestProcessingFailed()
+    {
+        std::string url = "https://example.com/v";
+        auto expectError = [&](std::vector<std::string> env, std::string const& message, std::string const& name)
+        {
+            auto out = NewDir("out");
+            auto r = Run({ "download", "--url", url, "--output", out.string(), "--max-size-mb", "10" }, env);
+            Check(r.code == 4, name + " exits 4");
+            Check(r.lines.back() == "{\"type\":\"error\",\"code\":\"processing_failed\",\"message\":\"" + message + "\"}", name + ": " + r.lines.back());
+            Check(NoTempDirs(out) && CountFiles(out) == 0, name + " leaves nothing behind");
+        };
+        expectError({ "FAKE_FFMPEG_MODE=fail" }, "FFmpeg a échoué pendant l'encodage passe 1", "ffmpeg failure");
+        expectError({ "FAKE_FFMPEG_MODE=nofile" }, "FFmpeg n'a pas produit le fichier attendu", "ffmpeg without output");
+        expectError({ "FAKE_PROBE_OUTPUT=abc" }, "La durée retournée par ffprobe est invalide", "invalid ffprobe duration");
+        expectError({ "FAKE_PROBE_OUTPUT=0" }, "La durée retournée par ffprobe est invalide", "zero ffprobe duration");
+
+        // Warning log when no JavaScript runtime exists (PATH holds only head, needed by the fakes).
+        auto bin = NewDir("bin");
+        for (auto const* head : { "/usr/bin/head", "/bin/head" })
+            if (fs::exists(head)) { fs::create_symlink(head, bin / "head"); break; }
+        auto out = NewDir("out");
+        auto r = Run({ "download", "--url", url, "--output", out.string() },
+            { "PATH=" + bin.string(), "MEDIADOWNLOADER_DENO=/nonexistent", "MEDIADOWNLOADER_NODE=/nonexistent" });
+        Check(r.code == 0, "download without JS runtime still succeeds: " + r.out);
+        Check(Has(r, "{\"type\":\"log\",\"level\":\"warning\",\"message\":\"Aucun runtime JavaScript compatible n'a été trouvé ; certains liens YouTube peuvent échouer.\"}"),
+            "warning log without JS runtime");
+        Check(!Contains(ToolLine(r, (fs::path(MD_FAKE_TOOLS_DIR) / "yt-dlp").string()), "--js-runtimes"), "no --js-runtimes flag without runtime");
+    }
 }
 
 int main()
@@ -312,10 +455,11 @@ int main()
     if (access("/bin/sh", X_OK) != 0 || std::string(MD_CLI_PATH).empty() || std::string(MD_FAKE_TOOLS_DIR).empty())
     {
         std::cout << "ContractTests skipped: /bin/sh or CLI path unavailable\n";
-        return 0;
+        return 77; // CTest SKIP_RETURN_CODE
     }
     g_tmp = fs::temp_directory_path() / ("md-contract-" + std::to_string(getpid()));
     g_home = g_tmp / "home";
+    g_argvLog = g_tmp / "argv.log";
     fs::create_directories(g_home);
 
     TestHelp();
@@ -327,6 +471,10 @@ int main()
     TestDefaultOutput();
     TestDownloadEncode();
     TestDownloadFailure();
+    TestArguments();
+    TestToolFlags();
+    TestOrphanCleanup();
+    TestProcessingFailed();
 
     std::error_code ignored;
     fs::remove_all(g_tmp, ignored);
