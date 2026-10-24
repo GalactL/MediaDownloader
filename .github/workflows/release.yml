@@ -13,7 +13,35 @@ env:
   DENO_VERSION: "2.5.6"
 
 jobs:
+  extension:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Empaqueter et signer l'extension
+        shell: bash
+        env:
+          WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
+          WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+        run: |
+          set -euo pipefail
+          mkdir -p ext-src out
+          cp -r extension/. ext-src/
+          rm -rf ext-src/test ext-src/README.md
+          if [ -n "$WEB_EXT_API_KEY" ] && [ -n "$WEB_EXT_API_SECRET" ]; then
+            npx --yes web-ext@8.3.0 sign --channel=unlisted --source-dir ext-src --artifacts-dir signed
+            cp signed/*.xpi out/mediadownloader.xpi
+          else
+            echo "::warning::AMO_JWT_ISSUER/AMO_JWT_SECRET absents : mediadownloader.xpi n'est PAS signé (Firefox stable le refusera)."
+            (cd ext-src && zip -r -X ../out/mediadownloader.xpi .)
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mediadownloader-xpi
+          path: out/mediadownloader.xpi
+          if-no-files-found: error
+
   build:
+    needs: extension
     strategy:
       fail-fast: false
       matrix:
@@ -48,6 +76,13 @@ jobs:
         run: ctest --test-dir build -C Release --output-on-failure
       - name: Installer
         run: cmake --install build --config Release --prefix package/${{ matrix.artifact }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: mediadownloader-xpi
+          path: xpi
+      - name: Ajouter l'extension Firefox
+        shell: bash
+        run: cp xpi/mediadownloader.xpi "package/${{ matrix.artifact }}/mediadownloader.xpi"
       - name: Ajouter la notice
         shell: bash
         run: cp "${{ matrix.readme }}" "package/${{ matrix.artifact }}/README.txt"

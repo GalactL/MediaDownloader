@@ -12,3 +12,5 @@ Lancez MediaDownloader.exe par double-clic.
 
 Extension Firefox (messagerie native) :
   MediaDownloader.Cli.exe install-host
+
+Extension Firefox signée : mediadownloader.xpi (voir docs/EXTENSION_SIGNATURE.md).

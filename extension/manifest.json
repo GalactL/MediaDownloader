@@ -5,7 +5,8 @@
   "description": "Télécharge la vidéo de la page avec MediaDownloader (yt-dlp et FFmpeg).",
   "browser_specific_settings": {
     "gecko": {
-      "id": "mediadownloader@localhost"
+      "id": "mediadownloader@localhost",
+      "data_collection_permissions": { "required": ["none"] }
     }
   },
   "permissions": ["nativeMessaging"],

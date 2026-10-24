@@ -16,3 +16,5 @@ Sans --output, les vidéos sont enregistrées dans ~/Videos.
 
 Extension Firefox (messagerie native) :
   ./MediaDownloader.Cli install-host
+
+Extension Firefox signée : mediadownloader.xpi (voir docs/EXTENSION_SIGNATURE.md).
