@@ -11,7 +11,7 @@
 
 namespace media_downloader
 {
-    // All strings are UTF-8. Events mirror the HUB protocol (docs/HUB_PROTOCOL.md).
+    // All strings are UTF-8. Events mirror the CLI protocol (docs/CLI_PROTOCOL.md).
     struct StartedEvent { std::string outputDirectory; };
     struct LogEvent { std::string level; std::string message; };
     struct ProgressEvent { std::string stage; double percent{}; int pass{}; }; // pass 0 = absent

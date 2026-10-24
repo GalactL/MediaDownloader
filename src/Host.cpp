@@ -7,7 +7,9 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cmath>
+#include <csignal>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -169,7 +171,24 @@ namespace media_downloader
                 }
             }
 
-            // shortcut: raw UTF-8 bytes are copied without validation, upgrade if strictness is ever needed.
+            // Copies one multi-byte UTF-8 sequence whose lead byte was just consumed; rejects invalid ones
+            // (bad lead/continuation, overlong, surrogates, > U+10FFFF).
+            bool Utf8Tail(unsigned char lead, std::string& out)
+            {
+                int extra = lead >= 0xF0 ? 3 : lead >= 0xE0 ? 2 : 1;
+                if (lead < 0xC2 || lead > 0xF4) return false;
+                std::uint32_t cp = lead & (0x3F >> extra);
+                out += static_cast<char>(lead);
+                for (int k = 0; k < extra; ++k)
+                {
+                    if (i_ >= s_.size() || (static_cast<unsigned char>(s_[i_]) & 0xC0) != 0x80) return false;
+                    cp = (cp << 6) | (static_cast<unsigned char>(s_[i_]) & 0x3F);
+                    out += s_[i_++];
+                }
+                return !(extra == 2 && (cp < 0x800 || (cp >= 0xD800 && cp <= 0xDFFF))) &&
+                    !(extra == 3 && (cp < 0x10000 || cp > 0x10FFFF));
+            }
+
             bool String(std::string& out)
             {
                 ++i_; // opening quote
@@ -178,6 +197,7 @@ namespace media_downloader
                     unsigned char c = static_cast<unsigned char>(s_[i_++]);
                     if (c == '"') return true;
                     if (c < 0x20) return false;
+                    if (c >= 0x80) { if (!Utf8Tail(c, out)) return false; continue; }
                     if (c != '\\') { out += static_cast<char>(c); continue; }
                     if (i_ >= s_.size()) return false;
                     switch (s_[i_++])
@@ -293,14 +313,18 @@ namespace media_downloader
                     json = WithId(ErrorJson("message_too_large", "La réponse dépasse la taille maximale autorisée."), id);
                 auto length = static_cast<std::uint32_t>(json.size());
                 std::scoped_lock lock(mutex_);
-                std::fwrite(&length, 1, sizeof length, file_);
-                std::fwrite(json.data(), 1, json.size(), file_);
-                std::fflush(file_);
+                if (failed_) return;
+                if (std::fwrite(&length, 1, sizeof length, file_) != sizeof length ||
+                    std::fwrite(json.data(), 1, json.size(), file_) != json.size() || std::fflush(file_) != 0)
+                    failed_ = true; // stdout is gone: nobody is listening any more
             }
+
+            bool Failed() const { return failed_; }
 
         private:
             std::FILE* file_;
             std::mutex mutex_;
+            std::atomic_bool failed_{};
         };
 
         // Per-job sink: adds the request id, summarizes probes and reports the end of the job before
@@ -425,20 +449,26 @@ namespace media_downloader
 
     std::optional<Json> ParseJson(std::string_view text) { return Parser(text).Document(); }
 
-    int RunHost()
+    int RunHost(std::atomic_bool const& shutdown)
     {
 #ifdef _WIN32
         _setmode(_fileno(stdin), _O_BINARY);
         _setmode(_fileno(stdout), _O_BINARY);
+#else
+        std::signal(SIGPIPE, SIG_IGN); // a closed stdout surfaces as a failed write
 #endif
         Output output(stdout);
-        std::atomic_bool cancel{}, busy{};
+        std::atomic_bool cancel{}, busy{}, finished{};
         std::thread worker;
 
         auto runJob = [&](Options const& options, std::optional<std::string> id, bool inlineJob)
         {
             HostSink sink(output, id, [&busy, inlineJob] { if (!inlineJob) busy = false; });
             Engine engine(sink, cancel);
+            auto report = [&sink](char const* code, char const* message)
+            {
+                try { sink.On(ErrorEvent{ code, message }); } catch (...) {} // a worker thread must never throw
+            };
             try
             {
                 switch (options.command)
@@ -448,26 +478,41 @@ namespace media_downloader
                 default: engine.Download(options); break;
                 }
             }
-            catch (std::exception const& error)
-            {
-                sink.On(ErrorEvent{ cancel ? "cancelled" : "processing_failed", error.what() });
-            }
-            catch (...)
-            {
-                sink.On(ErrorEvent{ "processing_failed", "Une erreur inattendue est survenue" });
-            }
-            if (!inlineJob) busy = false;
+            catch (std::exception const& error) { report(cancel ? "cancelled" : "processing_failed", error.what()); }
+            catch (...) { report("processing_failed", "Une erreur inattendue est survenue"); }
+            if (inlineJob) return;
+            busy = false;
+            if (output.Failed()) std::_Exit(1); // stdout is gone and the job has been cancelled and cleaned up
         };
 
-        std::string body;
-        for (;;)
+        // SIGINT/SIGTERM: cancel the running job, then leave (the reader thread may be blocked on stdin).
+        std::thread watcher([&]
         {
+            while (!finished)
+            {
+                if (shutdown)
+                {
+                    for (int i = 0; i < 500 && busy; ++i)
+                    {
+                        cancel = true;
+                        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+                    }
+                    std::_Exit(0);
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            }
+        });
+
+        // Returns false when the host must stop (EOF or broken stdout).
+        auto handleNext = [&]() -> bool
+        {
+            std::string body;
             auto read = ReadMessage(stdin, body);
-            if (read == ReadResult::Eof) break;
+            if (read == ReadResult::Eof) return false;
             if (read == ReadResult::TooLarge)
             {
                 output.Send(ErrorJson("message_too_large", "Le message dépasse 4 Mio."), std::nullopt);
-                continue;
+                return !output.Failed();
             }
 
             auto request = ParseJson(body);
@@ -475,21 +520,21 @@ namespace media_downloader
             if (!typeField || typeField->type != Json::Type::String)
             {
                 output.Send(ErrorJson("invalid_message", "Message JSON invalide ou sans type."), std::nullopt);
-                continue;
+                return !output.Failed();
             }
-            std::optional<std::string> id;
+            std::optional<std::string> id; // valid UTF-8 guaranteed by the parser; JsonEscape handles the rest
             if (auto const* idField = request->Get("id"); idField && idField->type == Json::Type::String) id = idField->string;
             auto const& type = typeField->string;
 
             if (type == "cancel")
             {
                 if (busy) cancel = true;
-                continue;
+                return true;
             }
             if (type != "doctor" && type != "probe" && type != "download")
             {
                 output.Send(ErrorJson("invalid_message", "Type de message inconnu : " + type), id);
-                continue;
+                return !output.Failed();
             }
 
             std::vector<std::wstring> args;
@@ -504,23 +549,36 @@ namespace media_downloader
             if (!options)
             {
                 output.Send(ErrorJson("invalid_arguments", error), id);
-                continue;
+                return !output.Failed();
             }
 
-            if (type == "doctor") { runJob(*options, id, true); continue; }
+            if (type == "doctor") { runJob(*options, id, true); return !output.Failed(); }
             if (busy)
             {
                 output.Send(ErrorJson("busy", "Un traitement est déjà en cours."), id);
-                continue;
+                return !output.Failed();
             }
             if (worker.joinable()) worker.join();
             cancel = false;
             busy = true;
             worker = std::thread(runJob, *options, id, false);
+            return true;
+        };
+
+        for (bool more = true; more;)
+        {
+            try { more = handleNext(); }
+            catch (...) // never let an exception escape unframed
+            {
+                try { output.Send(ErrorJson("processing_failed", "Une erreur inattendue est survenue"), std::nullopt); } catch (...) {}
+                more = !output.Failed();
+            }
         }
 
         if (busy) cancel = true;
         if (worker.joinable()) worker.join();
+        finished = true;
+        watcher.join();
         return 0;
     }
 }

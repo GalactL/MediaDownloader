@@ -51,6 +51,7 @@ namespace
         Emit("{\"type\":\"error\",\"code\":\"" + JsonEscape(code) + "\",\"message\":\"" + JsonEscape(message) + "\"}");
     }
 
+    // Serializes engine events as one JSON object per line (CLI protocol, docs/CLI_PROTOCOL.md).
     class JsonSink : public EventSink
     {
     public:
@@ -111,7 +112,7 @@ int wmain(int argc, wchar_t* argv[])
         case Command::Doctor: exitCode = g_engine.Doctor(*parsed.options); break;
         case Command::Probe: exitCode = g_engine.Probe(*parsed.options); break;
         case Command::Download: exitCode = g_engine.Download(*parsed.options); break;
-        case Command::Host: exitCode = RunHost(); break;
+        case Command::Host: exitCode = RunHost(g_cancelRequested); break;
         }
     }
     catch (std::exception const& error)
@@ -148,7 +149,7 @@ int main(int argc, char* argv[])
         case Command::Doctor: return g_engine.Doctor(*parsed.options);
         case Command::Probe: return g_engine.Probe(*parsed.options);
         case Command::Download: return g_engine.Download(*parsed.options);
-        case Command::Host: return RunHost();
+        case Command::Host: return RunHost(g_cancelRequested);
         }
     }
     catch (std::exception const& error)

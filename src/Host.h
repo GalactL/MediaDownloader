@@ -10,7 +10,7 @@
 
 namespace media_downloader
 {
-    // One JSON object (no trailing newline) in the HUB protocol format, shared by the CLI and the host.
+    // One JSON object (no trailing newline) in the CLI protocol format (docs/CLI_PROTOCOL.md), shared by the CLI and the host.
     std::string SerializeEvent(Event const& event);
 
     // Minimal JSON value; numbers are doubles, object keys keep their order (last duplicate wins on Get).
@@ -31,6 +31,7 @@ namespace media_downloader
     std::optional<Json> ParseJson(std::string_view text);
 
     // Firefox native messaging host on stdin/stdout (4-byte native-endian length + UTF-8 JSON).
-    // Returns the process exit code (0 on stdin EOF).
-    int RunHost();
+    // Returns the process exit code (0 on stdin EOF). Setting `shutdown` (SIGINT/SIGTERM) cancels the
+    // running job and exits the process.
+    int RunHost(std::atomic_bool const& shutdown);
 }

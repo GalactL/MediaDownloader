@@ -55,6 +55,9 @@ static void TestParser()
     for (auto const* bad : { "", "{", "[1,]", "{\"a\":1,}", "01", "1.", "-", "1e", "\"\\ud800\"", "\"\\udc00\"", "\"\\ud83dx\"",
         "\"a\nb\"", "tru", "{} x", "'a'", "{\"a\" 1}", "\"\\x\"", "\"\\u12G4\"", "[1 2]", "{1:2}" })
         Check(!ParseJson(bad), std::string("parser rejects: ") + bad);
+    for (auto const* bad : { "\"\xff\"", "\"\xc0\x80\"", "\"\xed\xa0\x80\"", "\"\xf4\x90\x80\x80\"", "\"\xe2\x82\"", "\"\xe2\x82(\"", "\"\x80\"" })
+        Check(!ParseJson(bad), "parser rejects invalid UTF-8");
+    Check(ParseJson("\"\xe2\x82\xac \xf0\x9f\x98\x80 \xc3\xa9\"").has_value(), "parser accepts valid UTF-8");
     Check(!ParseJson(std::string(100, '[') + std::string(100, ']')), "parser: depth limit");
     Check(ParseJson(std::string(30, '[') + std::string(30, ']')).has_value(), "parser: moderate depth ok");
 }
@@ -82,16 +85,33 @@ namespace
         return dir;
     }
 
+    // Cleanup can finish just after the terminal event: poll up to 2 s instead of checking once.
+    template <typename Pred>
+    bool Eventually(Pred pred)
+    {
+        for (int i = 0; i < 200; ++i)
+        {
+            if (pred()) return true;
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        return pred();
+    }
+
     bool NoTempDirs(fs::path const& dir)
     {
-        for (auto const& e : fs::directory_iterator(dir))
-            if (e.path().filename().string().starts_with(".mediadownloader-")) return false;
-        return true;
+        return Eventually([&]
+        {
+            for (auto const& e : fs::directory_iterator(dir))
+                if (e.path().filename().string().starts_with(".mediadownloader-")) return false;
+            return true;
+        });
     }
+
+    bool DirEmpty(fs::path const& dir) { return Eventually([&] { return fs::is_empty(dir); }); }
 
     bool Contains(std::string const& s, std::string const& needle) { return s.find(needle) != std::string::npos; }
 
-    bool Gone(pid_t pid) { return kill(pid, 0) == -1 && errno == ESRCH; }
+    bool Gone(pid_t pid) { return Eventually([&] { return kill(pid, 0) == -1 && errno == ESRCH; }); }
 
     // Reads the pid a hanging fake tool wrote, waiting for the file to appear.
     pid_t WaitPid(fs::path const& file)
@@ -212,9 +232,9 @@ namespace
         }
 
         // Closes stdin and returns the host's exit code (-1 if it did not exit in time).
-        int Finish()
+        int Finish(bool closeInput = true)
         {
-            CloseInput();
+            if (closeInput) CloseInput();
             for (int i = 0; i < 500; ++i)
             {
                 int status{};
@@ -300,6 +320,10 @@ namespace
             { R"({"type":"download",)", "{\"type\":\"error\",\"code\":\"invalid_message\"" },
             { R"([1,2])", "{\"type\":\"error\",\"code\":\"invalid_message\"" },
             { "", "{\"type\":\"error\",\"code\":\"invalid_message\"" },
+            // Invalid UTF-8 anywhere in a string: the whole message is invalid and no id is echoed.
+            { "{\"type\":\"doctor\",\"id\":\"b\xff\"}", "{\"type\":\"error\",\"code\":\"invalid_message\"" },
+            { "{\"type\":\"probe\",\"id\":\"u1\",\"url\":\"https://example.com/\xc3(\"}", "{\"type\":\"error\",\"code\":\"invalid_message\"" },
+            { "{\"type\":\"download\",\"id\":\"t1\",\"url\":\"https://example.com/v\",\"title\":\"a\xed\xa0\x80z\"}", "{\"type\":\"error\",\"code\":\"invalid_message\"" },
         };
         for (auto const& c : cases)
         {
@@ -373,9 +397,7 @@ namespace
         Check(Last(messages).starts_with("{\"type\":\"error\",\"id\":\"e1\",\"code\":\"cancelled\""), "cancel ffmpeg: cancelled error: " + Last(messages));
         Check(tool > 0 && Gone(tool), "cancel ffmpeg: ffmpeg process is gone");
         Check(NoTempDirs(out), "cancel ffmpeg: temp dir removed");
-        bool leftover = false;
-        for (auto const& e : fs::directory_iterator(out)) leftover = true;
-        Check(!leftover, "cancel ffmpeg: no output file left");
+        Check(DirEmpty(out), "cancel ffmpeg: no output file left");
         Check(host.Finish() == 0, "cancel ffmpeg: EOF exits 0");
     }
 
@@ -390,6 +412,20 @@ namespace
         Check(host.Finish() == 0, "eof: host exits 0 while a job runs");
         Check(tool > 0 && Gone(tool), "eof: yt-dlp process is gone");
         Check(NoTempDirs(out), "eof: temp dir removed");
+    }
+
+    void TestSigtermCancelsJob()
+    {
+        auto out = NewDir("out");
+        auto pidFile = g_tmp / "term.pid";
+        HostProcess host({ "FAKE_YTDLP_MODE=hang", "FAKE_YTDLP_PID_FILE=" + pidFile.string() });
+        host.Send("{\"type\":\"download\",\"url\":\"https://example.com/v\",\"outputDirectory\":\"" + out.string() + "\"}");
+        auto tool = WaitPid(pidFile);
+        Check(tool > 0, "sigterm: fake yt-dlp started");
+        kill(host.pid, SIGTERM); // stdin stays open
+        Check(host.Finish(false) == 0, "sigterm: host exits 0 with stdin still open");
+        Check(tool > 0 && Gone(tool), "sigterm: yt-dlp process is gone");
+        Check(NoTempDirs(out), "sigterm: temp dir removed");
     }
 }
 
@@ -412,6 +448,7 @@ int main()
     TestBusyAndCancelYtDlp();
     TestCancelFfmpeg();
     TestEofCancelsJob();
+    TestSigtermCancelsJob();
 
     std::error_code ignored;
     fs::remove_all(g_tmp, ignored);
