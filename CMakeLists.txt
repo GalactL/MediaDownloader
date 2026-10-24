@@ -16,17 +16,22 @@ else()
     set(MEDIADOWNLOADER_PROCESS_SOURCE src/ProcessPosix.cpp)
 endif()
 
-add_executable(MediaDownloaderCli
-    src/Main.cpp
+add_library(MediaDownloaderEngine
+    src/Engine.cpp
+    src/Engine.h
     ${MEDIADOWNLOADER_PROCESS_SOURCE}
     src/ChildProcess.h
 )
+target_compile_features(MediaDownloaderEngine PUBLIC cxx_std_20)
+target_link_libraries(MediaDownloaderEngine PUBLIC MediaDownloaderCore)
+if(WIN32)
+    target_link_libraries(MediaDownloaderEngine PUBLIC shell32 ole32)
+endif()
+
+add_executable(MediaDownloaderCli src/Main.cpp)
 set_target_properties(MediaDownloaderCli PROPERTIES OUTPUT_NAME "MediaDownloader.Cli")
 target_compile_features(MediaDownloaderCli PRIVATE cxx_std_20)
-target_link_libraries(MediaDownloaderCli PRIVATE MediaDownloaderCore)
-if(WIN32)
-    target_link_libraries(MediaDownloaderCli PRIVATE shell32 ole32)
-endif()
+target_link_libraries(MediaDownloaderCli PRIVATE MediaDownloaderEngine)
 
 if(WIN32)
     add_executable(MediaDownloader WIN32 src/Gui.cpp src/Process.cpp src/ChildProcess.h)
@@ -36,6 +41,7 @@ endif()
 
 if(MSVC)
     target_compile_options(MediaDownloaderCore PRIVATE /W4 /permissive- /utf-8)
+    target_compile_options(MediaDownloaderEngine PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MediaDownloaderCli PRIVATE /W4 /permissive- /utf-8)
     target_compile_options(MediaDownloader PRIVATE /W4 /permissive- /utf-8)
 endif()
@@ -57,7 +63,7 @@ target_compile_features(MediaDownloaderTests PRIVATE cxx_std_20)
 target_link_libraries(MediaDownloaderTests PRIVATE MediaDownloaderCore)
 if(MSVC)
     target_compile_options(MediaDownloaderTests PRIVATE /W4 /permissive- /utf-8)
-    set_property(TARGET MediaDownloaderCore MediaDownloaderCli MediaDownloader MediaDownloaderTests
+    set_property(TARGET MediaDownloaderCore MediaDownloaderEngine MediaDownloaderCli MediaDownloader MediaDownloaderTests
         PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 add_test(NAME MediaDownloaderCoreTests COMMAND MediaDownloaderTests)

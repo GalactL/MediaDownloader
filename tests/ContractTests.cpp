@@ -180,12 +180,10 @@ namespace
             { "PATH=" + empty.string(), "MEDIADOWNLOADER_YTDLP=/nonexistent/yt-dlp" });
         Check(r.code == 3 && Has(r, "\"code\":\"tool_missing\""), "probe without yt-dlp: tool_missing exit 3");
 
-        // KNOWN QUIRK (fix in T2, then tighten to exit 3 + tool_missing): with --max-size-mb and ffprobe
-        // absent, Main.cpp dereferences an empty optional (UB) because the up-front check tests ffmpeg
-        // twice. Today it happens to fail at runtime, so only assert "fails with 3 or 4".
+        // Only ffprobe is missing: yt-dlp/ffmpeg resolve from the fake tools.
         r = Run({ "download", "--url", url, "--output", out.string(), "--max-size-mb", "10" },
             { "PATH=" + empty.string(), "MEDIADOWNLOADER_FFPROBE=/nonexistent/ffprobe" });
-        Check(r.code == 4 || r.code == 3, "missing ffprobe with size limit fails");
+        Check(r.code == 3 && Has(r, "\"code\":\"tool_missing\""), "missing ffprobe with size limit: tool_missing exit 3");
     }
 
     void TestDoctor()
