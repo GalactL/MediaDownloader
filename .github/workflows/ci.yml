@@ -16,6 +16,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
+      - name: Télécharger les dépendances Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./tools/install-dependencies.ps1
       - name: Configurer
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
       - name: Compiler
