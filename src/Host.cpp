@@ -336,14 +336,14 @@ namespace media_downloader
         {
         public:
             HostSink(Output& output, std::optional<std::string> id, std::function<void()> onTerminal = {},
-                std::function<void(std::string const&)> onStarted = {})
-                : output_(output), id_(std::move(id)), onTerminal_(std::move(onTerminal)), onStarted_(std::move(onStarted)) {}
+                std::function<void(std::string const&)> onCompleted = {})
+                : output_(output), id_(std::move(id)), onTerminal_(std::move(onTerminal)), onCompleted_(std::move(onCompleted)) {}
 
             void On(Event const& event) override
             {
                 bool terminal = std::holds_alternative<CompletedEvent>(event) || std::holds_alternative<ErrorEvent>(event) ||
                     std::holds_alternative<ProbeEvent>(event);
-                if (auto const* started = std::get_if<StartedEvent>(&event); started && onStarted_) onStarted_(started->outputDirectory);
+                if (auto const* completed = std::get_if<CompletedEvent>(&event); completed && onCompleted_) onCompleted_(completed->path);
                 std::string json;
                 if (auto const* probe = std::get_if<ProbeEvent>(&event))
                 {
@@ -360,7 +360,7 @@ namespace media_downloader
             Output& output_;
             std::optional<std::string> id_;
             std::function<void()> onTerminal_;
-            std::function<void(std::string const&)> onStarted_;
+            std::function<void(std::string const&)> onCompleted_;
         };
 
         // Opens a folder in the system file manager. execv-based RunProcess needs absolute paths.
@@ -488,12 +488,16 @@ namespace media_downloader
         std::atomic_bool cancel{}, busy{}, finished{};
         std::thread worker, opener; // opener: the file manager may stay alive, so never wait for it on the receive loop
         std::mutex folderMutex;
-        std::string lastFolder; // output directory of the latest download: the only folder a client can ask to open
+        std::string lastFolder; // folder of the latest completed download: the only folder a client can ask to open
 
         auto runJob = [&](Options const& options, std::optional<std::string> id, bool inlineJob)
         {
             HostSink sink(output, id, [&busy, inlineJob] { if (!inlineJob) busy = false; },
-                [&](std::string const& directory) { std::lock_guard<std::mutex> lock(folderMutex); lastFolder = directory; });
+                [&](std::string const& path)
+                {
+                    std::lock_guard<std::mutex> lock(folderMutex);
+                    lastFolder = WideToUtf8(std::filesystem::path(Utf8ToWide(path)).parent_path().wstring());
+                });
             Engine engine(sink, cancel);
             auto report = [&sink](char const* code, char const* message)
             {
