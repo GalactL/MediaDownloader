@@ -32,11 +32,11 @@ Contenu de l'archive :
 ```text
 MediaDownloader.Cli(.exe)
 mediadownloader.xpi
-tools/bin/   yt-dlp, ffmpeg, ffprobe, deno (Windows) ; deno seul (macOS, Linux)
+tools/bin/   yt-dlp, ffmpeg, ffprobe, deno (Windows, Linux) ; deno seul (macOS)
 README.txt
 ```
 
-Sous macOS et Linux, `yt-dlp` et FFmpeg doivent être installés séparément (voir `README.txt`).
+Sous Linux, l'archive est autonome : `yt-dlp`, `ffmpeg` (build statique GPL de BtbN/FFmpeg-Builds, redistribué sous licence GPL ; sources et licence : https://github.com/BtbN/FFmpeg-Builds et https://ffmpeg.org/legal.html), `ffprobe` et `deno` sont dans `tools/bin`. Sous macOS, `yt-dlp` et FFmpeg doivent être installés séparément, par exemple avec Homebrew (voir `README.txt`).
 Sous Windows, ne pas déplacer l'exécutable après `install-host` : le manifeste
 contient son chemin. Signature de l'extension : [docs/EXTENSION_SIGNATURE.md](docs/EXTENSION_SIGNATURE.md).
 
