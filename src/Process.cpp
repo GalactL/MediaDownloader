@@ -92,18 +92,41 @@ namespace media_downloader
         startup.dwFlags = STARTF_USESTDHANDLES;
         startup.hStdOutput = writePipe.value;
         startup.hStdError = writePipe.value;
-        startup.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+        // Children must not share our stdin: in host mode it carries the framed protocol.
+        SECURITY_ATTRIBUTES nullAttributes{ sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE };
+        Handle nullInput(CreateFileW(L"NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, &nullAttributes,
+            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+        startup.hStdInput = nullInput.value;
         PROCESS_INFORMATION process{};
+
+        // KILL_ON_JOB_CLOSE: yt-dlp's ffmpeg children die with the job, even if this process crashes.
+        Handle job(CreateJobObjectW(nullptr, nullptr));
+        if (job.value != nullptr)
+        {
+            JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
+            limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+            if (!SetInformationJobObject(job.value, JobObjectExtendedLimitInformation, &limits, sizeof(limits)))
+                job = Handle();
+        }
+        else
+        {
+            job = Handle();
+        }
         auto directory = workingDirectory.empty() ? std::wstring{} : workingDirectory.wstring();
 
         if (!CreateProcessW(executable.c_str(), mutableCommand.data(), nullptr, nullptr, TRUE,
-            CREATE_NO_WINDOW, nullptr, directory.empty() ? nullptr : directory.c_str(), &startup, &process))
+            CREATE_NO_WINDOW | CREATE_SUSPENDED, nullptr, directory.empty() ? nullptr : directory.c_str(), &startup, &process))
         {
             throw std::runtime_error("Impossible de lancer le processus externe");
         }
         Handle processHandle(process.hProcess);
         Handle threadHandle(process.hThread);
         writePipe = Handle();
+        nullInput = Handle();
+        // Assign while suspended so no grandchild can escape the job. If it fails (e.g. an outer job without
+        // nesting support), cancellation falls back to TerminateProcess on the direct child only.
+        bool const inJob = job.value != INVALID_HANDLE_VALUE && AssignProcessToJobObject(job.value, processHandle.value);
+        ResumeThread(threadHandle.value);
 
         std::string output;
         std::string pending;
@@ -135,7 +158,8 @@ namespace media_downloader
             if (cancellationRequested)
             {
                 cancelled = true;
-                TerminateProcess(processHandle.value, ERROR_CANCELLED);
+                if (inJob) TerminateJobObject(job.value, ERROR_CANCELLED);
+                else TerminateProcess(processHandle.value, ERROR_CANCELLED);
                 break;
             }
         }

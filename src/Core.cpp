@@ -80,6 +80,7 @@ namespace media_downloader
         if (command == L"doctor") result.command = Command::Doctor;
         else if (command == L"probe") result.command = Command::Probe;
         else if (command == L"download") result.command = Command::Download;
+        else if (command == L"host") return { Options{ .command = Command::Host }, {} }; // Firefox appends extra argv: ignored
         else return { std::nullopt, L"Commande inconnue : " + arguments[0] };
 
         for (size_t index = 1; index < arguments.size(); ++index)
