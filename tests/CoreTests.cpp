@@ -136,6 +136,15 @@ int main()
     std::error_code cleanupError;
     std::filesystem::remove_all(testRoot, cleanupError);
 
+    Check(IsNativeHostLaunch({ L"C:\\x\\media_downloader.json", L"mediadownloader@localhost" }), "lancement Firefox : manifeste + id");
+    Check(IsNativeHostLaunch({ L"/home/u/.mozilla/native-messaging-hosts/media_downloader.json" }), "lancement Firefox : manifeste seul");
+    Check(IsNativeHostLaunch({ L"mediadownloader@localhost" }), "lancement Firefox : id seul");
+    Check(IsNativeHostLaunch({ L"{12345678-1234-1234-1234-123456789abc}" }), "lancement Firefox : id uuid");
+    Check(!IsNativeHostLaunch({}), "aucun argument : pas l'hôte");
+    Check(!IsNativeHostLaunch({ L"download", L"--url", L"https://example.test/a@b.json" }), "download : pas l'hôte");
+    Check(!IsNativeHostLaunch({ L"host" }) && !IsNativeHostLaunch({ L"doctor" }) && !IsNativeHostLaunch({ L"--help" }), "commandes connues : pas l'hôte");
+    Check(!IsNativeHostLaunch({ L"n'importe-quoi" }), "mot inconnu : pas l'hôte");
+
     if (failures == 0) std::cout << "Tous les tests sont passes.\n";
     return failures == 0 ? 0 : 1;
 }

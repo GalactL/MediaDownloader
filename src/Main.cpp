@@ -95,6 +95,7 @@ int wmain(int argc, wchar_t* argv[])
 
     std::vector<std::wstring> arguments;
     for (int index = 1; index < argc; ++index) arguments.emplace_back(argv[index]);
+    if (IsNativeHostLaunch(arguments)) arguments = { L"host" };
     auto parsed = ParseArguments(arguments);
     if (!parsed.options)
     {
@@ -135,6 +136,7 @@ int main(int argc, char* argv[])
     std::signal(SIGTERM, ConsoleHandler);
     std::vector<std::wstring> arguments;
     for (int index = 1; index < argc; ++index) arguments.emplace_back(Utf8ToWide(argv[index]));
+    if (IsNativeHostLaunch(arguments)) arguments = { L"host" };
     auto parsed = ParseArguments(arguments);
     if (!parsed.options)
     {

@@ -16,6 +16,13 @@ d'enveloppe (`media-downloader-host.cmd` ou `media-downloader-host.sh`) qui exé
 manifeste et l'identifiant de l'extension ; l'enveloppe ne les transmet pas et ils
 sont ignorés.
 
+`MediaDownloader.Cli` détecte lui-même le lancement par Firefox : si le premier
+argument n'est ni une commande ni une option mais un chemin de manifeste (`.json`)
+ou un identifiant d'extension (`nom@domaine` ou `{uuid}`), il passe en mode `host`.
+Les scripts d'enveloppe ne sont donc plus nécessaires (le manifeste peut pointer
+directement vers l'exécutable) ; ils restent fonctionnels pour l'instant. Toute
+autre commande inconnue renvoie toujours le code de sortie 2.
+
 L'identifiant d'extension `mediadownloader@localhost` (`allowed_extensions`) est
 provisoire : il sera remplacé à l'étape 2, lors de la création de l'extension.
 

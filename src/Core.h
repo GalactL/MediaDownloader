@@ -50,6 +50,7 @@ namespace media_downloader
     };
 
     ParseResult ParseArguments(std::vector<std::wstring> const& arguments);
+    bool IsNativeHostLaunch(std::vector<std::wstring> const& arguments);
     bool IsSupportedUrl(std::wstring_view value);
     bool IsYouTubeUrl(std::wstring_view value);
     std::wstring BuildFormatSelector(std::wstring const& quality);

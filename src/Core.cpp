@@ -67,6 +67,17 @@ namespace media_downloader
         }
     }
 
+    bool IsNativeHostLaunch(std::vector<std::wstring> const& arguments)
+    {
+        if (arguments.empty()) return false;
+        auto first = Lower(arguments[0]);
+        if (first.empty() || first[0] == L'-' || first.find_first_of(L" \t") != std::wstring::npos) return false;
+        if (first.size() > 5 && first.ends_with(L".json")) return true;
+        auto at = first.find(L'@');
+        if (at != std::wstring::npos && at > 0 && at + 1 < first.size()) return true;
+        return first.size() > 2 && first.front() == L'{' && first.back() == L'}';
+    }
+
     ParseResult ParseArguments(std::vector<std::wstring> const& arguments)
     {
         Options result;
