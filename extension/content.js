@@ -40,7 +40,7 @@
   const title = el("p", { className: "title", textContent: "MediaDownloader" });
   const quality = el("select");
   const nameInput = el("input", { type: "text", placeholder: "Titre de la vidéo" });
-  const maxSize = el("input", { type: "text", inputMode: "decimal", value: String(lib.MAX_SIZE_MB) });
+  const maxSize = el("input", { type: "text", inputMode: "decimal", placeholder: "Non précisée" });
   const clip = el("input", { type: "checkbox" });
   const startInput = el("input", { type: "text", placeholder: "0 ou 1:30", disabled: true });
   const endInput = el("input", { type: "text", placeholder: "60 ou 2:00", disabled: true });
@@ -54,7 +54,7 @@
     title,
     el("label", { textContent: "Qualité" }, [quality]),
     el("label", { textContent: "Nom de la vidéo" }, [nameInput]),
-    el("label", { textContent: "Taille maximale (Mo, 20 max)" }, [maxSize]),
+    el("label", { textContent: "Taille maximale (Mo, 20 max, facultatif)" }, [maxSize]),
     el("label", { className: "check" }, [clip, " Découper la vidéo"]),
     el("div", { className: "row" }, [
       el("label", { textContent: "Début (s)" }, [startInput]),
