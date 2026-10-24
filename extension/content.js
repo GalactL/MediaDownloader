@@ -27,6 +27,9 @@
   // UI (closed shadow root: page scripts cannot reach in; every host/page string goes through textContent).
   const host = document.createElement("div");
   const shadow = host.attachShadow({ mode: "closed" });
+  // Keep typed keys away from the page's shortcuts (YouTube: f, k, space...). The inputs still get them first.
+  // shortcut: bubble phase only, covers document-level handlers; add a window-capture guard if a site listens there.
+  for (const type of ["keydown", "keyup", "keypress"]) host.addEventListener(type, (event) => event.stopPropagation());
 
   function el(tag, props, children) {
     const node = document.createElement(tag);
