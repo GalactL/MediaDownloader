@@ -69,7 +69,8 @@ namespace
             "  MediaDownloader doctor [chemins des outils]\n"
             "  MediaDownloader probe --url URL\n"
             "  MediaDownloader download --url URL [options]\n"
-            "  MediaDownloader host   Messagerie native Firefox (stdin/stdout)\n\n"
+            "  MediaDownloader host   Messagerie native Firefox (stdin/stdout)\n"
+            "  MediaDownloader install-host   Enregistre l'hote natif pour Firefox\n\n"
             "Options:\n"
             "  --quality best|720|1080    Qualite ou hauteur maximale\n"
             "  --format mp4|mkv|webm      Conteneur final (mp4 par defaut)\n"
@@ -113,6 +114,7 @@ int wmain(int argc, wchar_t* argv[])
         case Command::Doctor: exitCode = g_engine.Doctor(*parsed.options); break;
         case Command::Probe: exitCode = g_engine.Probe(*parsed.options); break;
         case Command::Download: exitCode = g_engine.Download(*parsed.options); break;
+        case Command::InstallHost: exitCode = g_engine.InstallHost(); break;
         case Command::Host: exitCode = RunHost(g_cancelRequested); break;
         }
     }
@@ -151,6 +153,7 @@ int main(int argc, char* argv[])
         case Command::Doctor: return g_engine.Doctor(*parsed.options);
         case Command::Probe: return g_engine.Probe(*parsed.options);
         case Command::Download: return g_engine.Download(*parsed.options);
+        case Command::InstallHost: return g_engine.InstallHost();
         case Command::Host: return RunHost(g_cancelRequested);
         }
     }

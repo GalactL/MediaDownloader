@@ -42,6 +42,8 @@ namespace media_downloader
         int Doctor(Options const& options);
         int Probe(Options const& options);
         int Download(Options const& options);
+        // Writes the Firefox native-messaging manifest (and the registry key on Windows). Throws on failure.
+        int InstallHost();
 
     private:
         EventSink& sink_;

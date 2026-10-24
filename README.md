@@ -157,14 +157,11 @@ Contrat complet : [docs/CLI_PROTOCOL.md](docs/CLI_PROTOCOL.md).
 (messages JSON préfixés par leur longueur). Protocole :
 [docs/NATIVE_HOST_PROTOCOL.md](docs/NATIVE_HOST_PROTOCOL.md).
 
-Installation (enregistre le manifeste pour Firefox) :
+Installation (écrit le manifeste pour Firefox ; sous Windows, enregistre aussi la clé de registre) :
 
-```powershell
-powershell -ExecutionPolicy Bypass -File tools/install-native-host.ps1
-powershell -ExecutionPolicy Bypass -File tools/install-native-host.ps1 -Uninstall
+```text
+MediaDownloader.Cli install-host
 ```
-
-Sur macOS et Linux : `tools/install-native-host.sh [--uninstall] [chemin du CLI]`.
 
 ## Tests
 

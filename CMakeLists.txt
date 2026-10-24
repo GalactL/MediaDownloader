@@ -27,7 +27,7 @@ add_library(MediaDownloaderEngine
 target_compile_features(MediaDownloaderEngine PUBLIC cxx_std_20)
 target_link_libraries(MediaDownloaderEngine PUBLIC MediaDownloaderCore)
 if(WIN32)
-    target_link_libraries(MediaDownloaderEngine PUBLIC shell32 ole32)
+    target_link_libraries(MediaDownloaderEngine PUBLIC shell32 ole32 advapi32)
 endif()
 
 add_executable(MediaDownloaderCli src/Main.cpp)

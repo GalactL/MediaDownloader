@@ -9,3 +9,6 @@ recommandé pour YouTube. Firefox connecté à YouTube est utilisé automatiquem
 lorsque la vidéo exige une session valide.
 
 Lancez MediaDownloader.exe par double-clic.
+
+Extension Firefox (messagerie native) :
+  MediaDownloader.Cli.exe install-host

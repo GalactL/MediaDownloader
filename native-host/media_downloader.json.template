@@ -1,7 +1,0 @@
-{
-  "name": "media_downloader",
-  "description": "MediaDownloader : télécharge et convertit des vidéos avec yt-dlp et FFmpeg.",
-  "path": "@HOST_PATH@",
-  "type": "stdio",
-  "allowed_extensions": ["mediadownloader@localhost"]
-}

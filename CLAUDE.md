@@ -40,7 +40,7 @@ Key invariants:
 - **Tool lookup order**: `--yt-dlp/--ffmpeg/--ffprobe` → `MEDIADOWNLOADER_YTDLP/_FFMPEG/_FFPROBE` env vars → `tools/bin` next to the project or exe → `PATH`. A JS runtime (Node 22+ or Deno 2.3+) is passed to yt-dlp for YouTube challenges.
 - **YouTube auth**: `cookiesFromBrowser` defaults to `auto`, which means `--cookies-from-browser firefox` for YouTube domains only (`IsYouTubeUrl` must reject look-alike hosts). The project never asks for or stores passwords and does not bypass DRM or age gates.
 - Only `http(s)` URLs are accepted (`IsSupportedUrl`). `--start-time`/`--end-time` must be given together; the size limit is computed from the clip's duration.
-- **`host` command**: stdout carries only framed messages (4-byte native-endian length + UTF-8 JSON; in max 4 MiB, out max 1 MiB), never raw text. Keep `docs/NATIVE_HOST_PROTOCOL.md` in sync. `tools/install-native-host.*` and `native-host/media_downloader.json.template` register it with Firefox.
+- **`host` command**: stdout carries only framed messages (4-byte native-endian length + UTF-8 JSON; in max 4 MiB, out max 1 MiB), never raw text. Keep `docs/NATIVE_HOST_PROTOCOL.md` in sync. `MediaDownloader.Cli install-host` (manifest built in code by `BuildNativeManifest`, registry on Windows) registers it with Firefox.
 - Default output is the Windows Videos known folder (`FOLDERID_Videos`) or `~/Videos` elsewhere.
 
 ## Releases

@@ -6,22 +6,23 @@ dialogue par messages JSON encadrés sur stdin/stdout.
 
 ## Lancement par Firefox
 
-Firefox lit le manifeste `media_downloader.json` (modèle :
-`native-host/media_downloader.json.template`), enregistré par
-`tools/install-native-host.ps1` (Windows, clé de registre
-`HKCU\Software\Mozilla\NativeMessagingHosts\media_downloader`) ou
-`tools/install-native-host.sh` (macOS/Linux). Le champ `path` désigne un script
-d'enveloppe (`media-downloader-host.cmd` ou `media-downloader-host.sh`) qui exécute
-`MediaDownloader.Cli host`. Firefox ajoute à la ligne de commande le chemin du
-manifeste et l'identifiant de l'extension ; l'enveloppe ne les transmet pas et ils
-sont ignorés.
+`MediaDownloader.Cli install-host` écrit le manifeste Firefox `media_downloader.json`
+(généré par le code, `path` = chemin absolu de l'exécutable en cours) :
+
+- Windows : `<dossier de l'exe>\native-host\media_downloader.json`, et la valeur par
+  défaut de `HKCU\Software\Mozilla\NativeMessagingHosts\media_downloader` pointe
+  vers ce fichier ;
+- macOS : `~/Library/Application Support/Mozilla/NativeMessagingHosts/media_downloader.json` ;
+- Linux : `~/.mozilla/native-messaging-hosts/media_downloader.json`.
+
+Firefox ajoute à la ligne de commande le chemin du manifeste et l'identifiant de
+l'extension.
 
 `MediaDownloader.Cli` détecte lui-même le lancement par Firefox : si le premier
 argument n'est ni une commande ni une option mais un chemin de manifeste (`.json`)
 ou un identifiant d'extension (`nom@domaine` ou `{uuid}`), il passe en mode `host`.
-Les scripts d'enveloppe ne sont donc plus nécessaires (le manifeste peut pointer
-directement vers l'exécutable) ; ils restent fonctionnels pour l'instant. Toute
-autre commande inconnue renvoie toujours le code de sortie 2.
+Aucun script d'enveloppe n'est nécessaire : le manifeste pointe directement vers
+l'exécutable. Toute autre commande inconnue renvoie toujours le code de sortie 2.
 
 L'identifiant d'extension `mediadownloader@localhost` (`allowed_extensions`) est
 provisoire : il sera remplacé à l'étape 2, lors de la création de l'extension.

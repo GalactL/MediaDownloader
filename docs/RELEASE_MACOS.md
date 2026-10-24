@@ -13,3 +13,6 @@ Diagnostic :
   ./MediaDownloader.Cli doctor
 
 Sans --output, les vidéos sont enregistrées dans ~/Videos.
+
+Extension Firefox (messagerie native) :
+  ./MediaDownloader.Cli install-host

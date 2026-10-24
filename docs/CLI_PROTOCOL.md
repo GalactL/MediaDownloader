@@ -46,6 +46,14 @@ indexé par la médiathèque Windows.
 Après `completed`, l'appelant peut rafraîchir sa liste de vidéos. Un événement `error` ou un code de sortie non nul ne doit
 pas déclencher de rafraîchissement.
 
+## Commande `install-host`
+
+`MediaDownloader.Cli install-host` (sans argument ; tout argument donne le code 2)
+écrit le manifeste de messagerie native de Firefox (voir
+[NATIVE_HOST_PROTOCOL.md](NATIVE_HOST_PROTOCOL.md)). La sortie standard reste vide :
+le message de réussite est écrit sur la sortie d'erreur. En cas d'échec, un
+événement `error` est émis et le code de sortie est `4`.
+
 ## Codes de sortie
 
 - `0` : réussite ;

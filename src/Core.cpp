@@ -78,6 +78,27 @@ namespace media_downloader
         return first.size() > 2 && first.front() == L'{' && first.back() == L'}';
     }
 
+    std::string BuildNativeManifest(std::string_view exePath, std::string_view extensionId)
+    {
+        return "{\n"
+            "  \"name\": \"media_downloader\",\n"
+            "  \"description\": \"MediaDownloader : télécharge et convertit des vidéos avec yt-dlp et FFmpeg.\",\n"
+            "  \"path\": \"" + JsonEscape(exePath) + "\",\n"
+            "  \"type\": \"stdio\",\n"
+            "  \"allowed_extensions\": [\"" + JsonEscape(extensionId) + "\"]\n"
+            "}\n";
+    }
+
+    std::filesystem::path NativeManifestPath(HostPlatform platform, std::filesystem::path const& home, std::filesystem::path const& exeDirectory)
+    {
+        switch (platform)
+        {
+        case HostPlatform::Windows: return exeDirectory / "native-host" / "media_downloader.json";
+        case HostPlatform::MacOS: return home / "Library" / "Application Support" / "Mozilla" / "NativeMessagingHosts" / "media_downloader.json";
+        default: return home / ".mozilla" / "native-messaging-hosts" / "media_downloader.json";
+        }
+    }
+
     ParseResult ParseArguments(std::vector<std::wstring> const& arguments)
     {
         Options result;
@@ -91,6 +112,11 @@ namespace media_downloader
         if (command == L"doctor") result.command = Command::Doctor;
         else if (command == L"probe") result.command = Command::Probe;
         else if (command == L"download") result.command = Command::Download;
+        else if (command == L"install-host")
+        {
+            if (arguments.size() > 1) return { std::nullopt, L"install-host n'accepte aucun argument : " + arguments[1] };
+            return { Options{ .command = Command::InstallHost }, {} };
+        }
         else if (command == L"host") return { Options{ .command = Command::Host }, {} }; // Firefox appends extra argv: ignored
         else return { std::nullopt, L"Commande inconnue : " + arguments[0] };
 
