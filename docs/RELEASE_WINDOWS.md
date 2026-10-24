@@ -1,4 +1,4 @@
-MediaDownloader v0.3.0 — Windows x64
+MediaDownloader v0.3.1 — Windows x64
 
 Contenu de l'archive :
 - MediaDownloader.Cli.exe : CLI et hôte de messagerie native.

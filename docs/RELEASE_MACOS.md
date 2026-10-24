@@ -1,4 +1,4 @@
-MediaDownloader v0.3.0 — macOS
+MediaDownloader v0.3.1 — macOS
 
 Cette version fournit le CLI et Deno (dans tools/bin). Installez le reste avec Homebrew :
   brew install yt-dlp ffmpeg
