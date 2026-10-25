@@ -68,3 +68,5 @@ label.check input { width: 17px; min-height: 17px; height: 17px; margin: 0; acce
 .secondary svg { width: 21px; height: 21px; }
 @media (prefers-reduced-motion: reduce) { .primary .fill { transition: none; }
   .check-mark path { animation: none; stroke-dashoffset: 0; } }
+.status:has(> span:empty) { display: none; }
+.times .field { margin-bottom: 0; }
