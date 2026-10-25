@@ -2,6 +2,7 @@
 
 ## Non publié
 
+- Extension : la taille maximale n'est plus plafonnée à 20 Mo (tout nombre supérieur à 0 est accepté) ; un bouton aux couleurs de Discord, « 20 Mo », remplit le champ avec la limite Discord.
 - Moteur : la progression du téléchargement fonctionne enfin. `--print` imposait `--quiet` à yt-dlp, qui n'émettait plus aucune ligne de progression : le moteur passe maintenant `--progress` et des `--progress-template` stables, et un nouvel événement facultatif `phase` (`inspection`, `download`, `merge`) signale les phases sans pourcentage. `progress` garde `percent` toujours présent (avec `stage` facultatif, et `pass` pour `encode`). Le pourcentage de téléchargement est lissé (vidéo puis audio, sans retour en arrière). Le format de `progress` existant est inchangé (voir `docs/CLI_PROTOCOL.md`).
 - Moteur : option facultative `--low-resources` du CLI (champ `lowResources` de la requête `download` de l'hôte) : FFmpeg en priorité basse avec 2 threads. Sans elle, rien ne change.
 - Extension : deux nouveaux réglages dans le panneau de réglages, conservés dans `storage.local` (aucune nouvelle permission) : « Optimiser l'application (économie de ressources) », désactivée par défaut (FFmpeg en priorité basse, animations réduites, plus de sondage en arrière-plan), et « Langue » (Automatique d'après la langue de Firefox, français ou anglais ; repli sur le français). Les animations sont aussi réduites quand Firefox demande `prefers-reduced-motion`.

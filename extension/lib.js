@@ -20,14 +20,14 @@
     return "";
   }
 
-  const MAX_SIZE_MB = 20; // Discord
+  const DISCORD_SIZE_MB = 20;
 
-  // "" -> null (no limit asked); number in ]0, 20] -> number; invalid -> NaN.
+  // "" -> null (no limit asked); number > 0 -> number; invalid -> NaN.
   function parseMaxSize(text) {
     const value = String(text ?? "").trim().replace(",", ".");
     if (value === "") return null;
     const number = /^\d+(?:\.\d+)?$/.test(value) ? Number(value) : NaN;
-    return number > 0 && number <= MAX_SIZE_MB ? number : NaN;
+    return number > 0 && Number.isFinite(number) ? number : NaN;
   }
 
   function buildDownloadRequest({ url, quality, maxSizeMb, start, end, name, outputDirectory, lowResources }) {
@@ -146,7 +146,7 @@
     return { text: i18n.translate(language, "progress.withPercent", { phase, percent: Math.round(overall) }), percent: overall };
   }
 
-  const api = { parseTime, validateRange, parseMaxSize, buildDownloadRequest, qualityOptions, errorKey, DEFAULT_SETTINGS, normalizeSettings, isCalm, validateOutputDirectory, sameFolder, MAX_SIZE_MB, isVideoPage, canonicalUrl, phaseLabel, overallPercent, progressView };
+  const api = { parseTime, validateRange, parseMaxSize, buildDownloadRequest, qualityOptions, errorKey, DEFAULT_SETTINGS, normalizeSettings, isCalm, validateOutputDirectory, sameFolder, DISCORD_SIZE_MB, isVideoPage, canonicalUrl, phaseLabel, overallPercent, progressView };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.MDLib = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

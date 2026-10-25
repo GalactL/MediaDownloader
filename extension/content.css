@@ -164,3 +164,7 @@ label.check + .hint { margin-top: -4px; }
   appearance: none; flex: none; width: 22px; min-height: 22px; height: 22px; margin: 0; padding: 0; border: 2px solid var(--field-border); border-radius: 50%; background: none; cursor: pointer;
 }
 .choice input:checked { border-color: var(--accent); background: radial-gradient(circle closest-side, var(--accent) 0 55%, transparent 60%); }
+.discord { display: flex; align-items: center; gap: 6px; padding: 0 12px; border: 0; background: #5865f2; color: #fff; font: 600 13px system-ui; cursor: pointer; }
+.discord:hover { background: #4752c4; }
+.discord:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.discord svg { width: 18px; height: 18px; fill: currentColor; stroke: none; }
