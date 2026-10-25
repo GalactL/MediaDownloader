@@ -520,25 +520,29 @@
 
   setView("main"); // marks the settings card inert from the start
 
-  // Page button (site adapter in sites.js): its own closed shadow root, styled by the adapter from the page's CSS variables.
+  // Page button (site adapter in sites.js): a clone of a native action button, created on first use and reused across re-renders.
   const adapter = sites.adapterFor(location.hostname);
-  const buttonHost = document.createElement("div");
-  const pageButton = el("button", { type: "button" }, [icon(...ICON.download)]);
-  bind(() => { pageButton.title = t("button.download"); pageButton.setAttribute("aria-label", t("button.download")); });
-  buttonHost.attachShadow({ mode: "closed" }).append(el("style", { textContent: adapter ? adapter.css : "" }), pageButton);
-  pageButton.addEventListener("click", toggle);
+  let pageButton = null;
+  function createPageButton() {
+    if (!pageButton) {
+      pageButton = adapter.createButton(document, icon(...ICON.download), toggle);
+      if (pageButton) adapter.labelButton(pageButton, t("button.download"));
+      if (pageButton) for (const type of ["keydown", "keyup", "keypress"]) pageButton.addEventListener(type, (event) => event.stopPropagation());
+    }
+    return pageButton;
+  }
+  bind(() => { if (pageButton) adapter.labelButton(pageButton, t("button.download")); });
   let watcher = null;
   let watched = null;
   let timer = 0;
   // Mounts or removes the page button; a missing anchor does nothing (the toolbar icon still works).
   function syncButton() {
     const want = adapter && settings.buttonMode === "page" && lib.isVideoPage(location.href);
-    if (!want || !sites.mountButton(adapter, document, () => buttonHost)) {
+    if (!want || !sites.mountButton(adapter, document, createPageButton)) {
       sites.unmountButton(document);
       if (!want && watcher) { watcher.disconnect(); watched = null; }
     }
     if (want) {
-      buttonHost.toggleAttribute("data-dark", adapter.isDark(document));
       const target = adapter.observeTarget(document);
       if (target && target !== watched) {
         watcher = watcher || new MutationObserver(() => { clearTimeout(timer); timer = setTimeout(syncButton, 300); });
@@ -548,16 +552,17 @@
       }
     }
   }
-  // The open box stays glued to the page button (scroll and resize); no button rendered = keep the last spot, or the fixed corner.
+  // The open box stays glued to the page button (scroll and resize) and closes when the button leaves the viewport.
+  // Opened without a usable button (toolbar icon, button off-screen or missing) it stays in the fixed corner and is never glued.
   function placePanel() {
-    if (panel.hidden || !buttonHost.isConnected) return;
-    const place = sites.placement(pageButton.getBoundingClientRect(), innerWidth, innerHeight, panel.offsetHeight);
-    if (!place) return;
+    if (panel.hidden || !pageButton || !pageButton.isConnected) return;
+    const place = sites.placement(pageButton.querySelector("button").getBoundingClientRect(), innerWidth, innerHeight, panel.offsetHeight);
+    const glued = panel.style.left !== "";
+    if (!place || place.close) return glued ? closeBox() : undefined;
     panel.style.right = panel.style.bottom = "auto";
     panel.style.left = place.left + "px";
     panel.style.top = place.top + "px";
   }
-  for (const type of ["keydown", "keyup", "keypress"]) buttonHost.addEventListener(type, (event) => event.stopPropagation());
 
   // SPA navigation: YouTube changes the URL without reloading.
   function sync() {

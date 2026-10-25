@@ -1,6 +1,6 @@
 "use strict";
 // Per-site adapters: the ONLY place with page selectors. Adding a site = adding one object to ADAPTERS (+ its host match in manifest.json).
-// An adapter is { id, matches(hostname), findAnchor(document), observeTarget(document), css }: the button is inserted right before the anchor.
+// An adapter is { id, matches(hostname), findAnchor(document), observeTarget(document), createButton(document, svg, onClick), labelButton(node, text) }: the button is inserted right before the anchor.
 (function (root) {
   // YouTube keeps hidden duplicate action bars, so only a rendered node counts (no getClientRects = fake DOM, treated as rendered).
   const rendered = (node) => typeof node.getClientRects !== "function" || node.getClientRects().length > 0;
@@ -25,20 +25,36 @@
     ]),
     // Where to watch for the action bar being recreated (narrow layout, navigation).
     observeTarget: (doc) => first(doc, ["ytd-watch-flexy", "ytd-page-manager"]) || doc.body,
-    // YouTube's own dark mode is the `dark` attribute on <html>; content.js mirrors it on the host as [data-dark] (fallback colours only).
-    isDark: (doc) => !!(doc.documentElement && doc.documentElement.hasAttribute("dark")),
-    // The host takes no space by design (width 0), so the native row and its like bar keep their layout; the button hangs to the left of it.
-    // Icon-only pill like YouTube's own. Colours use YouTube's variables with explicit theme fallbacks (some vars are undefined on the live site).
-    css: `
-:host { --md-bg: #f2f2f2; --md-bg-hover: #e5e5e5; --md-fg: #0f0f0f;
-  display: block !important; position: relative !important; width: 0 !important; height: 36px !important; flex: none !important;
-  margin: 0 !important; padding: 0 !important; overflow: visible !important; align-self: center; visibility: visible !important; opacity: 1 !important; z-index: 1; }
-:host([data-dark]) { --md-bg: #272727; --md-bg-hover: #3f3f3f; --md-fg: #fff; }
-button { position: absolute; right: 8px; top: 0; display: inline-flex; align-items: center; justify-content: center; width: 36px; min-width: 36px; height: 36px; padding: 0; border: 0; border-radius: 18px;
-  background: var(--yt-spec-button-chip-background, var(--md-bg)); color: var(--yt-spec-text-primary, var(--md-fg)); cursor: pointer; }
-button:hover { background: var(--yt-spec-button-chip-background-hover, var(--md-bg-hover)); }
-button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
-svg { fill: none; stroke: currentColor; width: 20px; height: 20px; flex: none; }`,
+    // Clone of a native action button (Share...) so YouTube's own CSS gives the pill, hover, theme and spacing; icon only. null = no template found.
+    createButton(doc, svg, onClick) {
+      const skip = ["segmented-like-dislike-button-view-model", "ytd-segmented-like-dislike-button-renderer"];
+      const inside = (node) => { for (let up = node; up; up = up.parentElement) if (up.hasAttribute && (up.hasAttribute("data-md-button") || skip.includes(up.localName))) return true; return false; };
+      const template = ["#top-level-buttons-computed yt-button-view-model", "#actions yt-button-view-model", "yt-button-view-model", "button-view-model"]
+        .map((selector) => [...doc.querySelectorAll(selector)].find((node) => rendered(node) && !inside(node))).find(Boolean);
+      if (!template) return null;
+      const clone = template.cloneNode(true);
+      for (const node of [clone, ...clone.querySelectorAll("*")]) {
+        for (const { name } of [...node.attributes]) if (name === "id" || name === "href" || name.startsWith("aria-")) node.removeAttribute(name);
+      }
+      const button = clone.localName === "button" ? clone : clone.querySelector("button");
+      const icon = clone.querySelector(".yt-spec-button-shape-next__icon");
+      if (!button || !icon) return null;
+      const label = clone.querySelector(".yt-spec-button-shape-next__button-text-content");
+      if (label) label.remove();
+      button.className = button.className.replace("yt-spec-button-shape-next--icon-leading", "yt-spec-button-shape-next--icon-button");
+      svg.setAttribute("width", "24");
+      svg.setAttribute("height", "24");
+      svg.style.display = "block";
+      icon.replaceChildren(svg);
+      button.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); onClick(); });
+      return clone;
+    },
+    // Accessible name and tooltip (re-applied on a language change).
+    labelButton(node, text) {
+      const button = node.localName === "button" ? node : node.querySelector("button");
+      button.setAttribute("aria-label", text);
+      button.setAttribute("title", text);
+    },
   };
 
   const ADAPTERS = [youtube];
@@ -47,8 +63,8 @@ svg { fill: none; stroke: currentColor; width: 20px; height: 20px; flex: none; }
   let warned = false; // one diagnostic line per page load
   const MARK = "[data-md-button]";
 
-  // Keeps exactly one button, directly before the anchor. `create()` returns the host element (the same one every time is fine).
-  // -> the mounted host, or null when the anchor is missing (any stale button is removed).
+  // Keeps exactly one button, directly before the anchor. `create()` returns the element (the same one every time is fine) or null (no template).
+  // -> the mounted element, or null when the anchor or the template is missing (any stale button is removed).
   function mountButton(adapter, doc, create) {
     const anchor = adapter.findAnchor(doc);
     const existing = [...doc.querySelectorAll(MARK)];
@@ -57,6 +73,7 @@ svg { fill: none; stroke: currentColor; width: 20px; height: 20px; flex: none; }
     existing.forEach((node) => { if (node !== kept) node.remove(); });
     if (kept) return kept;
     const host = create();
+    if (!host) { if (!warned) { warned = true; console.debug("[MediaDownloader] bouton: bouton natif modèle introuvable"); } return null; }
     host.setAttribute("data-md-button", "");
     anchor.before(host);
     return host;
@@ -64,16 +81,16 @@ svg { fill: none; stroke: currentColor; width: 20px; height: 20px; flex: none; }
 
   const unmountButton = (doc) => doc.querySelectorAll(MARK).forEach((node) => node.remove());
 
-  // Box position from the button rect: left right-aligned to the button (clamped), top below it when it fits, else above, else clamped
-  // into the viewport (never the corner just because the button scrolled away). null = button not rendered (caller keeps the last spot).
+  // Box position from the button rect: left right-aligned to the button (clamped), top below it when it fits, else above, else below.
+  // null = button not rendered; { close: true } = button fully outside the visible area.
   function placement(rect, vw, vh, panelHeight) {
     if (!(rect.width > 0) || !(rect.height > 0)) return null;
+    if (rect.bottom <= 0 || rect.top >= vh) return { close: true };
     const height = panelHeight > 0 ? panelHeight : 420;
     const width = Math.min(400, vw - 32);
     const left = Math.max(16, Math.min(rect.right - width, vw - width - 16));
     const below = rect.bottom + 8;
-    const wanted = below + height <= vh - 8 ? below : rect.top - 8 - height >= 8 ? rect.top - 8 - height : below;
-    return { top: Math.max(8, Math.min(wanted, vh - height - 8)), left };
+    return { top: Math.max(8, below + height <= vh - 8 || rect.top - 8 - height < 8 ? below : rect.top - 8 - height), left };
   }
 
   const api = { ADAPTERS, adapterFor, mountButton, unmountButton, placement };

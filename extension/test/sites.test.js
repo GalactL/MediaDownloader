@@ -5,35 +5,50 @@ const sites = require("../sites.js");
 
 // Minimal fake DOM: nodes with a parent/children list, enough for before/remove/nextElementSibling/querySelector(All).
 class Node {
-  constructor(name, attrs = {}) { this.name = name; this.attrs = { ...attrs }; this.children = []; this.parent = null; }
+  constructor(name, attrs = {}) { this.name = name; this.localName = name; this.attrs = { ...attrs }; this.children = []; this.parent = null; this.handlers = {}; this.style = {}; }
+  get parentElement() { return this.parent; }
+  get attributes() { return Object.keys(this.attrs).map((name) => ({ name })); }
+  get className() { return this.attrs.class || ""; }
+  set className(value) { this.attrs.class = value; }
+  hasAttribute(name) { return name in this.attrs; }
+  removeAttribute(name) { delete this.attrs[name]; }
+  addEventListener(type, handler) { this.handlers[type] = handler; }
   append(child) { child.remove(); child.parent = this; this.children.push(child); return child; }
+  replaceChildren(...nodes) { this.children.forEach((child) => { child.parent = null; }); this.children = []; nodes.forEach((node) => this.append(node)); }
   setAttribute(name, value) { this.attrs[name] = value; }
+  cloneNode() { const copy = new Node(this.name, this.attrs); this.children.forEach((child) => copy.append(child.cloneNode())); return copy; }
   remove() { if (this.parent) this.parent.children.splice(this.parent.children.indexOf(this), 1); this.parent = null; }
   before(node) { node.remove(); node.parent = this.parent; this.parent.children.splice(this.parent.children.indexOf(this), 0, node); }
-  after(node) { node.remove(); node.parent = this.parent; this.parent.children.splice(this.parent.children.indexOf(this) + 1, 0, node); }
   get previousElementSibling() { return this.parent ? this.parent.children[this.parent.children.indexOf(this) - 1] || null : null; }
   get nextElementSibling() { return this.parent ? this.parent.children[this.parent.children.indexOf(this) + 1] || null : null; }
   all() { return this.children.flatMap((child) => [child, ...child.all()]); }
+  querySelectorAll(selector) { return find(this, selector); }
+  querySelector(selector) { return find(this, selector)[0] || null; }
 }
-// Supports only the selector shapes the tests use: "[data-md-button]", "tag", "#id tag", "#id".
-const matches = (node, simple) => simple === `[${Object.keys(node.attrs).find((key) => `[${key}]` === simple)}]` || simple === node.name || simple === "#" + node.attrs.id;
-function fakeDocument(root) {
-  const find = (selector) => {
-    const parts = selector.split(" ");
-    return root.all().filter((node) => {
-      if (!matches(node, parts[parts.length - 1])) return false;
-      let up = node.parent;
-      for (let i = parts.length - 2; i >= 0; i--) { while (up && !matches(up, parts[i])) up = up.parent; if (!up) return false; up = up.parent; }
-      return true;
-    });
-  };
-  return { body: root, querySelector: (selector) => find(selector)[0] || null, querySelectorAll: find };
+// Selector shapes used here: "tag", "#id", ".class", "[attr]", and descendant chains of those.
+const matches = (node, simple) =>
+  simple[0] === "#" ? node.attrs.id === simple.slice(1)
+    : simple[0] === "." ? (node.attrs.class || "").split(" ").includes(simple.slice(1))
+      : simple[0] === "[" ? simple.slice(1, -1) in node.attrs
+        : simple === "*" || simple === node.name;
+function find(root, selector) {
+  const parts = selector.split(" ");
+  return root.all().filter((node) => {
+    if (!matches(node, parts[parts.length - 1])) return false;
+    let up = node.parent;
+    for (let i = parts.length - 2; i >= 0; i--) { while (up && !matches(up, parts[i])) up = up.parent; if (!up) return false; up = up.parent; }
+    return true;
+  });
 }
+const fakeDocument = (root) => ({ body: root, querySelector: (selector) => find(root, selector)[0] || null, querySelectorAll: (selector) => find(root, selector) });
 function youtubePage() {
   const root = new Node("body");
   const bar = root.append(new Node("div", { id: "top-level-buttons-computed" }));
   const group = bar.append(new Node("segmented-like-dislike-button-view-model"));
-  const share = bar.append(new Node("share"));
+  const share = bar.append(new Node("yt-button-view-model", { id: "share-host" }));
+  const shareButton = share.append(new Node("button", { class: "yt-spec-button-shape-next yt-spec-button-shape-next--icon-leading", "aria-label": "Partager", id: "sb" }));
+  shareButton.append(new Node("div", { class: "yt-spec-button-shape-next__icon" })).append(new Node("svg"));
+  shareButton.append(new Node("div", { class: "yt-spec-button-shape-next__button-text-content" }));
   return { root, bar, group, share, doc: fakeDocument(root) };
 }
 const adapter = sites.adapterFor("www.youtube.com");
@@ -96,23 +111,44 @@ test("a stale button is removed when the anchor disappears; unmountButton remove
   assert.equal(page.doc.querySelectorAll("[data-md-button]").length, 0);
 });
 
-test("placement: below, above, clamped, and null for an unrendered button", () => {
+test("placement: below, above, close when off-screen, null when unrendered", () => {
   const rect = (top) => ({ width: 100, height: 36, top, bottom: top + 36, right: 700 });
   assert.deepEqual(sites.placement(rect(100), 1280, 800, 420), { top: 144, left: 300 });
   assert.deepEqual(sites.placement(rect(650), 1280, 800, 420), { top: 222, left: 300 });
-  assert.equal(sites.placement(rect(-500), 1280, 800, 420).top, 8); // scrolled away above: clamped, not the corner
-  assert.equal(sites.placement(rect(900), 1280, 800, 420).top, 372); // below the fold: 800 - 420 - 8
-  assert.equal(sites.placement(rect(400), 1280, 800, 420).top, 372); // neither side fits
+  assert.equal(sites.placement(rect(400), 1280, 800, 420).top, 444); // neither side fits: below
+  assert.deepEqual(sites.placement(rect(-500), 1280, 800, 420), { close: true });
+  assert.deepEqual(sites.placement(rect(-36), 1280, 800, 420), { close: true });
+  assert.deepEqual(sites.placement(rect(900), 1280, 800, 420), { close: true });
   assert.equal(sites.placement(rect(100), 360, 700, 0).left, 16);
   assert.equal(sites.placement({ ...rect(100), width: 0 }, 1280, 800, 420), null);
   assert.equal(sites.placement({ ...rect(100), height: 0 }, 1280, 800, 420), null);
 });
 
-test("isDark reads the dark attribute on <html>", () => {
-  const doc = (dark) => ({ documentElement: { hasAttribute: (name) => dark && name === "dark" } });
-  assert.equal(adapter.isDark(doc(true)), true);
-  assert.equal(adapter.isDark(doc(false)), false);
-  assert.equal(adapter.isDark({}), false);
+test("createButton clones the native button: no id/aria, icon only, our icon and click", () => {
+  const page = youtubePage();
+  const svg = new Node("svg", { mine: "" });
+  let clicks = 0;
+  const clone = adapter.createButton(page.doc, svg, () => { clicks++; });
+  const button = clone.querySelector("button");
+  assert.equal(clone.name, "yt-button-view-model");
+  assert.ok(!clone.hasAttribute("id") && !button.hasAttribute("id") && !button.hasAttribute("aria-label"));
+  assert.ok(button.className.includes("--icon-button") && !button.className.includes("--icon-leading"));
+  assert.equal(clone.querySelector(".yt-spec-button-shape-next__button-text-content"), null);
+  assert.deepEqual(clone.querySelector(".yt-spec-button-shape-next__icon").children, [svg]);
+  adapter.labelButton(clone, "Télécharger");
+  assert.equal(button.attrs["aria-label"], "Télécharger");
+  assert.equal(button.attrs.title, "Télécharger");
+  button.handlers.click({ preventDefault() {}, stopPropagation() {} });
+  assert.equal(clicks, 1);
+  assert.ok(page.share.querySelector("button").hasAttribute("aria-label"), "template untouched");
+});
+
+test("createButton returns null without a native template, and mountButton then mounts nothing", () => {
+  const page = youtubePage();
+  page.share.remove();
+  assert.equal(adapter.createButton(page.doc, new Node("svg"), () => {}), null);
+  assert.equal(sites.mountButton(adapter, page.doc, () => adapter.createButton(page.doc, new Node("svg"), () => {})), null);
+  assert.equal(page.doc.querySelectorAll("[data-md-button]").length, 0);
 });
 
 test("findAnchor skips hidden duplicates and returns null when none is rendered", () => {
