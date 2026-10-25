@@ -9,6 +9,7 @@
   const MESSAGES = {
     fr: {
       "app.name": "MediaDownloader",
+      "button.download": "Télécharger",
       "main.title": "Télécharger la vidéo",
       "settings.title": "Réglages",
       "action.close": "Fermer",
@@ -96,6 +97,7 @@
     },
     en: {
       "app.name": "MediaDownloader",
+      "button.download": "Download",
       "main.title": "Download the video",
       "settings.title": "Settings",
       "action.close": "Close",

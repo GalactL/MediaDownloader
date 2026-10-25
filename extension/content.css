@@ -4,7 +4,7 @@
   --placeholder: #9693a7; --hover: #34333e; --loading-bg: #34333e; --thumb-bg: #19394b; --accent: #0060df; --accent-hover: #0250bb; --focus: #80baff;
   --success-fg: #70e5a4; --success-bg: #143127; --error-fg: #ffb1b7; --error-bg: #3c2028; --side-fg: #e0e0e6;
   --dot: #2ecc71; --toggle-off: #3b3a47; --knob: #fff;
-  --fab-shadow: rgba(0, 0, 0, .4); --dialog-shadow: rgba(0, 0, 0, .2);
+  --dialog-shadow: rgba(0, 0, 0, .2);
 }
 :host([data-theme="light"]) {
   color-scheme: light;
@@ -12,17 +12,10 @@
   --placeholder: #6e6e7a; --hover: #e0e0e6; --loading-bg: #5b5a68; --thumb-bg: #cfe3ef; --focus: #0060df;
   --success-fg: #00643a; --success-bg: #dff5e8; --error-fg: #a4000f; --error-bg: #fde8ea; --side-fg: #3a3944;
   --dot: #1a9d4f; --toggle-off: #8f8f9d;
-  --fab-shadow: rgba(0, 0, 0, .25); --dialog-shadow: rgba(0, 0, 0, .15);
+  --dialog-shadow: rgba(0, 0, 0, .15);
 }
 * { box-sizing: border-box; font-family: system-ui, sans-serif; }
 [hidden] { display: none !important; }
-.fab {
-  position: fixed; right: 16px; bottom: 16px; z-index: 2147483647;
-  width: 44px; height: 44px; border: 0; border-radius: 50%;
-  background: var(--accent); color: #fff; font-size: 20px; cursor: pointer;
-  box-shadow: 0 2px 8px var(--fab-shadow);
-}
-.fab:hover { background: var(--accent-hover); }
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
 
 /* One clipped box holding two sibling cards in the same grid cell; the view switch slides them. */
@@ -32,7 +25,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
   overflow: clip; border-radius: 14px; box-shadow: 0 12px 32px var(--dialog-shadow);
 }
 .card {
-  grid-area: 1 / 1; display: flex; flex-direction: column; max-height: calc(100vh - 90px); overflow: hidden auto;
+  grid-area: 1 / 1; display: flex; flex-direction: column; max-height: var(--max-h, calc(100vh - 90px)); overflow: hidden auto;
   padding: 24px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg); color: var(--fg); font-size: 14px;
   visibility: hidden; transition: transform .3s ease, visibility 0s .3s, max-height 0s .3s; /* leaving: hidden once the slide ends */
 }

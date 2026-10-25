@@ -3,6 +3,7 @@
 (function () {
   const lib = globalThis.MDLib;
   const i18n = globalThis.MDI18n;
+  const sites = globalThis.MDSites;
   // Every visible string comes from the catalogue (i18n.js). `bind` registers a renderer that runs now and again on a language change.
   let language = i18n.resolveLanguage("auto", navigator.languages);
   const t = (key, params) => i18n.translate(language, key, params);
@@ -44,8 +45,6 @@
   }
 
   const style = el("link", { rel: "stylesheet", href: browser.runtime.getURL("content.css") });
-  const fab = el("button", { className: "fab", hidden: true, type: "button", textContent: "⬇" });
-  text(fab, "app.name", "title");
 
   // Outline icons (currentColor).
   function icon(...paths) {
@@ -253,7 +252,7 @@
   // Two sibling cards in one clipped box: the view switch slides them (CSS, off with reduced motion).
   const panel = el("div", { className: "dialog", hidden: true }, [mainCard, settingsCard]);
   panel.dataset.view = "main";
-  shadow.append(style, fab, panel);
+  shadow.append(style, panel);
   // Typing in the box must not trigger the page's shortcuts (space, k, f, arrows...): events leave the shadow root retargeted to the host.
   for (const type of ["keydown", "keyup", "keypress"]) host.addEventListener(type, (event) => event.stopPropagation());
 
@@ -309,9 +308,9 @@
   function applySettings(next) {
     settings = next;
     host.dataset.theme = next.theme;
-    fab.hidden = next.buttonMode === "icon";
     applyMotion();
     applyPolling();
+    syncButton();
     const resolved = i18n.resolveLanguage(next.language, navigator.languages);
     if (resolved !== language) {
       language = resolved;
@@ -467,10 +466,11 @@
     sync(); // catches a navigation missed while polling is off
     if (!host.isConnected) return; // not on a video page: no box to show
     panel.hidden = !panel.hidden;
+    placePanel();
     if (panel.hidden) setView("main");
     if (!panel.hidden && !running && probedUrl !== location.href) probe();
   }
-  fab.addEventListener("click", toggle);
+  window.addEventListener("resize", placePanel);
   const closeBox = () => { panel.hidden = true; setView("main"); };
   gear.addEventListener("click", () => setView("settings"));
   back.addEventListener("click", () => setView("main"));
@@ -518,9 +518,52 @@
 
   setView("main"); // marks the settings card inert from the start
 
+  // Page button (site adapter in sites.js): its own closed shadow root, styled by the adapter from the page's CSS variables.
+  const adapter = sites.adapterFor(location.hostname);
+  const buttonHost = document.createElement("div");
+  const pageButton = el("button", { type: "button" }, [icon("M12 4v11", "M7.5 11L12 15.5 16.5 11", "M5 20h14"), el("span")]);
+  text(pageButton.lastChild, "button.download");
+  buttonHost.attachShadow({ mode: "closed" }).append(el("style", { textContent: adapter ? adapter.css : "" }), pageButton);
+  pageButton.addEventListener("click", toggle);
+  let watcher = null;
+  let watched = null;
+  let timer = 0;
+  // Mounts or removes the page button; a missing anchor does nothing (the toolbar icon still works).
+  function syncButton() {
+    const want = adapter && settings.buttonMode === "page" && lib.isVideoPage(location.href);
+    if (!want || !sites.mountButton(adapter, document, () => buttonHost)) {
+      sites.unmountButton(document);
+      if (!want && watcher) { watcher.disconnect(); watched = null; }
+    }
+    if (want) {
+      const target = adapter.observeTarget(document);
+      if (target && target !== watched) {
+        watcher = watcher || new MutationObserver(() => { clearTimeout(timer); timer = setTimeout(syncButton, 300); });
+        watcher.disconnect();
+        watcher.observe(target, { childList: true, subtree: true });
+        watched = target;
+      }
+    }
+    placePanel();
+  }
+  // The box hangs under the page button, right-aligned and clamped to the viewport; without a button it keeps its fixed corner.
+  function placePanel() {
+    const anchored = !panel.hidden && buttonHost.isConnected && buttonHost.getBoundingClientRect().width > 0;
+    for (const name of ["top", "left", "right", "bottom"]) panel.style[name] = anchored ? "auto" : "";
+    panel.style.removeProperty("--max-h");
+    if (!anchored) return;
+    const rect = buttonHost.getBoundingClientRect();
+    const width = Math.min(400, innerWidth - 32);
+    const top = Math.max(8, rect.bottom + 8);
+    panel.style.left = Math.max(16, Math.min(rect.right - width, innerWidth - width - 16)) + "px";
+    panel.style.top = top + "px";
+    panel.style.setProperty("--max-h", `calc(100vh - ${top + 16}px)`);
+  }
+
   // SPA navigation: YouTube changes the URL without reloading.
   function sync() {
     const visible = lib.isVideoPage(location.href);
+    syncButton();
     if (visible && !host.isConnected) document.documentElement.append(host);
     if (!visible && host.isConnected) host.remove();
     if (location.href !== currentUrl) {
