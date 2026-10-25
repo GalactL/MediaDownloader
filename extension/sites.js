@@ -54,6 +54,10 @@
       for (let up = icon; up && up !== button.parentElement; up = up.parentElement) chain.push(up);
       for (const node of chain) for (const child of [...(node.childNodes || node.children)]) if (!chain.includes(child) && node !== icon) child.remove();
       button.className = button.className.replace("yt-spec-button-shape-next--icon-leading", "yt-spec-button-shape-next--icon-button");
+      // Square 36x36 whatever YouTube's classes say (inline !important); the native border-radius is kept.
+      for (const [name, value] of [["width", "36px"], ["min-width", "36px"], ["max-width", "36px"], ["height", "36px"], ["padding", "0"], ["box-sizing", "border-box"], ["display", "inline-flex"], ["align-items", "center"], ["justify-content", "center"]])
+        button.style.setProperty(name, value, "important");
+      for (const [name, value] of [["margin", "0"], ["padding", "0"], ["width", "24px"], ["height", "24px"]]) icon.style.setProperty(name, value, "important");
       svg.setAttribute("width", "24");
       svg.setAttribute("height", "24");
       svg.style.display = "block";

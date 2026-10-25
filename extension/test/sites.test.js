@@ -138,6 +138,11 @@ test("createButton clones the native button: no id/aria, icon only, our icon and
   assert.ok(!clone.hasAttribute("id") && !button.hasAttribute("id") && !button.hasAttribute("aria-label"));
   assert.ok(button.className.includes("--icon-button") && !button.className.includes("--icon-leading"));
   assert.equal(clone.querySelector(".yt-spec-button-shape-next__button-text-content"), null);
+  assert.equal(button.style.width, "36px");
+  assert.equal(button.style.height, "36px");
+  assert.equal(button.style.padding, "0");
+  assert.equal(button.style["border-radius"], undefined, "native radius kept");
+  assert.equal(clone.querySelector(".yt-spec-button-shape-next__icon").style.margin, "0");
   assert.equal(button.children.length, 1); // only the branch to the icon survives
   assert.deepEqual(clone.querySelector(".yt-spec-button-shape-next__icon").children, [svg]);
   adapter.labelButton(wrapper, "Télécharger");
