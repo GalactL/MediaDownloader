@@ -190,7 +190,7 @@
     if (rangeError) return say(rangeError, "error");
     if (Number.isNaN(size)) return say("La taille maximale doit être comprise entre 0 et " + lib.MAX_SIZE_MB + " Mo.", "error");
     setRunning(true);
-    fill.style.width = "0";
+    fill.style.removeProperty("width"); // an inline width would hide the CSS start animation
     label.textContent = "Démarrage…";
     say("");
     request(lib.buildDownloadRequest({

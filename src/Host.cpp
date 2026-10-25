@@ -368,8 +368,10 @@ namespace media_downloader
         {
             std::filesystem::path opener;
 #ifdef _WIN32
-            wchar_t const* root = _wgetenv(L"SystemRoot");
+            wchar_t* root = nullptr;
+            _wdupenv_s(&root, nullptr, L"SystemRoot");
             opener = std::filesystem::path(root ? root : L"C:\\Windows") / L"explorer.exe";
+            std::free(root);
 #elif defined(__APPLE__)
             opener = "/usr/bin/open";
 #else
