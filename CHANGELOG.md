@@ -2,6 +2,11 @@
 
 ## Non publié
 
+- Distribution : scripts d'installation et de désinstallation dans chaque archive (`Installer.bat` et `Desinstaller.bat` sous Windows, `install.sh` et `uninstall.sh` sous Linux et macOS) : ils lancent `install-host` / `uninstall-host` puis ouvrent `mediadownloader.xpi` dans Firefox. FFprobe n'est plus embarqué dans l'archive Linux.
+- Moteur : ffprobe n'est plus nécessaire. La durée de la vidéo est lue avec `ffmpeg -i` (ligne `Duration:`). Le champ `ffprobe` disparaît de l'événement `doctor` (CLI et hôte natif) ; l'option `--ffprobe` reste acceptée mais est ignorée. Retiré aussi de CMake, du script `install-dependencies.ps1` et de la documentation.
+- Moteur : `doctor` n'exige un runtime JavaScript (Deno ou Node) que pour une URL YouTube (`doctor --url`), et l'avertissement « Aucun runtime JavaScript » du téléchargement n'apparaît plus que pour YouTube.
+- CLI : nouvelle commande `update` (`yt-dlp -U`, sortie relayée en événements `log`, codes 0, 3 ou 4) et nouvelle commande `uninstall-host` (supprime le manifeste et, sous Windows, la clé de registre ; sans effet si rien n'est installé).
+
 ## v0.4.0 (2026-10-25)
 
 - Extension : le bouton de la page affiche le logo de l'extension (tracé SVG intégré, clair sur thème sombre et sombre sur thème clair) sur tous les sites, YouTube compris, à la place du pictogramme « télécharger ». Bouton TikTok : l'ancre reste le bouton « J'aime » (ou son conteneur) même si les autres actions de la colonne ne sont pas des `<button>`.

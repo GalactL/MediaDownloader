@@ -85,6 +85,15 @@ jobs:
       - name: Ajouter l'extension Firefox
         shell: bash
         run: cp xpi/mediadownloader.xpi "package/${{ matrix.artifact }}/mediadownloader.xpi"
+      - name: Ajouter les scripts d'installation
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Windows ]; then
+            cp packaging/Installer.bat packaging/Desinstaller.bat "package/${{ matrix.artifact }}/"
+          else
+            cp packaging/install.sh packaging/uninstall.sh "package/${{ matrix.artifact }}/"
+            chmod +x "package/${{ matrix.artifact }}/install.sh" "package/${{ matrix.artifact }}/uninstall.sh"
+          fi
       - name: Ajouter la notice
         shell: bash
         run: cp "${{ matrix.readme }}" "package/${{ matrix.artifact }}/README.txt"
@@ -125,8 +134,8 @@ jobs:
           curl -fsSL -o "$RUNNER_TEMP/$FFMPEG_ASSET" "$ff/$FFMPEG_ASSET"
           curl -fsSL -o "$RUNNER_TEMP/checksums.sha256" "$ff/checksums.sha256"
           (cd "$RUNNER_TEMP" && grep -F "  $FFMPEG_ASSET" checksums.sha256 | sha256sum -c -)
-          tar -xJf "$RUNNER_TEMP/$FFMPEG_ASSET" -C "$bin" --strip-components=2 --wildcards '*/bin/ffmpeg' '*/bin/ffprobe'
-          chmod +x "$bin/ffmpeg" "$bin/ffprobe"
+          tar -xJf "$RUNNER_TEMP/$FFMPEG_ASSET" -C "$bin" --strip-components=2 --wildcards '*/bin/ffmpeg'
+          chmod +x "$bin/ffmpeg"
       - name: Archiver Windows
         if: runner.os == 'Windows'
         shell: pwsh

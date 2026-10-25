@@ -83,6 +83,28 @@ gabarits dont les lignes ne sont jamais recopiées dans les événements `log` :
 Après `completed`, l'appelant peut rafraîchir sa liste de vidéos. Un événement `error` ou un code de sortie non nul ne doit
 pas déclencher de rafraîchissement.
 
+## Commande `doctor`
+
+`doctor` émet un événement `{"type":"doctor","tools":{"yt-dlp":…,"ffmpeg":…,"javascript-runtime":…}}` (il n'y a plus
+de champ `ffprobe` : la durée est lue avec `ffmpeg -i`). Code `0` si yt-dlp et FFmpeg sont trouvés, `3` sinon. Le
+runtime JavaScript (Deno ou Node) n'est exigé que si `--url` désigne une URL YouTube ; sinon il est seulement
+rapporté. L'option `--ffprobe` reste acceptée mais est ignorée. Le téléchargement n'émet l'avertissement « Aucun
+runtime JavaScript compatible » que pour une URL YouTube.
+
+## Commande `update`
+
+`MediaDownloader.Cli update` (sans argument ; tout argument donne le code 2) exécute `yt-dlp -U` ; chaque ligne de
+sortie est relayée dans un événement `log` de niveau `info`. Pas de nouveau type d'événement. Code `0` en cas de succès,
+`3` (`error` `tool_missing`) si yt-dlp est introuvable, `4` en cas d'échec (`error` `update_failed`) ou d'annulation.
+Non exposée par l'hôte natif.
+
+## Commande `uninstall-host`
+
+`MediaDownloader.Cli uninstall-host` (sans argument ; tout argument donne le code 2) supprime le manifeste écrit par
+`install-host` et, sous Windows, la clé de registre `HKCU\Software\Mozilla\NativeMessagingHosts\media_downloader`.
+Rien à supprimer n'est pas une erreur (code `0`). La sortie standard reste vide, le message est écrit sur la sortie
+d'erreur ; en cas d'échec, un événement `error` est émis et le code est `4`.
+
 ## Commande `install-host`
 
 `MediaDownloader.Cli install-host` (sans argument ; tout argument donne le code 2)

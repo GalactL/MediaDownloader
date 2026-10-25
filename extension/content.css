@@ -92,6 +92,8 @@ label.check input:disabled { opacity: 1; cursor: default; }
 .notice { margin: 16px 0 0; padding: 12px; border-radius: 7px; background: var(--hover); font-size: 13px; line-height: 1.5; word-break: break-word; }
 .notice.success { color: var(--success-fg); background: var(--success-bg); }
 .notice.error { color: var(--error-fg); background: var(--error-bg); }
+.notice { white-space: pre-line; }
+.notice a { color: inherit; font-weight: 600; }
 
 .actions { display: flex; gap: 8px; align-items: stretch; margin-top: 16px; }
 .primary {

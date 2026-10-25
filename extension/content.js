@@ -274,6 +274,7 @@
   function renderNotice(box) {
     const current = notices.get(box);
     box.textContent = current ? (current.kind === "ok" ? "✓ " : "") + t(current.key, current.params) : "";
+    if (current && current.key === "error.host_disconnected") box.append(" ", el("a", { href: lib.INSTALL_URL, target: "_blank", rel: "noopener", textContent: lib.INSTALL_URL }));
     box.className = "notice" + (current && current.kind === "ok" ? " success" : current && current.kind === "error" ? " error" : "");
     box.hidden = !current;
     box.setAttribute("role", current && current.kind === "error" ? "alert" : "status");
