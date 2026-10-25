@@ -83,8 +83,10 @@
   }
   setSide("close");
 
-  // Progress fills the primary button from behind (CSS ::before, --progress); the state text sits on top.
-  const download = el("button", { className: "primary", type: "button", textContent: "Télécharger" });
+  // Progress fills the primary button from behind (.fill); the state text sits on top.
+  const fill = el("span", { className: "fill" });
+  const label = el("span", { className: "label", textContent: "Télécharger" });
+  const download = el("button", { className: "primary", type: "button" }, [fill, label]);
   const status = el("span", { textContent: "Prêt à télécharger" });
   const notice = el("p", { className: "notice", role: "status", hidden: true });
   const panel = el("article", { className: "dialog", hidden: true }, [
@@ -99,6 +101,8 @@
     el("div", { className: "actions" }, [download, side]),
   ]);
   shadow.append(style, fab, panel);
+  // Typing in the box must not trigger the page's shortcuts (space, k, f, arrows...): events leave the shadow root retargeted to the host.
+  for (const type of ["keydown", "keyup", "keypress"]) host.addEventListener(type, (event) => event.stopPropagation());
 
   function say(text, kind) { // kind: "ok" | "error"; empty text hides the notice
     notice.textContent = text ? (kind === "ok" ? "✓ " : "") + text : "";
@@ -129,10 +133,11 @@
     form.disabled = download.disabled = value;
     download.classList.remove("complete");
     download.classList.toggle("loading", value);
+    download.classList.remove("started");
     download.toggleAttribute("aria-busy", value);
     setSide(value ? "cancel" : "close"); // a successful run then switches it to the folder
     status.textContent = value ? "En cours…" : "Prêt à télécharger";
-    if (!value) { download.style.removeProperty("--progress"); download.textContent = "Télécharger"; }
+    if (!value) { fill.style.width = "0"; label.textContent = "Télécharger"; }
   }
 
   // After a result, any edit goes back to the idle state.
@@ -140,7 +145,7 @@
     if (running || !download.classList.contains("complete")) return;
     download.classList.remove("complete");
     download.disabled = false;
-    download.textContent = "Télécharger";
+    label.textContent = "Télécharger";
     status.textContent = "Prêt à télécharger";
     setSide("close");
     say("");
@@ -185,20 +190,21 @@
     if (rangeError) return say(rangeError, "error");
     if (Number.isNaN(size)) return say("La taille maximale doit être comprise entre 0 et " + lib.MAX_SIZE_MB + " Mo.", "error");
     setRunning(true);
-    download.style.setProperty("--progress", "0%");
-    download.textContent = "Démarrage…";
+    fill.style.width = "0";
+    label.textContent = "Démarrage…";
     say("");
     request(lib.buildDownloadRequest({
       url: lib.canonicalUrl(location.href), quality: quality.value, maxSizeMb: size, start: startTime, end: endTime, name: nameInput.value,
     }), (reply) => {
       if (reply.type === "progress") {
-        download.style.setProperty("--progress", Math.min(100, Math.max(0, Number(reply.percent) || 0)) + "%");
-        download.textContent = lib.progressText(reply.stage, reply.percent, reply.pass).replace(" : ", "… ");
+        download.classList.add("started");
+        fill.style.width = Math.min(100, Math.max(0, Number(reply.percent) || 0)) + "%";
+        label.textContent = lib.progressText(reply.stage, reply.percent, reply.pass).replace(" : ", "… ");
       } else if (reply.type === "completed") {
         setRunning(false);
         download.classList.add("complete");
         download.disabled = true;
-        download.textContent = "Terminé";
+        label.textContent = "Terminé";
         status.textContent = "Téléchargement terminé";
         say("Vidéo téléchargée.", "ok");
         setSide("folder");
@@ -242,7 +248,7 @@
         resetVideo();
         download.classList.remove("complete");
         download.disabled = false;
-        download.textContent = "Télécharger";
+        label.textContent = "Télécharger";
         status.textContent = "Prêt à télécharger";
         setSide("close");
         say("");

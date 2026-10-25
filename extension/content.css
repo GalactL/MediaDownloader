@@ -53,10 +53,11 @@ label.check input { width: 17px; min-height: 17px; height: 17px; margin: 0; acce
 .primary:hover { background: #0250bb; }
 .primary:disabled { cursor: default; }
 .primary.loading { background: #34333e; }
-.primary.loading::before {
-  content: ""; position: absolute; inset: 0 auto 0 0; width: var(--progress, 0%); z-index: -1;
-  background: #0060df; transition: width .2s linear;
-}
+.primary .fill { position: absolute; inset: 0 auto 0 0; width: 0; z-index: -1; background: #0060df; transition: width .2s linear; }
+.primary .label { position: relative; }
+/* No percentage yet: a sweeping bar shows that work has started. */
+.primary.loading:not(.started) .fill { width: 30%; animation: sweep 1.2s ease-in-out infinite alternate; }
+@keyframes sweep { from { transform: translateX(0); } to { transform: translateX(233%); } }
 .primary.complete { background: #27262f; color: #e0e0e6; }
 .secondary {
   display: inline-flex; align-items: center; justify-content: center; flex: 0 0 42px; width: 42px; height: 42px; padding: 10px;
@@ -64,4 +65,4 @@ label.check input { width: 17px; min-height: 17px; height: 17px; margin: 0; acce
 }
 .secondary:hover { background: #34333e; border-color: #0060df; }
 .secondary svg { width: 21px; height: 21px; }
-@media (prefers-reduced-motion: reduce) { .primary.loading::before { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .primary .fill { transition: none; animation: none !important; } }
