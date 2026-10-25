@@ -5,8 +5,9 @@ const sites = require("../sites.js");
 
 // Minimal fake DOM: nodes with a parent/children list, enough for before/remove/nextElementSibling/querySelector(All).
 class Node {
-  constructor(name, attrs = {}) { this.name = name; this.localName = name; this.attrs = { ...attrs }; this.children = []; this.parent = null; this.handlers = {}; this.style = {}; }
+  constructor(name, attrs = {}) { this.name = name; this.localName = name; this.attrs = { ...attrs }; this.children = []; this.parent = null; this.handlers = {}; this.style = { setProperty: (name, value) => { this.style[name] = value; } }; }
   get parentElement() { return this.parent; }
+  get childNodes() { return this.children; }
   get attributes() { return Object.keys(this.attrs).map((name) => ({ name })); }
   get className() { return this.attrs.class || ""; }
   set className(value) { this.attrs.class = value; }
@@ -40,7 +41,7 @@ function find(root, selector) {
     return true;
   });
 }
-const fakeDocument = (root) => ({ body: root, querySelector: (selector) => find(root, selector)[0] || null, querySelectorAll: (selector) => find(root, selector) });
+const fakeDocument = (root) => ({ createElement: (name) => new Node(name), body: root, querySelector: (selector) => find(root, selector)[0] || null, querySelectorAll: (selector) => find(root, selector) });
 function youtubePage() {
   const root = new Node("body");
   const bar = root.append(new Node("div", { id: "top-level-buttons-computed" }));
@@ -128,19 +129,40 @@ test("createButton clones the native button: no id/aria, icon only, our icon and
   const page = youtubePage();
   const svg = new Node("svg", { mine: "" });
   let clicks = 0;
-  const clone = adapter.createButton(page.doc, svg, () => { clicks++; });
+  const wrapper = adapter.createButton(page.doc, svg, () => { clicks++; });
+  const clone = wrapper.children[0];
   const button = clone.querySelector("button");
+  assert.equal(wrapper.style.width, "0"); // takes no space in the row
+  assert.equal(clone.style.position, "absolute");
   assert.equal(clone.name, "yt-button-view-model");
   assert.ok(!clone.hasAttribute("id") && !button.hasAttribute("id") && !button.hasAttribute("aria-label"));
   assert.ok(button.className.includes("--icon-button") && !button.className.includes("--icon-leading"));
   assert.equal(clone.querySelector(".yt-spec-button-shape-next__button-text-content"), null);
+  assert.equal(button.children.length, 1); // only the branch to the icon survives
   assert.deepEqual(clone.querySelector(".yt-spec-button-shape-next__icon").children, [svg]);
-  adapter.labelButton(clone, "Télécharger");
+  adapter.labelButton(wrapper, "Télécharger");
   assert.equal(button.attrs["aria-label"], "Télécharger");
   assert.equal(button.attrs.title, "Télécharger");
   button.handlers.click({ preventDefault() {}, stopPropagation() {} });
   assert.equal(clicks, 1);
   assert.ok(page.share.querySelector("button").hasAttribute("aria-label"), "template untouched");
+});
+
+test("createButton is icon-only even when the label has an unknown class", () => {
+  const page = youtubePage();
+  const button = page.share.querySelector("button");
+  button.children[1].attrs.class = "weird-label";
+  button.append(new Node("yt-touch-feedback-shape"));
+  const clone = adapter.createButton(page.doc, new Node("svg"), () => {}).children[0];
+  assert.deepEqual(clone.querySelector("button").children.map((node) => node.attrs.class), ["yt-spec-button-shape-next__icon"]);
+  assert.equal(page.share.querySelector("button").children.length, 3, "template untouched");
+});
+
+test("mount puts the wrapper right before the like group", () => {
+  const page = youtubePage();
+  const host = sites.mountButton(adapter, page.doc, () => adapter.createButton(page.doc, new Node("svg"), () => {}));
+  assert.equal(page.group.previousElementSibling, host);
+  assert.ok(host.hasAttribute("data-md-button"));
 });
 
 test("createButton returns null without a native template, and mountButton then mounts nothing", () => {

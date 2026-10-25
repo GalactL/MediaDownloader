@@ -32,7 +32,7 @@ stockés avec `storage.local` et appliqués immédiatement sans recharger :
   `prefers-reduced-motion`, qui est aussi respecté sans le réglage) et le sondage de navigation de la page est arrêté.
 - **Affichage du bouton** : « Sur la page » (clone d'un bouton natif de la barre d'actions, par exemple « Partager », réduit à
   une icône, inséré juste avant le groupe J'aime / Je n'aime pas) ou « Icône de la barre uniquement ». Comme c'est un clone,
-  YouTube lui applique lui-même son style (thème clair ou sombre, survol, espacement) ; le réglage de thème de l'extension
+  YouTube lui applique lui-même son style (thème clair ou sombre, survol) ; il est posé dans un conteneur de largeur nulle, à gauche du groupe J'aime : le bouton ne prend pas de place dans la barre et ne décale rien ; le réglage de thème de l'extension
   ne concerne que la boîte. La boîte s'ouvre sous le bouton (au-dessus s'il manque de la place), le suit au défilement et
   se ferme quand le bouton sort de l'écran ; ouverte depuis l'icône de la barre d'outils sans bouton visible, elle reste
   dans le coin. Le bouton est réinséré après chaque navigation ou reconstruction de la barre d'actions ; si YouTube change

@@ -49,15 +49,23 @@
       const button = clone.localName === "button" ? clone : clone.querySelector("button");
       const icon = clone.querySelector(ICON_BOX) || (clone.querySelector("svg") || {}).parentElement;
       if (!button || !icon) return null;
-      const label = clone.querySelector(".yt-spec-button-shape-next__button-text-content") || clone.querySelector('[class*="button-text-content"]');
-      if (label) label.remove();
+      // Icon only without trusting class names: keep just the chain from the button down to the icon box, drop every other branch and text node.
+      const chain = [];
+      for (let up = icon; up && up !== button.parentElement; up = up.parentElement) chain.push(up);
+      for (const node of chain) for (const child of [...(node.childNodes || node.children)]) if (!chain.includes(child) && node !== icon) child.remove();
       button.className = button.className.replace("yt-spec-button-shape-next--icon-leading", "yt-spec-button-shape-next--icon-button");
       svg.setAttribute("width", "24");
       svg.setAttribute("height", "24");
       svg.style.display = "block";
       icon.replaceChildren(svg);
       button.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); onClick(); });
-      return clone;
+      // Zero-size wrapper: the clone hangs to the left of the like group without taking space, so YouTube's like bar keeps its position.
+      const wrapper = doc.createElement("div");
+      for (const [name, value] of [["display", "block"], ["position", "relative"], ["width", "0"], ["height", "36px"], ["flex", "none"], ["margin", "0"], ["padding", "0"], ["overflow", "visible"], ["align-self", "center"]])
+        wrapper.style.setProperty(name, value, "important");
+      for (const [name, value] of [["position", "absolute"], ["right", "8px"], ["top", "0"]]) clone.style.setProperty(name, value, "important");
+      wrapper.append(clone);
+      return wrapper;
     },
     // Accessible name and tooltip (re-applied on a language change).
     labelButton(node, text) {
