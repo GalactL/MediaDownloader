@@ -36,7 +36,7 @@ namespace
             sink.On(ProgressEvent{ stage, std::clamp(percent, 0.0, 100.0), pass });
         }
         // Phase-only event: the stage is known, the percentage is not.
-        void Phase(std::string const& stage, int pass = 0) const { sink.On(ProgressEvent{ stage, std::nullopt, pass }); }
+        void Phase(std::string const& stage) const { sink.On(PhaseEvent{ stage }); }
     };
 
 #ifdef _WIN32

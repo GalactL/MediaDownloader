@@ -58,11 +58,10 @@ répond `invalid_arguments`.
 
 ## Réponses
 
-Ce sont les événements du CLI (`started`, `log`, `progress`, `encodingPlan`,
-`completed`, `error`, `doctor`) avec le champ `id` ajouté juste après `type`. `progress` porte `stage`
-(`inspection`, `download`, `merge`, `encode`) et, quand la phase a un pourcentage, `percent` ; `pass` s'y ajoute pour
-`encode` (détails dans [CLI_PROTOCOL.md](CLI_PROTOCOL.md)). Un `progress` sans `percent` signale seulement le début
-d'une phase.
+Ce sont les événements du CLI (`started`, `log`, `progress`, `phase`, `encodingPlan`,
+`completed`, `error`, `doctor`) avec le champ `id` ajouté juste après `type`. `progress` porte toujours `percent`
+(plus `stage`, et `pass` pour `encode`) ; `phase` (`stage` = `inspection`, `download` ou `merge`) annonce le début
+d'une phase sans pourcentage et peut être ignoré (détails dans [CLI_PROTOCOL.md](CLI_PROTOCOL.md)).
 
 `openFolder` répond `{"type":"opened","id":"…"}`. Aucun chemin n'est accepté du client : seul le dernier dossier de sortie est ouvrable, sinon `no_folder`.
 
@@ -118,7 +117,7 @@ dépendance manquante) ; voir [CLI_PROTOCOL.md](CLI_PROTOCOL.md).
 ```text
 -> {"type":"download","id":"7","url":"https://example.com/v","quality":"1080","maxSizeMb":10}
 <- {"type":"started","id":"7","outputDirectory":"C:\\Users\\Moi\\Videos"}
-<- {"type":"progress","id":"7","stage":"inspection"}
+<- {"type":"phase","id":"7","stage":"inspection"}
 <- {"type":"progress","id":"7","stage":"download","percent":42.5}
 <- {"type":"completed","id":"7","path":"C:\\Users\\Moi\\Videos\\v.mp4","bytes":9853214}
 -> {"type":"download","id":"8","url":"https://example.com/w"}

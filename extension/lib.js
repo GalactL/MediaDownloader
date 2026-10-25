@@ -122,7 +122,7 @@
     return href;
   }
 
-  // Phase name from a `progress` event (stage + optional pass). Unknown stages from a newer engine -> generic label.
+  // Phase name from a `progress` or `phase` event (stage + optional pass). Unknown stages from a newer engine -> generic label.
   function phaseLabel(language, stage, pass) {
     if (stage === "encode" && pass) return i18n.translate(language, "phase.encodePass", { pass });
     const key = "phase." + stage;

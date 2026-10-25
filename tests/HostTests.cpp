@@ -2,6 +2,7 @@
 // command driven over pipes with the POSIX shell fake tools (never touches the network).
 #include "Host.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <iostream>
 #include <optional>
@@ -280,6 +281,8 @@ namespace
             progress |= m.starts_with("{\"type\":\"progress\",\"id\":\"d1\"");
         }
         Check(progress, "download: progress streamed");
+        Check(std::any_of(messages.begin(), messages.end(), [](auto const& m) { return m.starts_with("{\"type\":\"phase\",\"id\":\"d1\",\"stage\":\""); }),
+            "download: phase framed with the id");
         Check(messages.front().starts_with("{\"type\":\"started\",\"id\":\"d1\""), "download: started first: " + messages.front());
         Check(Last(messages).starts_with("{\"type\":\"completed\",\"id\":\"d1\",\"path\":\""), "download: completed last: " + Last(messages));
         Check(NoTempDirs(out), "download: no temp dir left");

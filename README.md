@@ -119,6 +119,9 @@ MediaDownloader.Cli.exe download --url "https://..." --start-time 30 --end-time 
 Les deux bornes doivent être fournies ensemble. La compression et la limite de
 taille sont calculées à partir de la durée du fichier extrait.
 
+Option `--low-resources` : FFmpeg tourne en priorité basse avec 2 threads (sans elle,
+rien ne change).
+
 Titre personnalisé et session YouTube connectée :
 
 ```powershell
@@ -146,10 +149,15 @@ messages de diagnostic non structurés des outils externes sont convertis en
 événements `log`.
 
 ```json
+{"type":"phase","stage":"inspection"}
 {"type":"progress","stage":"download","percent":42.0}
 {"type":"progress","stage":"encode","percent":71.0}
 {"type":"completed","path":"C:\\Users\\Utilisateur\\Videos\\video.mp4","bytes":9853214}
 ```
+
+`phase` est un événement facultatif (`inspection`, `download` ou `merge`) émis quand une
+phase n'a pas de pourcentage ; `progress` garde toujours `percent`, avec `stage`
+facultatif (et `pass` pour `encode`).
 
 Les codes de sortie sont `0` en cas de réussite, `2` pour une erreur de saisie,
 `3` lorsqu'un outil manque et `4` lorsqu'un traitement échoue.

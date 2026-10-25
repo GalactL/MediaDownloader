@@ -433,14 +433,15 @@
         usedDir = String(reply.outputDirectory || "");
       } else if (reply.type === "progress") {
         setLabel({ kind: "progress", reply: { stage: reply.stage, percent: reply.percent, pass: reply.pass } });
+      } else if (reply.type === "phase") {
+        setLabel({ kind: "progress", reply: { stage: reply.stage } }); // no percent: indeterminate bar
       } else if (reply.type === "completed") {
         // Very short jobs still show a full left-to-right run: the bar fills to 100 % over whatever is left of one second.
         const left = Math.max(0, 1000 - (Date.now() - startedAt));
         const calm = isCalm();
-        fill.classList.remove("indeterminate");
-        label.textContent = lib.progressView(language, { stage: "download", percent: 100 }, false).text;
         fill.style.transition = calm ? "none" : "width " + Math.max(left, 200) + "ms linear";
-        fill.style.width = "100%";
+        jobHasEncode = false;
+        setLabel({ kind: "progress", reply: { stage: "download", percent: 100 } }); // fills the bar to 100 % and drops the stripes
         setTimeout(() => {
           fill.style.transition = "";
           setRunning(false);

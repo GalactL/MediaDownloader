@@ -43,28 +43,30 @@ indexé par la médiathèque Windows.
 |---|---|---|
 | `started` | Traitement accepté | `outputDirectory` |
 | `log` | Information provenant du téléchargement | `level`, `message` |
-| `progress` | Avancement | `stage`, `percent` facultatif, `pass` facultatif |
+| `progress` | Avancement chiffré | `percent`, `stage` facultatif, `pass` facultatif |
+| `phase` | Début d'une phase sans pourcentage (facultatif) | `stage` |
 | `encodingPlan` | Paramètres calculés | `durationSeconds`, `videoKbps`, `audioKbps` |
 | `completed` | Fichier final disponible | `path`, `bytes` |
 | `error` | Échec terminal | `code`, `message` |
 
-### Événement `progress`
+### Événements `progress` et `phase`
 
-`stage` donne la phase en cours ; `percent` (0 à 100, une décimale) est absent quand la phase n'a pas de pourcentage
-(l'appelant affiche alors une progression indéterminée avec le nom de la phase) ; `pass` (1 ou 2) n'apparaît que pour
-`encode`.
+`progress` garde son format d'origine : `percent` (0 à 100, une décimale) est toujours présent. `stage`
+(`download` ou `encode`) l'accompagne quand la phase est connue, et `pass` (1 ou 2) n'apparaît que pour `encode`.
 
-| `stage` | Quand | `percent` |
+`phase` est un événement facultatif `{"type":"phase","stage":"…"}` émis au début d'une phase qui n'a pas de
+pourcentage : l'appelant affiche alors une progression indéterminée avec le nom de la phase. Un appelant qui ne
+connaît pas `phase` peut l'ignorer.
+
+| Événement | `stage` | Quand |
 |---|---|---|
-| `inspection` | juste après `started`, pendant que yt-dlp analyse la page | absent |
-| `download` | téléchargement | pourcentage global lissé du téléchargement (voir ci-dessous) ; absent tant que yt-dlp n'en fournit pas (extrait avec `--start-time`/`--end-time`, flux fragmentés sans nombre de fragments) |
-| `merge` | assemblage vidéo + audio par yt-dlp | absent |
-| `encode` | réencodage deux passes (avec `--max-size-mb`) | 0 à 100 sur les deux passes ; chaque passe est annoncée à son début (0 puis 50) |
+| `phase` | `inspection` | juste après `started`, pendant que yt-dlp analyse la page |
+| `phase` | `download` | début du transfert tant que yt-dlp ne fournit pas de pourcentage (extrait avec `--start-time`/`--end-time`, flux fragmentés sans nombre de fragments) |
+| `phase` | `merge` | assemblage vidéo + audio par yt-dlp |
+| `progress` | `download` | pourcentage global lissé du téléchargement (voir ci-dessous) |
+| `progress` | `encode` | réencodage deux passes (avec `--max-size-mb`) : 0 à 100 sur les deux passes ; chaque passe est annoncée à son début (0 puis 50) |
 
-Les événements `download` (avec `percent`) et `encode` (avec `percent` et `pass`) gardent le format d'origine, un
-appelant qui ne connaît que ces deux phases les lit comme avant ; `inspection`, `merge` et les événements `download`
-sans `percent` sont de nouveaux événements facultatifs qu'un appelant peut ignorer. Le dernier événement avant
-`completed` est toujours `percent` 100.
+Le dernier événement avant `completed` est toujours un `progress` à `percent` 100.
 
 Le pourcentage `download` est monotone : yt-dlp télécharge la vidéo puis l'audio séparément (la progression repart de 0),
 le moteur répartit donc la vidéo sur 0 à 85 % et l'audio sur 85 à 100 %. Un téléchargement d'un seul flux s'arrête à

@@ -134,12 +134,13 @@ label.check input:disabled { opacity: 1; cursor: default; }
   .card, .dialog[data-view] .card { transition: none; }
   label.check input, .primary .fill { transition: none; }
   .check-mark path { animation: none; stroke-dashoffset: 0; }
-  .primary .fill.indeterminate { animation: none; }
+  .primary .fill.indeterminate { animation: none; width: 35% !important; opacity: .55; background: var(--accent); }
 }
 :host([data-calm]) .card, :host([data-calm]) .dialog[data-view] .card { transition: none; }
 :host([data-calm]) label.check input, :host([data-calm]) .primary .fill { transition: none; }
 :host([data-calm]) .check-mark path { animation: none; stroke-dashoffset: 0; }
-:host([data-calm]) .primary .fill.indeterminate { animation: none; }
+/* Static and clearly partial (short, faded): a full still bar would read as 100 %. */
+:host([data-calm]) .primary .fill.indeterminate { animation: none; width: 35% !important; opacity: .55; background: var(--accent); }
 
 /* Header: title block on the left, actions on the right (main: gear | ×; settings: back arrow on the left, × on the right). */
 .head-left, .head-right { display: flex; gap: 14px; align-items: center; }

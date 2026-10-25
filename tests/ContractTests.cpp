@@ -226,9 +226,11 @@ namespace
         Check(r.lines.front() == "{\"type\":\"started\",\"outputDirectory\":\"" + out.string() + "\"}", "started is first: " + r.lines.front());
         int p42 = IndexOf(r, "{\"type\":\"progress\",\"stage\":\"download\",\"percent\":42.5}");
         Check(p42 > 0, "download progress 42.5 (500/1000 of the first stream, 0-85 scale; no pass field)");
-        int phase = IndexOf(r, "{\"type\":\"progress\",\"stage\":\"inspection\"}");
-        int merge = IndexOf(r, "{\"type\":\"progress\",\"stage\":\"merge\"}");
+        int phase = IndexOf(r, "{\"type\":\"phase\",\"stage\":\"inspection\"}");
+        int merge = IndexOf(r, "{\"type\":\"phase\",\"stage\":\"merge\"}");
         Check(phase == 1 && phase < p42 && p42 < merge, "phase events: inspection right after started, merge after the download lines: " + r.out);
+        for (auto const& line : r.lines)
+            Check(!line.starts_with("{\"type\":\"progress\"") || line.find("\"percent\":") != std::string::npos, "progress always carries percent: " + line);
         Check(!Has(r, "__MD_PROGRESS__") && !Has(r, "__MD_POST__") && !Has(r, "__MD_DL__"), "progress markers are not echoed");
         Check(Has(r, "{\"type\":\"progress\",\"stage\":\"download\",\"percent\":0.0}"), "download progress 0.0");
         Check(Has(r, "{\"type\":\"log\",\"level\":\"info\",\"message\":\"[info] abc: Downloading 1 format(s)\"}"), "other yt-dlp lines become info logs");

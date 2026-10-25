@@ -542,12 +542,14 @@ namespace media_downloader
             else if constexpr (std::is_same_v<T, ProgressEvent>)
             {
                 std::ostringstream json;
-                json << "{\"type\":\"progress\",\"stage\":\"" << e.stage << '"';
-                if (e.percent) json << ",\"percent\":" << std::fixed << std::setprecision(1) << *e.percent;
+                json << "{\"type\":\"progress\",\"stage\":\"" << e.stage << "\",\"percent\":"
+                     << std::fixed << std::setprecision(1) << e.percent;
                 if (e.pass > 0) json << ",\"pass\":" << e.pass;
                 json << '}';
                 return json.str();
             }
+            else if constexpr (std::is_same_v<T, PhaseEvent>)
+                return "{\"type\":\"phase\",\"stage\":\"" + e.stage + "\"}";
             else if constexpr (std::is_same_v<T, EncodingPlanEvent>)
                 return "{\"type\":\"encodingPlan\",\"durationSeconds\":" + std::to_string(e.durationSeconds) +
                     ",\"videoKbps\":" + std::to_string(e.videoKbps) + ",\"audioKbps\":" + std::to_string(e.audioKbps) + "}";
