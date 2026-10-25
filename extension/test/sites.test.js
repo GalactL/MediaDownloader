@@ -126,77 +126,27 @@ test("placement: below, above, close when off-screen, null when unrendered", () 
   assert.equal(sites.placement({ ...rect(100), height: 0 }, 1280, 800, 420), null);
 });
 
-const P = "yt-spec-button-shape-next";
-// Adds a native icon-only "..." button after Share (class list as on the live site: tonal mono icon-button, filled svg 24x24).
-function addMoreButton(page, viewBox = "0 0 24 24") {
-  const host = page.bar.append(new Node("yt-button-view-model"));
-  const button = host.append(new Node("button", { class: `${P} ${P}--tonal ${P}--mono ${P}--size-m ${P}--icon-button flag`, "aria-label": "Plus", id: "more" }));
-  const icon = button.append(new Node("div", { class: `${P}__icon` }));
-  const svg = icon.append(new Node("svg", { viewBox, width: "24", height: "24", class: "native-svg" }));
-  svg.append(new Node("path", { d: "M0 0" }));
-  button.append(new Node("yt-touch-feedback-shape"));
-  return { host, button, svg };
-}
-const pathOf = (clone) => clone.querySelector("path");
-
-test("createButton prefers the native icon-only template and swaps only the drawing", () => {
-  const page = youtubePage();
-  const more = addMoreButton(page);
-  let clicks = 0;
-  const wrapper = adapter.createButton(page.doc, () => { clicks++; });
-  const clone = wrapper.children[0];
-  const button = clone.querySelector("button");
-  assert.equal(wrapper.style.width, "0");
-  assert.equal(clone.style.position, "absolute");
-  assert.ok(!button.hasAttribute("id") && !button.hasAttribute("aria-label"));
-  assert.equal(button.children.length, 2, "structure (icon + ripple) kept intact");
-  assert.equal(clone.querySelector("svg").attrs.class, "native-svg"); // native svg kept
-  assert.equal(pathOf(clone).attrs.d, "M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z");
-  assert.equal(pathOf(clone).attrs.fill, "currentColor");
-  for (const name of ["width", "height", "padding", "display"]) assert.equal(button.style[name], undefined, "no inline sizing: " + name);
-  assert.ok(!button.hasAttribute("style"));
-  assert.equal(button.attrs.class, `${P} flag ${P}--tonal ${P}--mono ${P}--size-m ${P}--icon-button`);
-  adapter.labelButton(wrapper, "Télécharger");
-  assert.equal(button.attrs.title, "Télécharger");
-  assert.equal(button.attrs["aria-label"], "Télécharger");
-  button.handlers.click({ preventDefault() {}, stopPropagation() {} });
-  assert.equal(clicks, 1);
-  assert.equal(more.button.attrs["aria-label"], "Plus", "template untouched");
-  assert.equal(pathOf(more.host).attrs.d, "M0 0");
-});
-
-test("createButton scales our glyph to a template viewBox that is not 24", () => {
-  const page = youtubePage();
-  addMoreButton(page, "0 0 48 48");
-  const group = adapter.createButton(page.doc, () => {}).querySelector("g");
-  assert.equal(group.attrs.transform, "scale(2)");
-});
-
-test("createButton falls back to Share: icon only, chip classes, even with an unknown label class", () => {
-  const page = youtubePage();
-  const button = page.share.querySelector("button");
-  button.children[1].attrs.class = "weird-label";
-  button.append(new Node("yt-touch-feedback-shape"));
-  const clone = adapter.createButton(page.doc, () => {}).children[0];
-  const inner = clone.querySelector("button");
-  assert.deepEqual(inner.children.map((node) => node.attrs.class), [`${P}__icon`]);
-  assert.equal(inner.attrs.class, `${P} ${P}--tonal ${P}--mono ${P}--size-m ${P}--icon-button`);
-  assert.equal(pathOf(clone).attrs.d, "M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z");
-  assert.equal(button.children.length, 3, "template untouched");
+test("adapter css: zero-width host, 36px square button, explicit colours; isDark reads <html dark>", () => {
+  assert.match(adapter.css, /width: 0 !important/);
+  assert.match(adapter.css, /width: 36px; height: 36px/);
+  assert.match(adapter.css, /:host\(\[data-dark\]\)/);
+  assert.match(adapter.iconPath, /^M5 20h14/);
+  const doc = (dark) => ({ documentElement: { hasAttribute: (name) => dark && name === "dark" } });
+  assert.equal(adapter.isDark(doc(true)), true);
+  assert.equal(adapter.isDark(doc(false)), false);
+  assert.equal(adapter.isDark({}), false);
 });
 
 test("mount puts the wrapper right before the like group", () => {
   const page = youtubePage();
-  const host = sites.mountButton(adapter, page.doc, () => adapter.createButton(page.doc, () => {}));
+  const host = sites.mountButton(adapter, page.doc, () => new Node("div"));
   assert.equal(page.group.previousElementSibling, host);
   assert.ok(host.hasAttribute("data-md-button"));
 });
 
-test("createButton returns null without a native template, and mountButton then mounts nothing", () => {
+test("mountButton mounts nothing when create() returns null", () => {
   const page = youtubePage();
-  page.share.remove();
-  assert.equal(adapter.createButton(page.doc, () => {}), null);
-  assert.equal(sites.mountButton(adapter, page.doc, () => adapter.createButton(page.doc, () => {})), null);
+  assert.equal(sites.mountButton(adapter, page.doc, () => null), null);
   assert.equal(page.doc.querySelectorAll("[data-md-button]").length, 0);
 });
 
@@ -214,5 +164,4 @@ test("findAnchor skips hidden duplicates and returns null when none is rendered"
 test("diagnose lists every selector with its match count", () => {
   const out = adapter.diagnose(youtubePage().doc);
   assert.match(out, /segmented-like-dislike-button-view-model=1/);
-  assert.match(out, /yt-button-view-model=1/);
 });

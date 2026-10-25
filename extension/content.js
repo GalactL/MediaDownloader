@@ -519,18 +519,27 @@
 
   setView("main"); // marks the settings card inert from the start
 
-  // Page button (site adapter in sites.js): a clone of a native action button, created on first use and reused across re-renders.
+  // Page button (site adapter in sites.js): a zero-width host (closed shadow root) carrying a 36px square button; created once and reused.
   const adapter = sites.adapterFor(location.hostname);
-  let pageButton = null;
+  let pageButton = null; // the host element
+  let pageControl = null; // the <button> inside its shadow root
   function createPageButton() {
     if (!pageButton) {
-      pageButton = adapter.createButton(document, toggle);
-      if (pageButton) adapter.labelButton(pageButton, t("button.download"));
-      if (pageButton) for (const type of ["keydown", "keyup", "keypress"]) pageButton.addEventListener(type, (event) => event.stopPropagation());
+      pageButton = document.createElement("div");
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      svg.setAttribute("viewBox", "0 0 24 24");
+      svg.setAttribute("aria-hidden", "true");
+      path.setAttribute("d", adapter.iconPath);
+      svg.append(path);
+      pageControl = el("button", { type: "button" }, [svg]);
+      pageControl.addEventListener("click", toggle);
+      pageButton.attachShadow({ mode: "closed" }).append(el("style", { textContent: adapter.css }), pageControl);
+      for (const type of ["keydown", "keyup", "keypress"]) pageButton.addEventListener(type, (event) => event.stopPropagation());
+      bind(() => { pageControl.title = t("button.download"); pageControl.setAttribute("aria-label", t("button.download")); });
     }
     return pageButton;
   }
-  bind(() => { if (pageButton) adapter.labelButton(pageButton, t("button.download")); });
   let watcher = null;
   let watched = null;
   let timer = 0;
@@ -542,6 +551,7 @@
       if (!want && watcher) { watcher.disconnect(); watched = null; }
     }
     if (want) {
+      if (pageButton) pageButton.toggleAttribute("data-dark", adapter.isDark(document));
       const target = adapter.observeTarget(document);
       if (target && target !== watched) {
         watcher = watcher || new MutationObserver(() => { clearTimeout(timer); timer = setTimeout(syncButton, 300); });
@@ -555,7 +565,7 @@
   // Opened without a usable button (toolbar icon, button off-screen or missing) it stays in the fixed corner and is never glued.
   function placePanel() {
     if (panel.hidden || !pageButton || !pageButton.isConnected) return;
-    const place = sites.placement(pageButton.querySelector("button").getBoundingClientRect(), innerWidth, innerHeight, panel.offsetHeight);
+    const place = sites.placement(pageControl.getBoundingClientRect(), innerWidth, innerHeight, panel.offsetHeight);
     const glued = panel.style.left !== "";
     if (!place || place.close) return glued ? closeBox() : undefined;
     panel.style.right = panel.style.bottom = "auto";

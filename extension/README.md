@@ -30,14 +30,14 @@ stockés avec `storage.local` et appliqués immédiatement sans recharger :
 - **Optimiser l'application (économie de ressources)** : désactivée par défaut. Activée, le moteur lance FFmpeg en
   priorité basse avec 2 threads (champ `lowResources` de la requête `download`), les animations sont supprimées (comme
   `prefers-reduced-motion`, qui est aussi respecté sans le réglage) et le sondage de navigation de la page est arrêté.
-- **Affichage du bouton** : « Sur la page » (clone d'un bouton natif à icône seule de la barre d'actions (« Plus d'actions », sinon « Partager » réduit à son icône), dont seul le dessin est remplacé,
-  inséré juste avant le groupe J'aime / Je n'aime pas) ou « Icône de la barre uniquement ». Comme c'est un clone,
-  YouTube lui applique lui-même son style (thème clair ou sombre, survol) ; il est posé dans un conteneur de largeur nulle, à gauche du groupe J'aime : le bouton ne prend pas de place dans la barre et ne décale rien ; le réglage de thème de l'extension
-  ne concerne que la boîte. La boîte s'ouvre sous le bouton (au-dessus s'il manque de la place), le suit au défilement et
-  se ferme quand le bouton sort de l'écran ; ouverte depuis l'icône de la barre d'outils sans bouton visible, elle reste
-  dans le coin. Le bouton est réinséré après chaque navigation ou reconstruction de la barre d'actions ; si YouTube change
-  sa structure et que l'ancre ou le bouton modèle est introuvable, rien n'est affiché et l'icône de la barre d'outils
-  reste utilisable.
+- **Affichage du bouton** : « Sur la page » (bouton carré de 36 px, discret, placé à gauche du groupe J'aime / Je n'aime pas
+  sans prendre de place dans la barre : un conteneur de largeur nulle l'accroche sans rien décaler, pas même la barre grise des
+  « J'aime ») ou « Icône de la barre uniquement ». Ses couleurs sont explicites (clair ou sombre selon l'attribut `dark` de
+  la page YouTube), indépendantes du réglage de thème de l'extension, qui ne concerne que la boîte. La boîte s'ouvre sous le
+  bouton (au-dessus s'il manque de la place), le suit au défilement et se ferme quand le bouton sort de l'écran ; ouverte
+  depuis l'icône de la barre d'outils sans bouton visible, elle reste dans le coin. Le bouton est réinséré après chaque
+  navigation ou reconstruction de la barre d'actions ; si YouTube change sa structure et que l'ancre est introuvable, rien
+  n'est affiché (une ligne `console.debug` liste les sélecteurs essayés) et l'icône de la barre d'outils reste utilisable.
   Dans le mode « icône », le bouton de la page disparaît aussitôt et l'icône MediaDownloader de la barre d'outils
   ouvre et ferme le menu. Elle n'agit que sur une page vidéo YouTube : pour revenir au bouton
   de la page, ouvrir une vidéo, cliquer sur l'icône puis sur l'engrenage.
