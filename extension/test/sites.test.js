@@ -104,7 +104,7 @@ test("placement: below, above, off-screen, and corner when nothing fits", () => 
   assert.equal(sites.placement(rect(900), 1280, 800, 420).mode, "fixed");
   assert.equal(sites.placement({ ...rect(100), width: 0 }, 1280, 800, 420).mode, "fixed");
   assert.equal(sites.placement(rect(100), 1280, 300, 420).mode, "fixed");
-  assert.equal(sites.placement(rect(300), 1280, 800, 420).mode, "fixed"); // 464 below, 284 above: neither fits
+  assert.equal(sites.placement(rect(400), 1280, 800, 420).mode, "fixed"); // 348 below, 384 above: neither fits
   assert.equal(sites.placement(rect(100), 360, 700, 0).left, 16);
 });
 
