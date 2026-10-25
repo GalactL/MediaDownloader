@@ -26,13 +26,20 @@ class Node {
   all() { return this.children.flatMap((child) => [child, ...child.all()]); }
   querySelectorAll(selector) { return find(this, selector); }
   querySelector(selector) { return find(this, selector)[0] || null; }
+  closest(selector) { for (let node = this; node; node = node.parent) if (selector.split(" ").length === 1 && matches(node, selector)) return node; return null; }
 }
-// Selector shapes used here: "tag", "#id", ".class", "[attr]", and descendant chains of those.
-const matches = (node, simple) =>
-  simple[0] === "#" ? node.attrs.id === simple.slice(1)
-    : simple[0] === "." ? (node.attrs.class || "").split(" ").includes(simple.slice(1))
-      : simple[0] === "[" ? simple.slice(1, -1) in node.attrs
-        : simple === "*" || simple === node.name;
+// Selector shapes used here: "tag", "#id", ".class", "[attr]", "[attr=value]", compounds of those ("tag[attr]") and descendant chains. Anything else (":has", ">") matches nothing.
+const PARTS = /[#.][\w-]+|\[[^\]]+\]/g;
+const matches = (node, simple) => {
+  const m = /^([\w-]*|\*)((?:[#.][\w-]+|\[[^\]]+\])*)$/.exec(simple);
+  if (!m || (m[1] && m[1] !== "*" && m[1] !== node.name)) return false;
+  return (m[2].match(PARTS) || []).every((part) => {
+    if (part[0] === "#") return node.attrs.id === part.slice(1);
+    if (part[0] === ".") return (node.attrs.class || "").split(" ").includes(part.slice(1));
+    const [name, value] = part.slice(1, -1).split("=");
+    return value === undefined ? name in node.attrs : node.attrs[name] === value.replace(/"/g, "");
+  });
+};
 function find(root, selector) {
   const parts = selector.split(" ");
   return root.all().filter((node) => {
@@ -42,7 +49,7 @@ function find(root, selector) {
     return true;
   });
 }
-const fakeDocument = (root) => ({ createElement: (name) => new Node(name), createElementNS: (ns, name) => new Node(name), body: root, querySelector: (selector) => find(root, selector)[0] || null, querySelectorAll: (selector) => find(root, selector) });
+const fakeDocument = (root, pathname) => ({ location: { pathname }, createElement: (name) => new Node(name), createElementNS: (ns, name) => new Node(name), body: root, querySelector: (selector) => find(root, selector)[0] || null, querySelectorAll: (selector) => find(root, selector) });
 function youtubePage() {
   const root = new Node("body");
   const bar = root.append(new Node("div", { id: "top-level-buttons-computed" }));
@@ -164,4 +171,125 @@ test("findAnchor skips hidden duplicates and returns null when none is rendered"
 test("diagnose lists every selector with its match count", () => {
   const out = adapter.diagnose(youtubePage().doc);
   assert.match(out, /segmented-like-dislike-button-view-model=1/);
+});
+
+// --- Shorts, X, TikTok, Instagram ---
+const add = (parent, name, attrs) => parent.append(new Node(name, attrs));
+
+test("adapterFor picks the adapter from host and path", () => {
+  assert.equal(sites.adapterFor("www.youtube.com", "/shorts/abc").id, "youtube-shorts");
+  assert.equal(sites.adapterFor("www.youtube.com", "/watch").id, "youtube");
+  assert.equal(sites.adapterFor("www.youtube.com", "/").id, "youtube");
+  for (const [host, id] of [["x.com", "x"], ["twitter.com", "x"], ["www.x.com", "x"], ["www.tiktok.com", "tiktok"], ["www.instagram.com", "instagram"]])
+    assert.equal(sites.adapterFor(host, "/").id, id);
+  for (const host of ["evilx.com", "x.com.evil.example", "tiktok.com.evil.example", "notinstagram.com"]) assert.equal(sites.adapterFor(host, "/"), null);
+});
+
+test("Shorts: the button leads the like button of the active short only", () => {
+  const root = new Node("body");
+  const idle = add(add(root, "ytd-reel-video-renderer"), "like-button-view-model");
+  const active = add(root, "ytd-reel-video-renderer", { "is-active": "" });
+  const column = add(active, "div", { id: "actions" });
+  const like = add(column, "like-button-view-model");
+  add(column, "button-view-model");
+  const shorts = sites.adapterFor("www.youtube.com", "/shorts/abc");
+  const doc = fakeDocument(root, "/shorts/abc");
+  assert.equal(shorts.findAnchor(doc), like);
+  const host = sites.mountButton(shorts, doc, make);
+  assert.equal(like.previousElementSibling, host);
+  assert.equal(idle.previousElementSibling, null);
+  assert.match(shorts.css, /width: 48px; height: 48px/);
+  assert.match(shorts.diagnose(doc), /like-button-view-model=1/);
+  assert.equal(shorts.findAnchor(fakeDocument(new Node("body"), "/shorts/abc")), null);
+});
+
+function xPage(pathname, { video = true, id = "123" } = {}) {
+  const root = new Node("body");
+  const main = add(root, "main");
+  const thread = add(main, "article", { "data-testid": "tweet" }); // a post above the page's own
+  add(thread, "a", { href: "/other/status/1" });
+  add(thread, "video");
+  add(add(thread, "div", { role: "group" }), "div");
+  const post = add(main, "article", { "data-testid": "tweet" });
+  add(post, "a", { href: "/user/status/" + id });
+  if (video) add(add(post, "div", { "data-testid": "videoPlayer" }), "video");
+  const bar = add(post, "div", { role: "group" });
+  const reply = add(bar, "div");
+  add(add(reply, "div"), "button", { "data-testid": "reply" });
+  add(bar, "div");
+  return { root, reply, doc: fakeDocument(root, pathname) };
+}
+
+test("X: the button leads the action bar of the page's own post, only with a video", () => {
+  const x = sites.adapterFor("x.com", "/user/status/123");
+  const page = xPage("/user/status/123");
+  assert.equal(x.findAnchor(page.doc), page.reply);
+  const host = sites.mountButton(x, page.doc, make);
+  assert.equal(page.reply.previousElementSibling, host);
+  const none = xPage("/user/status/123", { video: false });
+  assert.equal(x.findAnchor(none.doc), null); // the thread above has a video, but it is not this post
+  assert.equal(sites.mountButton(x, none.doc, make), null);
+  assert.equal(none.doc.querySelectorAll("[data-md-button]").length, 0);
+  assert.equal(x.findAnchor(xPage("/user/status/999").doc), null); // page id not found among the posts
+});
+
+test("TikTok: the button leads the like button of the video, falling back to its icon's parent", () => {
+  const tiktok = sites.adapterFor("www.tiktok.com", "/@a/video/1");
+  const root = new Node("body");
+  const column = add(root, "div");
+  const likeButton = add(column, "button");
+  add(likeButton, "span", { "data-e2e": "like-icon" });
+  add(column, "button");
+  const doc = fakeDocument(root, "/@a/video/1");
+  assert.equal(tiktok.findAnchor(doc), likeButton);
+  assert.equal(sites.mountButton(tiktok, doc, make), likeButton.previousElementSibling);
+  const bare = new Node("body");
+  const wrap = add(bare, "div");
+  add(wrap, "span", { "data-e2e": "browse-like-icon" });
+  assert.equal(tiktok.findAnchor(fakeDocument(bare, "/@a/video/1")), wrap);
+  assert.equal(tiktok.findAnchor(fakeDocument(new Node("body"), "/@a/video/1")), null);
+});
+
+test("Instagram: the button leads the action row of a post (or of main) holding a video", () => {
+  const instagram = sites.adapterFor("www.instagram.com", "/reel/abc");
+  const page = (box, video) => {
+    const root = new Node("body");
+    const post = add(add(root, "main"), box);
+    if (video) add(post, "video");
+    const row = add(post, "section");
+    add(row, "svg");
+    return { doc: fakeDocument(root, "/reel/abc") };
+  };
+  const post = page("article", true);
+  assert.equal(instagram.findAnchor(post.doc), post.doc.querySelector("svg")); // first child of the row
+  assert.equal(instagram.findAnchor(page("article", false).doc), null);
+  const reel = page("div", true);
+  assert.equal(instagram.findAnchor(reel.doc), reel.doc.querySelector("svg"));
+});
+
+test("a missing anchor logs one diagnostic line and leaves the page untouched", () => {
+  delete require.cache[require.resolve("../sites.js")];
+  const fresh = require("../sites.js");
+  const x = fresh.adapterFor("x.com", "/user/status/123");
+  const logs = [];
+  const original = console.debug;
+  console.debug = (line) => logs.push(line);
+  try {
+    const doc = fakeDocument(new Node("body"), "/user/status/123");
+    fresh.mountButton(x, doc, make);
+    fresh.mountButton(x, doc, make);
+    assert.equal(logs.length, 1);
+    assert.match(logs[0], /ancre introuvable/);
+    assert.equal(doc.querySelectorAll("*").length, 0);
+  } finally { console.debug = original; }
+});
+
+test("isDark reads the page background where the site has no theme attribute", () => {
+  const doc = (backgroundColor) => ({ body: {}, defaultView: { getComputedStyle: () => ({ backgroundColor }) } });
+  for (const id of ["x", "tiktok", "instagram"]) {
+    const adapterOf = sites.ADAPTERS.find((a) => a.id === id);
+    assert.equal(adapterOf.isDark(doc("rgb(0, 0, 0)")), true);
+    assert.equal(adapterOf.isDark(doc("rgb(255, 255, 255)")), false);
+    assert.equal(adapterOf.isDark({}), false);
+  }
 });

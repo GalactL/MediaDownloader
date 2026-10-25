@@ -1,6 +1,7 @@
 "use strict";
 // Per-site adapters: the ONLY place with page selectors. Adding a site = adding one object to ADAPTERS (+ its host match in manifest.json).
-// An adapter is { id, matches(hostname), findAnchor(document), observeTarget(document), isDark(document), iconPath, css }: the button is inserted right before the anchor.
+// An adapter is { id, matches(hostname, pathname), findAnchor(document), observeTarget(document), isDark(document), iconPath, css }: the button is inserted right before the anchor.
+// Selectors of every site except YouTube classic are unverified on the live site (these sites rename and obfuscate their DOM): each list has fallbacks and `diagnose` reports what matched.
 (function (root) {
   // YouTube keeps hidden duplicate action bars, so only a rendered node counts (no getClientRects = fake DOM, treated as rendered).
   const rendered = (node) => typeof node.getClientRects !== "function" || node.getClientRects().length > 0;
@@ -10,6 +11,43 @@
     }
     return null;
   };
+
+  const counts = (doc, selectors) => selectors.map((selector) => { try { return selector + "=" + doc.querySelectorAll(selector).length; } catch { return selector + "=err"; } }).join(" | ");
+  const DOWNLOAD_ICON = "M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z"; // filled download glyph (24x24 viewBox), Material "download"
+  const isYouTube = (hostname) => /^(?:[a-z0-9-]+\.)*youtube\.com$/i.test(hostname) || hostname.toLowerCase() === "youtu.be";
+  // Sites without a theme attribute: dark when the page background is.
+  function darkBackground(doc) {
+    if (!doc.defaultView || !doc.body) return false;
+    const [r, g, b] = (doc.defaultView.getComputedStyle(doc.body).backgroundColor.match(/\d+/g) || [255, 255, 255]).map(Number);
+    return r * 0.299 + g * 0.587 + b * 0.114 < 128;
+  }
+  // First rendered post (matching `box`) with a video, `accept` and an action bar (from `bars`); -> the bar's first child (the button goes before it).
+  function barOf(doc, box, bars, accept = () => true) {
+    for (const post of doc.querySelectorAll(box)) {
+      if (!rendered(post) || !accept(post) || !first(post, ["video"])) continue;
+      const bar = first(post, bars);
+      if (bar && bar.children[0]) return bar.children[0];
+    }
+    return null;
+  }
+  // Square 36px button in a horizontal action bar (X, Instagram): a normal flex item.
+  const ROW_CSS = `
+:host { display: flex !important; align-items: center; justify-content: center; flex: none !important; width: 36px !important; height: 36px !important;
+  margin: 0 !important; padding: 0 !important; visibility: visible !important; opacity: 1 !important; --bg-hover: rgba(0, 0, 0, .1); --fg: #0f1419; }
+:host([data-dark]) { --bg-hover: rgba(255, 255, 255, .15); --fg: #e7e9ea; }
+button { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--fg); cursor: pointer; }
+button:hover { background: var(--bg-hover); }
+button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+svg { width: 22px; height: 22px; flex: none; fill: currentColor; }`;
+  // Round 48px button at the top of a vertical action column (Shorts, TikTok): in the flow, so the column keeps its spacing.
+  const COLUMN_CSS = `
+:host { display: flex !important; justify-content: center; flex: none !important; width: 100% !important; margin: 0 0 12px !important; padding: 0 !important;
+  visibility: visible !important; opacity: 1 !important; --bg: rgba(0, 0, 0, .08); --bg-hover: rgba(0, 0, 0, .14); --fg: #0f0f0f; }
+:host([data-dark]) { --bg: rgba(255, 255, 255, .12); --bg-hover: rgba(255, 255, 255, .2); --fg: #fff; }
+button { display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; padding: 0; border: 0; border-radius: 50%; background: var(--bg); color: var(--fg); cursor: pointer; }
+button:hover { background: var(--bg-hover); }
+button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+svg { width: 24px; height: 24px; flex: none; fill: currentColor; }`;
 
   const YT_ANCHORS = [
     "#top-level-buttons-computed segmented-like-dislike-button-view-model",
@@ -23,15 +61,15 @@
   ];
   const youtube = {
     id: "youtube",
-    matches: (hostname) => /^(?:[a-z0-9-]+\.)*youtube\.com$/i.test(hostname) || hostname.toLowerCase() === "youtu.be",
+    matches: isYouTube,
     // Like/dislike group (the button goes before it so the native buttons do not move), most specific first (YouTube renames these often; unverified on the live site).
     findAnchor: (doc) => first(doc, YT_ANCHORS),
     // What matched, for the one-time console.debug when mounting fails (the owner can paste it).
-    diagnose: (doc) => YT_ANCHORS.map((selector) => { try { return selector + "=" + doc.querySelectorAll(selector).length; } catch { return selector + "=err"; } }).join(" | "),
+    diagnose: (doc) => counts(doc, YT_ANCHORS),
     // Where to watch for the action bar being recreated (narrow layout, navigation).
     observeTarget: (doc) => first(doc, ["ytd-watch-flexy", "ytd-page-manager"]) || doc.body,
     // Filled download glyph (24x24 viewBox), Material "download".
-    iconPath: "M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z",
+    iconPath: DOWNLOAD_ICON,
     isDark: (doc) => !!(doc.documentElement && doc.documentElement.hasAttribute("dark")),
     // Self-contained button, explicit colours (YouTube's variables are not reliable). The host takes no space (width 0) so the native row and
     // its like bar keep their layout; the 36px square hangs to the left of the like group.
@@ -47,8 +85,72 @@ button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 svg { width: 24px; height: 24px; flex: none; fill: currentColor; }`,
   };
 
-  const ADAPTERS = [youtube];
-  const adapterFor = (hostname) => ADAPTERS.find((adapter) => adapter.matches(hostname)) || null;
+  // YouTube Shorts (/shorts/<id>): the button leads the vertical actions column of the active short. Listed before `youtube`, which keeps every other YouTube page.
+  const SHORTS_ANCHORS = [
+    "ytd-reel-video-renderer[is-active] like-button-view-model",
+    "ytd-reel-video-renderer[is-active] #like-button",
+    "ytd-reel-video-renderer[is-active] #actions > :first-child",
+  ];
+  const shorts = {
+    id: "youtube-shorts",
+    matches: (hostname, pathname) => isYouTube(hostname) && /^\/shorts\//.test(pathname),
+    findAnchor: (doc) => first(doc, SHORTS_ANCHORS),
+    diagnose: (doc) => counts(doc, SHORTS_ANCHORS),
+    observeTarget: (doc) => first(doc, ["ytd-shorts", "ytd-page-manager"]) || doc.body,
+    iconPath: DOWNLOAD_ICON,
+    isDark: youtube.isDark,
+    css: COLUMN_CSS,
+  };
+
+  // X / Twitter (/<account>/status/<id>): the post of the page, only when it holds a video; the button leads its action bar (reply, repost, like...).
+  const X_BARS = ['[role="group"]:has([data-testid="reply"])', '[role="group"]'];
+  const x = {
+    id: "x",
+    matches: (hostname) => /^(?:[a-z0-9-]+\.)*(?:x|twitter)\.com$/i.test(hostname),
+    findAnchor: (doc) => {
+      const id = (/\/status\/(\d+)/.exec(doc.location && doc.location.pathname) || [])[1];
+      // The page may also show replies or the thread above: only the post whose own link carries the page's id.
+      const isPageOf = (post) => !id || [...post.querySelectorAll("a")].some((link) => (link.getAttribute("href") || "").includes("/status/" + id));
+      return barOf(doc, "article", X_BARS, isPageOf);
+    },
+    diagnose: (doc) => counts(doc, ["article", "article video", ...X_BARS]),
+    observeTarget: (doc) => first(doc, ["main", '[data-testid="primaryColumn"]']) || doc.body,
+    iconPath: DOWNLOAD_ICON,
+    isDark: darkBackground,
+    css: ROW_CSS,
+  };
+
+  // TikTok (/@<account>/video/<id>): the button leads the like / comment / share column of the video.
+  const TT_LIKES = ['[data-e2e="like-icon"]', '[data-e2e="browse-like-icon"]'];
+  const tiktok = {
+    id: "tiktok",
+    matches: (hostname) => /^(?:[a-z0-9-]+\.)*tiktok\.com$/i.test(hostname),
+    findAnchor: (doc) => {
+      const icon = first(doc, TT_LIKES);
+      return icon && (icon.closest("button") || icon.parentElement);
+    },
+    diagnose: (doc) => counts(doc, TT_LIKES),
+    observeTarget: (doc) => first(doc, ["main", "#app"]) || doc.body,
+    iconPath: DOWNLOAD_ICON,
+    isDark: darkBackground,
+    css: COLUMN_CSS,
+  };
+
+  // Instagram (/reel/<id>, /p/<id>): the post (or the page's main area) holding a video; the button leads its action row (like, comment, share...).
+  const IG_BARS = ["section:has(svg)", "section"];
+  const instagram = {
+    id: "instagram",
+    matches: (hostname) => /^(?:[a-z0-9-]+\.)*instagram\.com$/i.test(hostname),
+    findAnchor: (doc) => barOf(doc, "article", IG_BARS) || barOf(doc, "main", IG_BARS),
+    diagnose: (doc) => counts(doc, ["article video", "main video", ...IG_BARS.map((bar) => "article " + bar), ...IG_BARS.map((bar) => "main " + bar)]),
+    observeTarget: (doc) => first(doc, ["main"]) || doc.body,
+    iconPath: DOWNLOAD_ICON,
+    isDark: darkBackground,
+    css: ROW_CSS,
+  };
+
+  const ADAPTERS = [shorts, youtube, x, tiktok, instagram];
+  const adapterFor = (hostname, pathname = "") => ADAPTERS.find((adapter) => adapter.matches(hostname, pathname)) || null;
 
   let warned = false; // one diagnostic line per page load
   function report(what, adapter, doc) {
