@@ -42,4 +42,6 @@ button.dl.running { background: #0a3d80; }
 button.dl:disabled.running { opacity: 1; }
 .status { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 .status .message { margin: 0; flex: 0 1 auto; }
-button.icon { padding: 2px 4px; border: 0; background: none; font-size: 16px; cursor: pointer; }
+.actions > button.dl { flex: 9 1 0; }
+.actions > button.side { flex: 1 1 0; display: flex; align-items: center; justify-content: center; }
+button.side svg { width: 16px; height: 16px; }

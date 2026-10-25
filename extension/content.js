@@ -44,12 +44,32 @@
   const clip = el("input", { type: "checkbox" });
   const startInput = el("input", { type: "text", placeholder: "0 ou 1:30", disabled: true });
   const endInput = el("input", { type: "text", placeholder: "60 ou 2:00", disabled: true });
-  const openFolder = el("button", { className: "icon", type: "button", textContent: "📁", title: "Ouvrir le dossier", ariaLabel: "Ouvrir le dossier", hidden: true });
+  // Side button (10 % of the row): close -> cancel while running -> open folder once done. Icons are outlines (currentColor).
+  const SIDE = {
+    close: { label: "Fermer", path: "M6 6l12 12M18 6L6 18" },
+    cancel: { label: "Annuler", path: "M6 6l12 12M18 6L6 18" },
+    folder: { label: "Ouvrir le dossier", path: "M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" },
+  };
+  const side = el("button", { className: "btn secondary side", type: "button" });
+  let sideMode = "close";
+  function setSide(mode) {
+    sideMode = mode;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    for (const [name, value] of [["fill", "none"], ["stroke", "currentColor"], ["stroke-width", "2"], ["stroke-linecap", "round"], ["stroke-linejoin", "round"]])
+      svg.setAttribute(name, value);
+    path.setAttribute("d", SIDE[mode].path);
+    svg.append(path);
+    side.replaceChildren(svg);
+    side.title = SIDE[mode].label;
+    side.setAttribute("aria-label", SIDE[mode].label);
+  }
+  setSide("close");
   // Progress fills the button from behind; the state text sits on top of it.
   const fill = el("span", { className: "fill" });
   const label = el("span", { className: "label", textContent: "Télécharger" });
   const download = el("button", { className: "btn dl", type: "button" }, [fill, label]);
-  const cancel = el("button", { className: "btn secondary", type: "button", textContent: "Annuler", hidden: true });
   const message = el("div", { className: "message", role: "status" });
   const panel = el("div", { className: "panel", hidden: true }, [
     title,
@@ -61,8 +81,8 @@
       el("label", { textContent: "Début (s)" }, [startInput]),
       el("label", { textContent: "Fin (s)" }, [endInput]),
     ]),
-    el("div", { className: "actions" }, [download, cancel]),
-    el("div", { className: "status" }, [message, openFolder]),
+    el("div", { className: "actions" }, [download, side]),
+    el("div", { className: "status" }, [message]),
   ]);
   shadow.append(style, fab, panel);
 
@@ -85,7 +105,7 @@
     running = value;
     download.disabled = value;
     download.classList.toggle("running", value);
-    cancel.hidden = !value;
+    setSide(value ? "cancel" : "close"); // a successful run then switches it to the folder
     if (!value) { fill.style.width = "0"; label.textContent = "Télécharger"; }
   }
 
@@ -118,7 +138,6 @@
       ? "Renseignez le début et la fin du découpage." : lib.validateRange(startTime, endTime);
     if (rangeError) return say(rangeError, "error");
     if (Number.isNaN(size)) return say("La taille maximale doit être comprise entre 0 et " + lib.MAX_SIZE_MB + " Mo.", "error");
-    openFolder.hidden = true;
     setRunning(true);
     fill.style.width = "0";
     label.textContent = "Démarrage…";
@@ -132,7 +151,7 @@
       } else if (reply.type === "completed") {
         setRunning(false);
         say("Terminé", "ok");
-        openFolder.hidden = false;
+        setSide("folder");
       } else if (reply.type === "error") {
         setRunning(false);
         say(lib.errorText(reply.code, reply.message), "error");
@@ -146,11 +165,14 @@
   });
   nameInput.addEventListener("input", () => { nameEdited = true; });
   clip.addEventListener("change", () => { startInput.disabled = endInput.disabled = !clip.checked; });
-  openFolder.addEventListener("click", () => request({ type: "openFolder" }, (reply) => {
-    if (reply.type === "error") say(lib.errorText(reply.code, reply.message), "error");
-  }));
+  side.addEventListener("click", () => {
+    if (sideMode === "cancel") request({ type: "cancel" }, () => {});
+    else if (sideMode === "close") panel.hidden = true;
+    else request({ type: "openFolder" }, (reply) => {
+      if (reply.type === "error") say(lib.errorText(reply.code, reply.message), "error");
+    });
+  });
   download.addEventListener("click", start);
-  cancel.addEventListener("click", () => request({ type: "cancel" }, () => {}));
 
   // SPA navigation: YouTube changes the URL without reloading.
   function sync() {
@@ -164,6 +186,7 @@
         nameInput.value = "";
         nameEdited = false;
         title.textContent = "MediaDownloader";
+        setSide("close");
         say("");
         if (!panel.hidden && visible) probe();
       }
