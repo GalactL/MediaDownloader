@@ -104,6 +104,19 @@
   // Typing in the box must not trigger the page's shortcuts (space, k, f, arrows...): events leave the shadow root retargeted to the host.
   for (const type of ["keydown", "keyup", "keypress"]) host.addEventListener(type, (event) => event.stopPropagation());
 
+  // Green check that draws itself (see .check-mark in content.css).
+  function checkmark() {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    svg.setAttribute("class", "check-mark");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("aria-hidden", "true");
+    path.setAttribute("d", "M5 12.5l4.5 4.5L19 7.5");
+    path.setAttribute("pathLength", "1");
+    svg.append(path);
+    return svg;
+  }
+
   function say(text, kind) { // kind: "ok" | "error"; empty text hides the notice
     notice.textContent = text ? (kind === "ok" ? "✓ " : "") + text : "";
     notice.className = "notice" + (kind === "ok" ? " success" : kind === "error" ? " error" : "");
@@ -212,9 +225,8 @@
           setRunning(false);
           download.classList.add("complete");
           download.disabled = true;
-          label.textContent = "Terminé";
-          status.textContent = "Téléchargement terminé";
-          say("Vidéo téléchargée.", "ok");
+          label.replaceChildren(checkmark(), "Terminé");
+          status.textContent = "";
           setSide("folder");
         }, calm ? 0 : Math.max(left, 200));
       } else if (reply.type === "error") {

@@ -55,11 +55,16 @@ label.check input { width: 17px; min-height: 17px; height: 17px; margin: 0; acce
 .primary.loading { background: #34333e; }
 .primary .fill { position: absolute; inset: 0 auto 0 0; width: 0; z-index: -1; background: #0060df; transition: width .2s linear; }
 .primary .label { position: relative; }
-.primary.complete { background: #27262f; color: #e0e0e6; }
+.primary.complete { background: #143127; color: #70e5a4; }
+.primary.complete .label { display: inline-flex; align-items: center; gap: 8px; }
+.check-mark { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.check-mark path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw-check .45s ease-out .1s forwards; }
+@keyframes draw-check { to { stroke-dashoffset: 0; } }
 .secondary {
   display: inline-flex; align-items: center; justify-content: center; flex: 0 0 42px; width: 42px; height: 42px; padding: 10px;
   border: 1px solid #555360; border-radius: 7px; background: #27262f; color: #e0e0e6; cursor: pointer;
 }
 .secondary:hover { background: #34333e; border-color: #0060df; }
 .secondary svg { width: 21px; height: 21px; }
-@media (prefers-reduced-motion: reduce) { .primary .fill { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .primary .fill { transition: none; }
+  .check-mark path { animation: none; stroke-dashoffset: 0; } }
