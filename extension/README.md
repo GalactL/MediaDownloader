@@ -10,10 +10,13 @@ le port `connectNative` est ouvert, et c'est le plus simple pour `runtime.connec
 
 ## Réglages
 
-L'engrenage de l'en-tête du menu ouvre les réglages dans la même boîte (stockés avec
-`storage.local`, appliqués immédiatement sans recharger) :
+L'engrenage de l'en-tête du menu ouvre les réglages : « Télécharger la vidéo » et « Réglages » sont deux cartes
+distinctes dans la même boîte, qui glissent horizontalement l'une vers l'autre (sans animation si le système
+demande de réduire les animations ; la carte inactive est inerte et masquée aux lecteurs d'écran). La flèche de
+retour ou « Enregistrer » ramène à la carte principale, et la boîte se rouvre toujours dessus. Les réglages sont
+stockés avec `storage.local` et appliqués immédiatement sans recharger :
 
-- **Dossier de téléchargement** : chemin absolu ; vide = dossier Vidéos par défaut. « Parcourir… » ouvre le
+- **Dossier de téléchargement** : chemin absolu ; vide = dossier Vidéos par défaut. Le bouton dossier (« Parcourir… ») ouvre le
   sélecteur de dossier de l'hôte (le champ reste modifiable ; rien n'est enregistré avant « Enregistrer »). Si
   le dossier est inutilisable au moment du téléchargement, la vidéo va dans le dossier Vidéos et le menu l'indique.
 - **Thème** : clair ou sombre (sombre par défaut).

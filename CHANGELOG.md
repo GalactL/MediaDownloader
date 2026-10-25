@@ -8,6 +8,7 @@
 - Moteur : un dossier de sortie inutilisable (fichier, droits, lecture seule) ne fait plus échouer le téléchargement, qui se replie sur le dossier Vidéos avec un avertissement ; nouvelle requête d'hôte `pickFolder` (sélecteur de dossier du système).
 - Extension : icône MediaDownloader dans la barre d'outils, qui ouvre et ferme le menu ; nouvelle permission `storage`.
 - Extension : bouton « Parcourir… » dans les réglages pour choisir le dossier de téléchargement avec le sélecteur de l'hôte ; si le dossier choisi est inutilisable, le menu indique où la vidéo a été enregistrée (dossier Vidéos).
+- Extension : « Télécharger la vidéo » et « Réglages » sont deux cartes séparées avec une animation de glissement horizontal (désactivée avec `prefers-reduced-motion`) ; « Enregistrer » revient à la carte principale. Nouvelle présentation : champ « Nom du fichier », unité « Mo » et icônes d'horloge dans les champs, interrupteur pour « Découper la vidéo », pastille d'état, icônes sur « Télécharger » et « Enregistrer », bouton dossier intégré au champ du dossier de téléchargement.
 
 ## v0.3.1 (2026-10-24)
 

@@ -39,29 +39,7 @@
   const style = el("link", { rel: "stylesheet", href: browser.runtime.getURL("content.css") });
   const fab = el("button", { className: "fab", hidden: true, type: "button", title: "MediaDownloader", textContent: "⬇" });
 
-  // Header and video summary
-  const closeX = el("button", { className: "close", type: "button", textContent: "×", title: "Fermer", ariaLabel: "Fermer" });
-  const thumb = el("img", { className: "thumb", alt: "", hidden: true });
-  const title = el("div", { className: "title", textContent: "MediaDownloader" });
-  const meta = el("span", { className: "muted" });
-
-  // Form
-  const quality = el("select", { id: "quality" });
-  const nameInput = el("input", { id: "name", type: "text", placeholder: "Titre de la vidéo" });
-  const maxSize = el("input", { id: "size", type: "text", inputMode: "decimal", placeholder: "Ex. : 20" });
-  const clip = el("input", { id: "trim", type: "checkbox" });
-  const startInput = el("input", { id: "start", type: "text", placeholder: "00:00:00", ariaLabel: "Début, heures minutes secondes", disabled: true });
-  const endInput = el("input", { id: "end", type: "text", placeholder: "00:12:48", ariaLabel: "Fin, heures minutes secondes", disabled: true });
-  const field = (text, input) => el("div", { className: "field" }, [el("label", { htmlFor: input.id, textContent: text }), input]);
-  const form = el("fieldset", {}, [
-    field("Qualité", quality),
-    field("Nom de la vidéo", nameInput),
-    field("Taille maximale (Mo, 20 max, facultatif)", maxSize),
-    el("label", { className: "check" }, [clip, "Découper la vidéo"]),
-    el("div", { className: "times" }, [field("Début", startInput), field("Fin", endInput)]),
-  ]);
-
-  // Side button (square, next to Télécharger): close -> cancel while running -> open folder once done. Outline icons (currentColor).
+  // Outline icons (currentColor).
   function icon(...paths) {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("viewBox", "0 0 24 24");
@@ -74,36 +52,73 @@
     }
     return svg;
   }
-  const SIDE = {
-    close: { label: "Fermer", path: "M6 6l12 12M18 6L6 18" },
-    cancel: { label: "Annuler", path: "M6 6l12 12M18 6L6 18" },
-    folder: { label: "Ouvrir le dossier", path: "M3 7V5a1 1 0 0 1 1-1h5l2 3h9a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7ZM3 9h18" },
+  const ICON = {
+    close: ["M6 6l12 12M18 6L6 18"],
+    back: ["M19 12H5M12 19l-7-7 7-7"],
+    folder: ["M3 7V5a1 1 0 0 1 1-1h5l2 3h9a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7ZM3 9h18"],
+    clock: ["M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z", "M12 7v5l3 2"],
+    download: ["M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4", "M7 10l5 5 5-5", "M12 15V3"],
+    save: ["M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z", "M17 21v-8H7v8", "M7 3v5h8"],
+    gear: ["M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z", "M15 12a3 3 0 1 1-6 0a3 3 0 0 1 6 0z"],
   };
-  const side = el("button", { className: "secondary", type: "button" });
-  let sideMode = "close";
+  const headButton = (label, paths, extra) => el("button", { className: "close", type: "button", title: label, ariaLabel: label, ...extra }, [icon(...paths)]);
+
+  // Video summary
+  const thumb = el("img", { className: "thumb", alt: "", hidden: true });
+  const title = el("div", { className: "title", textContent: "MediaDownloader" });
+  const meta = el("span", { className: "muted" });
+
+  // Form. A .group is one bordered control: input + a suffix text, icon or button.
+  const quality = el("select", { id: "quality" });
+  const nameInput = el("input", { id: "name", type: "text", placeholder: "Titre de la vidéo" });
+  const maxSize = el("input", { id: "size", type: "text", inputMode: "decimal", placeholder: "Facultatif" });
+  const clip = el("input", { id: "trim", type: "checkbox", role: "switch" });
+  const startInput = el("input", { id: "start", type: "text", placeholder: "00:00:00", ariaLabel: "Début, heures minutes secondes", disabled: true });
+  const endInput = el("input", { id: "end", type: "text", placeholder: "00:12:48", ariaLabel: "Fin, heures minutes secondes", disabled: true });
+  const group = (...children) => el("div", { className: "group" }, children);
+  const tail = (...children) => el("span", { className: "tail", ariaHidden: "true" }, children);
+  const field = (text, input, control = input) => el("div", { className: "field" }, [el("label", { htmlFor: input.id, textContent: text }), control]);
+  const form = el("fieldset", {}, [
+    field("Qualité", quality),
+    field("Nom du fichier", nameInput),
+    field("Taille maximale (Mo, 20 max, facultatif)", maxSize, group(maxSize, tail("Mo"))),
+    el("div", { className: "trim" }, [
+      el("label", { className: "check" }, ["Découper la vidéo", clip]),
+      el("div", { className: "times" }, [
+        field("Début", startInput, group(startInput, tail(icon(...ICON.clock)))),
+        field("Fin", endInput, group(endInput, tail(icon(...ICON.clock)))),
+      ]),
+    ]),
+  ]);
+
+  // Side button (square, next to Télécharger): only while running (cancel) and once done (open folder).
+  const SIDE = { cancel: { label: "Annuler", icon: ICON.close }, folder: { label: "Ouvrir le dossier", icon: ICON.folder } };
+  const side = el("button", { className: "secondary", type: "button", hidden: true });
+  let sideMode = "idle";
   function setSide(mode) {
     sideMode = mode;
-    side.replaceChildren(icon(SIDE[mode].path));
+    side.hidden = !SIDE[mode];
+    if (!SIDE[mode]) return;
+    side.replaceChildren(icon(...SIDE[mode].icon));
     side.title = SIDE[mode].label;
     side.setAttribute("aria-label", SIDE[mode].label);
   }
-  setSide("close");
+  setSide("idle");
 
   // Progress fills the primary button from behind (.fill); the state text sits on top.
   const fill = el("span", { className: "fill" });
   const label = el("span", { className: "label", textContent: "Télécharger" });
-  const download = el("button", { className: "primary", type: "button" }, [fill, label]);
-  const status = el("span", { textContent: "Prêt à télécharger" });
+  const download = el("button", { className: "primary", type: "button" }, [fill, icon(...ICON.download), label]);
+  const status = el("span");
+  const statusBox = el("div", { className: "status", role: "status" }, [status]);
+  function setStatus(text, kind) { // kind: "ready" | "busy" | "error" (colours the dot); empty text hides the line
+    status.textContent = text;
+    statusBox.dataset.kind = kind || "";
+  }
+  setStatus("Prêt à télécharger", "ready");
   const notice = el("p", { className: "notice", role: "status", hidden: true });
-  const mainView = el("div", {}, [
-    el("div", { className: "video" }, [thumb, el("div", {}, [title, meta])]),
-    form,
-    el("div", { className: "status", role: "status" }, [status]),
-    notice,
-    el("div", { className: "actions" }, [download, side]),
-  ]);
 
-  // Settings view (same box, opened by the gear). Radio groups are native fieldset + radios.
+  // Settings. Radio groups are native fieldset + radios.
   function radioGroup(name, legend, options, stack) {
     const inputs = options.map(([value]) => el("input", { type: "radio", name, value }));
     const node = el("fieldset", { className: "field" }, [
@@ -112,37 +127,50 @@
     ]);
     return { node, get: () => inputs.find((i) => i.checked).value, set: (v) => inputs.forEach((i) => { i.checked = i.value === v; }) };
   }
+  const DIR_HINT = "Par défaut : dossier Vidéos.";
   const dirInput = el("input", { id: "dir", type: "text", placeholder: "Dossier Vidéos par défaut", spellcheck: false });
-  const browse = el("button", { className: "secondary text", type: "button", textContent: "Parcourir…" });
+  const browse = el("button", { className: "browse", type: "button", title: "Parcourir…", ariaLabel: "Parcourir…" }, [icon(...ICON.folder)]);
+  const dirHint = el("span", { className: "muted hint", textContent: DIR_HINT });
   const themeChoice = radioGroup("theme", "Thème", [["light", "Clair"], ["dark", "Sombre"]]);
   const modeChoice = radioGroup("mode", "Affichage du bouton", [["page", "Sur la page"], ["icon", "Icône de la barre uniquement"]], true);
   const settingsNotice = el("p", { className: "notice", role: "status", hidden: true });
-  const save = el("button", { className: "primary", type: "button", textContent: "Enregistrer" });
-  const settingsView = el("div", { hidden: true }, [
-    el("div", { className: "field" }, [
-      el("label", { htmlFor: "dir", textContent: "Dossier de téléchargement" }),
-      el("div", { className: "row" }, [dirInput, browse]),
-      el("span", { className: "muted hint", textContent: "Laissez vide pour utiliser le dossier Vidéos." }),
-    ]),
-    themeChoice.node,
-    modeChoice.node,
-    settingsNotice,
-    el("div", { className: "actions" }, [save]),
-  ]);
+  const save = el("button", { className: "primary", type: "button" }, [icon(...ICON.save), "Enregistrer"]);
 
-  const gear = el("button", { className: "close", type: "button", title: "Réglages", ariaLabel: "Réglages" }, [
-    icon("M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z", "M15 12a3 3 0 1 1-6 0a3 3 0 0 1 6 0z"),
+  const gear = headButton("Réglages", ICON.gear);
+  const back = headButton("Retour", ICON.back);
+  const sep = el("span", { className: "sep", ariaHidden: "true" });
+  const cardOf = (id, name, view, headLeft, headRight, body) => {
+    const card = el("section", { className: "card " + view }, [
+      el("header", {}, [
+        el("div", { className: "head-left" }, [...headLeft, el("div", {}, [el("h3", { id, textContent: name }), el("span", { className: "brand", textContent: "MediaDownloader" })])]),
+        el("div", { className: "head-right" }, headRight),
+      ]),
+      ...body,
+    ]);
+    card.setAttribute("aria-labelledby", id);
+    return card;
+  };
+  const mainCard = cardOf("h-main", "Télécharger la vidéo", "main", [], [gear, sep, headButton("Fermer", ICON.close)], [
+    el("div", { className: "video" }, [thumb, el("div", {}, [title, meta])]),
+    form,
+    statusBox,
+    notice,
+    el("div", { className: "actions" }, [download, side]),
   ]);
-  const back = el("button", { className: "close", type: "button", title: "Retour", ariaLabel: "Retour", hidden: true }, [icon("M19 12H5M12 19l-7-7 7-7")]);
-  const heading = el("h3", { textContent: "Télécharger la vidéo" });
-  const panel = el("article", { className: "dialog", hidden: true }, [
-    el("header", {}, [
-      el("div", { className: "head-left" }, [back, el("div", {}, [heading, el("span", { className: "brand", textContent: "MediaDownloader" })])]),
-      el("div", { className: "head-right" }, [gear, closeX]),
+  const settingsCard = cardOf("h-settings", "Réglages", "settings", [back], [headButton("Fermer", ICON.close)], [
+    el("div", { className: "body" }, [
+      el("div", { className: "field" }, [el("label", { htmlFor: "dir", textContent: "Dossier de téléchargement" }), group(dirInput, browse), dirHint]),
+      el("hr"),
+      themeChoice.node,
+      el("hr"),
+      modeChoice.node,
+      settingsNotice,
+      el("div", { className: "actions" }, [save]),
     ]),
-    mainView,
-    settingsView,
   ]);
+  // Two sibling cards in one clipped box: the view switch slides them (CSS, off with reduced motion).
+  const panel = el("div", { className: "dialog", hidden: true }, [mainCard, settingsCard]);
+  panel.dataset.view = "main";
   shadow.append(style, fab, panel);
   // Typing in the box must not trigger the page's shortcuts (space, k, f, arrows...): events leave the shadow root retargeted to the host.
   for (const type of ["keydown", "keyup", "keypress"]) host.addEventListener(type, (event) => event.stopPropagation());
@@ -178,14 +206,19 @@
     settings = next;
     host.dataset.theme = next.theme;
     fab.hidden = next.buttonMode === "icon";
-    if (settingsView.hidden) fillSettings(); // never clobber an edit in progress
+    if (panel.dataset.view !== "settings") fillSettings(); // never clobber an edit in progress
   }
   function setView(name) {
     const inSettings = name === "settings";
-    settingsView.hidden = back.hidden = !inSettings;
-    mainView.hidden = gear.hidden = inSettings;
-    heading.textContent = inSettings ? "Réglages" : "Télécharger la vidéo";
+    panel.dataset.view = name;
+    // The outgoing card is inert and hidden from assistive tech at once; CSS drops its visibility once the slide ends.
+    for (const [card, active] of [[mainCard, !inSettings], [settingsCard, inSettings]]) {
+      card.inert = !active;
+      if (active) card.removeAttribute("aria-hidden"); else card.setAttribute("aria-hidden", "true");
+    }
     if (inSettings) { fillSettings(); say("", "", settingsNotice); }
+    // preventScroll: the incoming card is still offset, focusing it must not scroll the clipped box.
+    if (!panel.hidden) (inSettings ? settingsCard : mainCard).querySelector("button, input, select").focus({ preventScroll: true });
   }
 
   function setQualities(heights) {
@@ -211,8 +244,8 @@
     download.classList.remove("complete");
     download.classList.toggle("loading", value);
     download.toggleAttribute("aria-busy", value);
-    setSide(value ? "cancel" : "close"); // a successful run then switches it to the folder
-    status.textContent = value ? "En cours…" : "Prêt à télécharger";
+    setSide(value ? "cancel" : "idle"); // a successful run then switches it to the folder
+    setStatus(value ? "En cours…" : "Prêt à télécharger", value ? "busy" : "ready");
     if (!value) { fill.style.width = "0"; label.textContent = "Télécharger"; }
   }
 
@@ -222,8 +255,8 @@
     download.classList.remove("complete");
     download.disabled = false;
     label.textContent = "Télécharger";
-    status.textContent = "Prêt à télécharger";
-    setSide("close");
+    setStatus("Prêt à télécharger", "ready");
+    setSide("idle");
     say("");
   }
 
@@ -294,7 +327,7 @@
           download.classList.add("complete");
           download.disabled = true;
           label.replaceChildren(checkmark(), "Terminé");
-          status.textContent = "";
+          setStatus("");
           setSide("folder");
           // The engine fell back to the Videos folder: say where the file really went.
           if (requestedDir && usedDir && !lib.sameFolder(requestedDir, usedDir))
@@ -303,7 +336,7 @@
       } else if (reply.type === "error") {
         setRunning(false);
         fill.style.transition = "";
-        status.textContent = "Interrompu";
+        setStatus("Interrompu", "error");
         say(lib.errorText(reply.code, reply.message), "error");
       }
     });
@@ -316,15 +349,19 @@
     if (!panel.hidden && !running && probedUrl !== location.href) probe();
   }
   fab.addEventListener("click", toggle);
+  const closeBox = () => { panel.hidden = true; setView("main"); };
   gear.addEventListener("click", () => setView("settings"));
   back.addEventListener("click", () => setView("main"));
+  const pickLabel = (text) => { browse.title = text; browse.setAttribute("aria-label", text); };
   browse.addEventListener("click", () => {
     browse.disabled = true;
-    browse.textContent = "Sélection…";
+    pickLabel("Sélection…");
+    dirHint.textContent = "Sélection du dossier en cours…";
     say("", "", settingsNotice);
     request({ type: "pickFolder" }, (reply) => {
       browse.disabled = false;
-      browse.textContent = "Parcourir…";
+      pickLabel("Parcourir…");
+      dirHint.textContent = DIR_HINT;
       if (reply.type === "folderPicked" && reply.path) dirInput.value = String(reply.path); // no path = cancelled; saved only by « Enregistrer »
       else if (reply.type === "error") say(lib.errorText(reply.code, reply.message), "error", settingsNotice);
     });
@@ -335,26 +372,28 @@
     const next = lib.normalizeSettings({ outputDirectory: dirInput.value, theme: themeChoice.get(), buttonMode: modeChoice.get() });
     browser.storage.local.set({ settings: next }).then(() => {
       applySettings(next);
-      say("Réglages enregistrés.", "ok", settingsNotice);
+      setView("main");
+      say("Réglages enregistrés.", "ok");
     }).catch(() => say("Impossible d'enregistrer les réglages.", "error", settingsNotice));
   });
   browser.storage.local.get("settings").then((stored) => applySettings(lib.normalizeSettings(stored.settings))).catch(() => applySettings(settings));
   browser.storage.onChanged.addListener((changes, area) => {
     if (area === "local" && changes.settings) applySettings(lib.normalizeSettings(changes.settings.newValue));
   });
-  closeX.addEventListener("click", () => { panel.hidden = true; setView("main"); });
+  for (const button of shadow.querySelectorAll("header .close[title=Fermer]")) button.addEventListener("click", closeBox);
   nameInput.addEventListener("input", () => { nameEdited = true; });
   clip.addEventListener("change", () => { startInput.disabled = endInput.disabled = !clip.checked; });
   form.addEventListener("input", resetResult);
   form.addEventListener("change", resetResult);
   side.addEventListener("click", () => {
     if (sideMode === "cancel") request({ type: "cancel" }, () => {});
-    else if (sideMode === "close") { panel.hidden = true; setView("main"); }
     else request({ type: "openFolder" }, (reply) => {
       if (reply.type === "error") say(lib.errorText(reply.code, reply.message), "error");
     });
   });
   download.addEventListener("click", start);
+
+  setView("main"); // marks the settings card inert from the start
 
   // SPA navigation: YouTube changes the URL without reloading.
   function sync() {
@@ -371,8 +410,8 @@
         download.classList.remove("complete");
         download.disabled = false;
         label.textContent = "Télécharger";
-        status.textContent = "Prêt à télécharger";
-        setSide("close");
+        setStatus("Prêt à télécharger", "ready");
+        setSide("idle");
         say("");
         if (!panel.hidden && visible) probe();
       }
