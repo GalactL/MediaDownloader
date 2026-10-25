@@ -66,6 +66,17 @@
     return /[<>"|?*]/.test(drive ? value.slice(2) : value) ? bad : "";
   }
 
+  // Same folder, ignoring trailing separators; Windows-looking paths (drive, UNC) also ignore case and / vs \\.
+  function sameFolder(a, b) {
+    const norm = (p) => {
+      const t = String(p ?? "").trim();
+      const win = /^[A-Za-z]:[\\/]|^\\\\/.test(t);
+      const s = (win ? t.replace(/\//g, "\\").toLowerCase() : t).replace(/[\\/]+$/, "");
+      return win ? s : s || t.slice(0, 1);
+    };
+    return norm(a) === norm(b);
+  }
+
   function qualityOptions(heights) {
     const list = Array.isArray(heights) ? heights.filter((h) => Number.isInteger(h) && h > 0) : [];
     const unique = [...new Set(list)].sort((a, b) => b - a);
@@ -85,6 +96,7 @@
     invalid_message: "L'hôte MediaDownloader installé est trop ancien : mettez à jour MediaDownloader.Cli puis relancez « install-host ».",
     no_folder: "Aucun dossier à ouvrir.",
     open_failed: "Impossible d'ouvrir le dossier.",
+    pick_failed: "Impossible d'ouvrir le sélecteur de dossier. Saisissez le chemin à la main.",
     processing_failed: "Le téléchargement a échoué.",
     download_failed: "Le téléchargement a échoué.",
     probe_failed: "Impossible d'analyser cette vidéo.",
@@ -121,7 +133,7 @@
     return label + passText + " : " + Math.round(Number(percent) || 0) + " %";
   }
 
-  const api = { parseTime, validateRange, parseMaxSize, buildDownloadRequest, qualityOptions, errorText, DEFAULT_SETTINGS, normalizeSettings, validateOutputDirectory, MAX_SIZE_MB, isVideoPage, canonicalUrl, progressText };
+  const api = { parseTime, validateRange, parseMaxSize, buildDownloadRequest, qualityOptions, errorText, DEFAULT_SETTINGS, normalizeSettings, validateOutputDirectory, sameFolder, MAX_SIZE_MB, isVideoPage, canonicalUrl, progressText };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.MDLib = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

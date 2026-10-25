@@ -21,7 +21,7 @@
     const reply = message.message;
     const handler = handlers.get(reply.id);
     if (!handler) return;
-    if (["completed", "error", "probe", "opened"].includes(reply.type)) handlers.delete(reply.id);
+    if (["completed", "error", "probe", "opened", "folderPicked"].includes(reply.type)) handlers.delete(reply.id);
     handler(reply);
   });
 
@@ -113,13 +113,15 @@
     return { node, get: () => inputs.find((i) => i.checked).value, set: (v) => inputs.forEach((i) => { i.checked = i.value === v; }) };
   }
   const dirInput = el("input", { id: "dir", type: "text", placeholder: "Dossier Vidéos par défaut", spellcheck: false });
+  const browse = el("button", { className: "secondary text", type: "button", textContent: "Parcourir…" });
   const themeChoice = radioGroup("theme", "Thème", [["light", "Clair"], ["dark", "Sombre"]]);
   const modeChoice = radioGroup("mode", "Affichage du bouton", [["page", "Sur la page"], ["icon", "Icône de la barre uniquement"]], true);
   const settingsNotice = el("p", { className: "notice", role: "status", hidden: true });
   const save = el("button", { className: "primary", type: "button", textContent: "Enregistrer" });
   const settingsView = el("div", { hidden: true }, [
     el("div", { className: "field" }, [
-      el("label", { htmlFor: "dir", textContent: "Dossier de téléchargement" }), dirInput,
+      el("label", { htmlFor: "dir", textContent: "Dossier de téléchargement" }),
+      el("div", { className: "row" }, [dirInput, browse]),
       el("span", { className: "muted hint", textContent: "Laissez vide pour utiliser le dossier Vidéos." }),
     ]),
     themeChoice.node,
@@ -268,11 +270,15 @@
     fill.style.width = "0";
     label.textContent = "Démarrage…";
     const startedAt = Date.now();
+    const requestedDir = settings.outputDirectory;
+    let usedDir = "";
     say("");
     request(lib.buildDownloadRequest({
       url: lib.canonicalUrl(location.href), quality: quality.value, maxSizeMb: size, start: startTime, end: endTime, name: nameInput.value, outputDirectory: settings.outputDirectory,
     }), (reply) => {
-      if (reply.type === "progress") {
+      if (reply.type === "started") {
+        usedDir = String(reply.outputDirectory || "");
+      } else if (reply.type === "progress") {
         fill.style.width = Math.min(100, Math.max(0, Number(reply.percent) || 0)) + "%";
         label.textContent = lib.progressText(reply.stage, reply.percent, reply.pass).replace(" : ", "… ");
       } else if (reply.type === "completed") {
@@ -290,6 +296,9 @@
           label.replaceChildren(checkmark(), "Terminé");
           status.textContent = "";
           setSide("folder");
+          // The engine fell back to the Videos folder: say where the file really went.
+          if (requestedDir && usedDir && !lib.sameFolder(requestedDir, usedDir))
+            say("Le dossier choisi est inutilisable : la vidéo a été enregistrée dans " + usedDir + ".");
         }, calm ? 0 : Math.max(left, 200));
       } else if (reply.type === "error") {
         setRunning(false);
@@ -309,6 +318,17 @@
   fab.addEventListener("click", toggle);
   gear.addEventListener("click", () => setView("settings"));
   back.addEventListener("click", () => setView("main"));
+  browse.addEventListener("click", () => {
+    browse.disabled = true;
+    browse.textContent = "Sélection…";
+    say("", "", settingsNotice);
+    request({ type: "pickFolder" }, (reply) => {
+      browse.disabled = false;
+      browse.textContent = "Parcourir…";
+      if (reply.type === "folderPicked" && reply.path) dirInput.value = String(reply.path); // no path = cancelled; saved only by « Enregistrer »
+      else if (reply.type === "error") say(lib.errorText(reply.code, reply.message), "error", settingsNotice);
+    });
+  });
   save.addEventListener("click", () => {
     const error = lib.validateOutputDirectory(dirInput.value);
     if (error) return say(error, "error", settingsNotice);

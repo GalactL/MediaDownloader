@@ -54,8 +54,12 @@ pas déclencher de rafraîchissement.
 le message de réussite est écrit sur la sortie d'erreur. En cas d'échec, un
 événement `error` est émis et le code de sortie est `4`.
 
-Si `--output` désigne un fichier existant ou un dossier impossible à créer, l'événement `error` a le code
-`invalid_output_directory` (message en français contenant le chemin) et le code de sortie est `4`.
+Si le dossier `--output` est inutilisable (fichier existant, création impossible, droits d'écriture refusés ;
+l'écriture est vérifiée par un fichier témoin), le téléchargement n'échoue pas : le moteur se replie sur le dossier
+Vidéos et émet avant `started` un événement `log` de niveau `warning` (« Dossier de sortie inutilisable (…),
+enregistrement dans le dossier Vidéos : … »). `started` porte le dossier réellement utilisé. Seul un dossier Vidéos
+lui-même inutilisable produit l'événement `error` `invalid_output_directory` (message en français contenant le
+chemin) et le code de sortie `4`.
 
 ## Codes de sortie
 

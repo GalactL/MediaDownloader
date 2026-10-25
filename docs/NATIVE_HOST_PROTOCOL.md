@@ -46,6 +46,7 @@ Chaque requête peut contenir une chaîne `id`, recopiée dans toutes les répon
 | `{"type":"download"}` | `url`, puis facultatifs : `quality`, `format`, `title`, `startTime`, `endTime`, `maxSizeMb`, `cookiesFromBrowser`, `outputDirectory`, `overwrite` |
 | `{"type":"cancel"}` | aucun |
 | `{"type":"openFolder"}` | aucun : ouvre le dossier de sortie du dernier téléchargement dans le gestionnaire de fichiers |
+| `{"type":"pickFolder"}` | aucun : ouvre le sélecteur de dossier du système |
 
 La validation est celle du CLI : `startTime` et `endTime` vont ensemble,
 `endTime` > `startTime`, seules les URL `http(s)` sont acceptées. Sinon l'hôte
@@ -58,6 +59,11 @@ Ce sont les événements du CLI (`started`, `log`, `progress`, `encodingPlan`,
 
 `openFolder` répond `{"type":"opened","id":"…"}`. Aucun chemin n'est accepté du client : seul le dernier dossier de sortie est ouvrable, sinon `no_folder`.
 
+`pickFolder` répond `{"type":"folderPicked","id":"…","path":"<chemin absolu>"}` lorsque l'utilisateur choisit un
+dossier, ou `{"type":"folderPicked","id":"…"}` sans champ `path` s'il annule (annuler = pas de chemin). Si aucun
+sélecteur n'est disponible ou s'il échoue, l'hôte répond l'erreur `pick_failed`. Le sélecteur est
+`IFileOpenDialog` (Windows), `osascript` (macOS), `zenity` puis `kdialog` (Linux).
+
 La réponse `probe` est compacte :
 
 ```json
@@ -69,6 +75,9 @@ La réponse `probe` est compacte :
 - Un seul travail à la fois : un second `probe` ou `download` reçoit `busy`.
 - `cancel` arrête yt-dlp et FFmpeg, supprime le dossier temporaire et produit
   l'erreur `cancelled`. Sans travail en cours, `cancel` est ignoré.
+- `pickFolder` ne bloque pas la lecture des requêtes. Il reçoit `busy` pendant un `probe` ou un `download`, ou
+  pendant un autre `pickFolder` ; inversement `probe` et `download` reçoivent `busy` tant que le sélecteur est
+  ouvert. `cancel` ferme le sélecteur (sauf sous Windows) et la réponse est alors un `folderPicked` sans `path`.
 - `doctor` est traité immédiatement, même pendant un travail.
 - Une requête trop grande reçoit `message_too_large`, sans `id`.
 - Un `id` qui n'est pas une chaîne est ignoré.
@@ -82,12 +91,17 @@ La réponse `probe` est compacte :
 |---|---|
 | `invalid_message` | JSON mal formé ou type inconnu |
 | `invalid_arguments` | champ de mauvais type ou validation des arguments échouée (comme le CLI) |
-| `busy` | un travail est déjà en cours |
+| `busy` | un travail ou un sélecteur de dossier est déjà en cours |
 | `message_too_large` | réponse supérieure à 1 Mio |
 | `cancelled` | travail annulé par `cancel` |
 | `no_folder` | `openFolder` sans téléchargement préalable |
 | `open_failed` | le gestionnaire de fichiers n'a pas pu s'ouvrir |
-| `invalid_output_directory` | `outputDirectory` n'est pas un dossier utilisable (fichier existant, création impossible) ; le message contient le chemin |
+| `pick_failed` | `pickFolder` : sélecteur de dossier indisponible ou en échec |
+| `invalid_output_directory` | le dossier Vidéos de repli est lui-même inutilisable ; le message contient le chemin |
+
+Un `outputDirectory` inutilisable (fichier existant, création impossible, écriture refusée) ne produit pas d'erreur :
+le moteur enregistre dans le dossier Vidéos et émet d'abord un `log` de niveau `warning` (« Dossier de sortie
+inutilisable (…), enregistrement dans le dossier Vidéos : … ») ; `started.outputDirectory` donne le dossier réel.
 
 Les autres codes d'`error` sont ceux du CLI (par exemple `processing_failed`,
 dépendance manquante) ; voir [CLI_PROTOCOL.md](CLI_PROTOCOL.md).

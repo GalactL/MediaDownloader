@@ -6,6 +6,9 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 
 using namespace media_downloader;
 
@@ -45,6 +48,23 @@ int main()
         { std::ofstream(base / L"f.txt") << "x"; }
         Check(!EnsureOutputDirectory(base / L"f.txt", resolved), "fichier refusé comme dossier de sortie");
         Check(!EnsureOutputDirectory(base / L"f.txt" / L"sub", resolved), "dossier sous un fichier refusé");
+        {
+            bool leftover = false;
+            for (auto const& entry : std::filesystem::directory_iterator(base / L"a" / L"b"))
+                leftover = leftover || entry.path().filename().wstring().starts_with(L".mediadownloader-probe-");
+            Check(!leftover, "le fichier témoin d'écriture est supprimé");
+        }
+#ifndef _WIN32
+        if (geteuid() != 0)
+        {
+            auto readOnly = base / L"ro";
+            std::filesystem::create_directories(readOnly);
+            std::filesystem::permissions(readOnly, std::filesystem::perms::owner_read | std::filesystem::perms::owner_exec);
+            Check(!EnsureOutputDirectory(readOnly, resolved), "dossier en lecture seule refusé");
+            Check(!EnsureOutputDirectory(readOnly / L"sub", resolved), "création sous un dossier en lecture seule refusée");
+            std::filesystem::permissions(readOnly, std::filesystem::perms::owner_all);
+        }
+#endif
         std::error_code ignored;
         std::filesystem::remove_all(base, ignored);
     }

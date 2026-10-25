@@ -13,7 +13,9 @@ le port `connectNative` est ouvert, et c'est le plus simple pour `runtime.connec
 L'engrenage de l'en-tête du menu ouvre les réglages dans la même boîte (stockés avec
 `storage.local`, appliqués immédiatement sans recharger) :
 
-- **Dossier de téléchargement** : chemin absolu ; vide = dossier Vidéos par défaut.
+- **Dossier de téléchargement** : chemin absolu ; vide = dossier Vidéos par défaut. « Parcourir… » ouvre le
+  sélecteur de dossier de l'hôte (le champ reste modifiable ; rien n'est enregistré avant « Enregistrer »). Si
+  le dossier est inutilisable au moment du téléchargement, la vidéo va dans le dossier Vidéos et le menu l'indique.
 - **Thème** : clair ou sombre (sombre par défaut).
 - **Affichage du bouton** : « Sur la page » (bouton flottant) ou « Icône de la barre uniquement ».
   Dans ce second mode, le bouton ⬇ disparaît et l'icône MediaDownloader de la barre d'outils

@@ -87,6 +87,18 @@ test("validateOutputDirectory", () => {
   assert.equal(lib.validateOutputDirectory("x"), "Saisissez un chemin absolu, par exemple C:\\Users\\Moi\\Videos.");
 });
 
+test("sameFolder", () => {
+  assert.ok(lib.sameFolder("/home/u/Videos", "/home/u/Videos/"));
+  assert.ok(lib.sameFolder("C:\\Users\\Moi\\Videos\\", "c:\\users\\moi\\videos"));
+  assert.ok(lib.sameFolder("C:/Users/Moi", "C:\\Users\\Moi"));
+  assert.ok(lib.sameFolder("\\\\srv\\share\\v", "\\\\SRV\\share\\v\\"));
+  assert.ok(lib.sameFolder("/", "/"));
+  assert.ok(!lib.sameFolder("/home/u/Videos", "/home/u/videos")); // POSIX is case-sensitive
+  assert.ok(!lib.sameFolder("/home/u/Videos", "/home/u/Videos2"));
+  assert.ok(!lib.sameFolder("C:\\a", "D:\\a"));
+  assert.match(lib.errorText("pick_failed"), /sélecteur de dossier/);
+});
+
 test("outputDirectory in request and error text", () => {
   assert.equal(lib.buildDownloadRequest({ url: "u", outputDirectory: " /v " }).outputDirectory, "/v");
   assert.ok(!("outputDirectory" in lib.buildDownloadRequest({ url: "u", outputDirectory: "  " })));

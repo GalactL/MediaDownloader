@@ -54,10 +54,14 @@ label.check input { width: 17px; min-height: 17px; height: 17px; margin: 0; acce
 .times label { font-size: 12px; color: var(--muted); }
 
 .status { display: flex; align-items: center; gap: 8px; min-height: 28px; margin-top: 20px; font-size: 12px; color: var(--muted); }
-.notice { margin: 16px 0 0; padding: 12px; border-radius: 7px; font-size: 13px; line-height: 1.5; word-break: break-word; }
+.notice { margin: 16px 0 0; padding: 12px; border-radius: 7px; background: var(--hover); font-size: 13px; line-height: 1.5; word-break: break-word; }
 .notice.success { color: var(--success-fg); background: var(--success-bg); }
 .notice.error { color: var(--error-fg); background: var(--error-bg); }
 
+.row { display: flex; gap: 8px; align-items: stretch; }
+.row input { flex: 1; min-width: 0; }
+.secondary.text { flex: 0 0 auto; width: auto; padding: 0 14px; font: 500 13px system-ui; white-space: nowrap; }
+.secondary:disabled { cursor: default; opacity: .6; }
 .actions { display: flex; gap: 8px; align-items: stretch; margin-top: 16px; }
 .primary {
   position: relative; isolation: isolate; overflow: hidden; flex: 1; min-width: 0; height: 42px;

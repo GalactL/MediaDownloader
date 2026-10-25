@@ -5,7 +5,9 @@
 ## v0.4.0 (2026-10-25)
 
 - Extension : réglages dans le menu (engrenage) : dossier de téléchargement, thème clair ou sombre, affichage du bouton (sur la page ou icône de la barre d'outils uniquement). Les changements s'appliquent immédiatement.
+- Moteur : un dossier de sortie inutilisable (fichier, droits, lecture seule) ne fait plus échouer le téléchargement, qui se replie sur le dossier Vidéos avec un avertissement ; nouvelle requête d'hôte `pickFolder` (sélecteur de dossier du système).
 - Extension : icône MediaDownloader dans la barre d'outils, qui ouvre et ferme le menu ; nouvelle permission `storage`.
+- Extension : bouton « Parcourir… » dans les réglages pour choisir le dossier de téléchargement avec le sélecteur de l'hôte ; si le dossier choisi est inutilisable, le menu indique où la vidéo a été enregistrée (dossier Vidéos).
 
 ## v0.3.1 (2026-10-24)
 

@@ -395,11 +395,19 @@ namespace
         }
 
         std::filesystem::path output;
-        auto const requested = options.outputDirectory.empty() ? VideosDirectory() : options.outputDirectory;
-        if (!EnsureOutputDirectory(requested, output))
+        auto const& requested = options.outputDirectory;
+        if (requested.empty() || !EnsureOutputDirectory(requested, output))
         {
-            c.Error("invalid_output_directory", "Le dossier de sortie est inutilisable (ce n'est pas un dossier ou il ne peut pas être créé) : " + WideToUtf8(requested.wstring()));
-            return 4;
+            // Un dossier demandé inutilisable ne fait pas échouer le téléchargement : repli sur le dossier Vidéos.
+            std::filesystem::path videos;
+            try { videos = VideosDirectory(); } catch (...) {}
+            if (videos.empty() || !EnsureOutputDirectory(videos, output))
+            {
+                c.Error("invalid_output_directory", "Le dossier Vidéos est inutilisable (ce n'est pas un dossier, il ne peut pas être créé ou il n'est pas accessible en écriture) : " + WideToUtf8(videos.wstring()));
+                return 4;
+            }
+            if (!requested.empty())
+                c.Log("warning", "Dossier de sortie inutilisable (" + WideToUtf8(requested.wstring()) + "), enregistrement dans le dossier Vidéos : " + WideToUtf8(output.wstring()));
         }
         auto cleanup = CleanupOrphanedTemporaryDirectories(output);
         for (auto const& removed : cleanup.removed)

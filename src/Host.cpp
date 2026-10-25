@@ -5,6 +5,9 @@
 #ifdef _WIN32
 #include <fcntl.h>
 #include <io.h>
+#include <windows.h>
+#include <objbase.h>
+#include <shobjidl.h>
 #endif
 
 #include <algorithm>
@@ -386,6 +389,93 @@ namespace media_downloader
             catch (...) { return false; } // e.g. the folder was deleted
         }
 
+        // ---- folder chooser ----------------------------------------------------------------------------
+
+        enum class PickOutcome { Picked, Cancelled, Failed };
+
+#ifndef _WIN32
+        // Runs one external chooser (absolute path: execv-based RunProcess). Success prints the folder on its last
+        // line starting with '/'; a silent exit 1 (zenity, kdialog) or "(-128)" (osascript) is the user cancelling.
+        PickOutcome RunChooser(std::filesystem::path const& executable, std::vector<std::wstring> const& arguments,
+            std::atomic_bool const& cancel, std::string& path)
+        {
+            std::string last;
+            ProcessResult result;
+            try
+            {
+                result = RunProcess(executable, arguments, {}, [&last](std::string const& line)
+                {
+                    if (!line.empty() && line.front() == '/') last = line;
+                }, cancel);
+            }
+            catch (...) { return PickOutcome::Failed; }
+            if (result.cancelled) return PickOutcome::Cancelled;
+            if (result.exitCode == 0 && !last.empty())
+            {
+                while (last.size() > 1 && last.back() == '/') last.pop_back();
+                try { Utf8ToWide(last); } catch (...) { return PickOutcome::Failed; } // the reply must be valid UTF-8 JSON
+                path = last;
+                return PickOutcome::Picked;
+            }
+            bool const silent = result.output.find_first_not_of(" \t\r\n") == std::string::npos;
+            return result.exitCode == 1 && (silent || result.output.find("(-128)") != std::string::npos)
+                ? PickOutcome::Cancelled : PickOutcome::Failed;
+        }
+#endif
+
+        // Blocks until the user answers the system folder chooser. `cancel` closes it (not supported on Windows).
+        PickOutcome PickFolder(std::atomic_bool const& cancel, std::string& path)
+        {
+#ifdef _WIN32
+            (void)cancel;
+            if (FAILED(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE))) return PickOutcome::Failed;
+            auto outcome = PickOutcome::Failed;
+            IFileOpenDialog* dialog = nullptr;
+            if (SUCCEEDED(CoCreateInstance(__uuidof(FileOpenDialog), nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&dialog))))
+            {
+                DWORD flags = 0;
+                dialog->GetOptions(&flags);
+                dialog->SetOptions(flags | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST);
+                auto const shown = dialog->Show(GetForegroundWindow());
+                if (shown == HRESULT_FROM_WIN32(ERROR_CANCELLED)) outcome = PickOutcome::Cancelled;
+                else if (SUCCEEDED(shown))
+                {
+                    IShellItem* item = nullptr;
+                    if (SUCCEEDED(dialog->GetResult(&item)))
+                    {
+                        PWSTR name = nullptr;
+                        if (SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &name)))
+                        {
+                            path = WideToUtf8(name);
+                            CoTaskMemFree(name);
+                            outcome = PickOutcome::Picked;
+                        }
+                        item->Release();
+                    }
+                }
+                dialog->Release();
+            }
+            CoUninitialize();
+            return outcome;
+#elif defined(__APPLE__)
+            return RunChooser("/usr/bin/osascript", { L"-e", L"POSIX path of (choose folder)" }, cancel, path);
+#else
+            struct Chooser { char const* name; std::vector<std::wstring> arguments; };
+            for (auto const& chooser : { Chooser{ "zenity", { L"--file-selection", L"--directory" } },
+                Chooser{ "kdialog", { L"--getexistingdirectory" } } })
+                for (auto const* directory : { "/usr/bin", "/usr/local/bin", "/bin" })
+                {
+                    auto const executable = std::filesystem::path(directory) / chooser.name;
+                    std::error_code ignored;
+                    if (!std::filesystem::exists(executable, ignored)) continue;
+                    auto outcome = RunChooser(executable, chooser.arguments, cancel, path);
+                    if (outcome != PickOutcome::Failed) return outcome;
+                    break; // this chooser is broken (e.g. no display): try the next one
+                }
+            return PickOutcome::Failed;
+#endif
+        }
+
         // ---- requests ----------------------------------------------------------------------------------
 
         bool AddString(Json const& request, char const* key, char const* flag, std::vector<std::wstring>& args, std::string& error)
@@ -488,7 +578,8 @@ namespace media_downloader
 #endif
         Output output(stdout);
         std::atomic_bool cancel{}, busy{}, finished{};
-        std::thread worker, opener; // opener: the file manager may stay alive, so never wait for it on the receive loop
+        std::atomic_bool picking{}, pickCancel{};
+        std::thread worker, opener, picker; // picker: the folder chooser waits for the user, so never on the receive loop; opener: the file manager may stay alive, so never wait for it on the receive loop
         std::mutex folderMutex;
         std::string lastFolder; // folder of the latest completed download: the only folder a client can ask to open
 
@@ -528,9 +619,10 @@ namespace media_downloader
             {
                 if (shutdown)
                 {
-                    for (int i = 0; i < 500 && busy; ++i)
+                    for (int i = 0; i < 500 && (busy || picking); ++i)
                     {
                         cancel = true;
+                        pickCancel = true;
                         std::this_thread::sleep_for(std::chrono::milliseconds(20));
                     }
                     std::_Exit(0);
@@ -565,6 +657,33 @@ namespace media_downloader
             if (type == "cancel")
             {
                 if (busy) cancel = true;
+                if (picking) pickCancel = true; // closes the chooser: answered like a user cancel
+                return true;
+            }
+            if (type == "pickFolder")
+            {
+                if (busy || picking)
+                {
+                    output.Send(ErrorJson("busy", "Un traitement est déjà en cours."), id);
+                    return !output.Failed();
+                }
+                if (picker.joinable()) picker.join();
+                pickCancel = false;
+                picking = true;
+                picker = std::thread([&output, &picking, &pickCancel, id]
+                {
+                    std::string path;
+                    auto outcome = PickOutcome::Failed;
+                    try { outcome = PickFolder(pickCancel, path); } catch (...) {}
+                    picking = false; // before the reply, so the client can immediately send the next request
+                    try
+                    {
+                        if (outcome == PickOutcome::Picked) output.Send("{\"type\":\"folderPicked\",\"path\":\"" + JsonEscape(path) + "\"}", id);
+                        else if (outcome == PickOutcome::Cancelled) output.Send("{\"type\":\"folderPicked\"}", id);
+                        else output.Send(ErrorJson("pick_failed", "Impossible d'ouvrir le sélecteur de dossier."), id);
+                    }
+                    catch (...) {} // a worker thread must never throw
+                });
                 return true;
             }
             if (type == "openFolder")
@@ -605,7 +724,7 @@ namespace media_downloader
             }
 
             if (type == "doctor") { runJob(*options, id, true); return !output.Failed(); }
-            if (busy)
+            if (busy || picking)
             {
                 output.Send(ErrorJson("busy", "Un traitement est déjà en cours."), id);
                 return !output.Failed();
@@ -629,6 +748,14 @@ namespace media_downloader
 
         if (busy) cancel = true;
         if (worker.joinable()) worker.join();
+        if (picking)
+        {
+            pickCancel = true;
+#ifdef _WIN32
+            std::_Exit(0); // the native dialog cannot be closed from here: leaving ends it
+#endif
+        }
+        if (picker.joinable()) picker.join();
         if (opener.joinable()) opener.join();
         finished = true;
         watcher.join();
