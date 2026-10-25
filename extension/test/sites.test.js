@@ -3,13 +3,15 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const sites = require("../sites.js");
 
-// Minimal fake DOM: nodes with a parent/children list, enough for after/remove/nextElementSibling/querySelector(All).
+// Minimal fake DOM: nodes with a parent/children list, enough for before/remove/nextElementSibling/querySelector(All).
 class Node {
   constructor(name, attrs = {}) { this.name = name; this.attrs = { ...attrs }; this.children = []; this.parent = null; }
   append(child) { child.remove(); child.parent = this; this.children.push(child); return child; }
   setAttribute(name, value) { this.attrs[name] = value; }
   remove() { if (this.parent) this.parent.children.splice(this.parent.children.indexOf(this), 1); this.parent = null; }
+  before(node) { node.remove(); node.parent = this.parent; this.parent.children.splice(this.parent.children.indexOf(this), 0, node); }
   after(node) { node.remove(); node.parent = this.parent; this.parent.children.splice(this.parent.children.indexOf(this) + 1, 0, node); }
+  get previousElementSibling() { return this.parent ? this.parent.children[this.parent.children.indexOf(this) - 1] || null : null; }
   get nextElementSibling() { return this.parent ? this.parent.children[this.parent.children.indexOf(this) + 1] || null : null; }
   all() { return this.children.flatMap((child) => [child, ...child.all()]); }
 }
@@ -50,11 +52,11 @@ test("findAnchor returns null without throwing when the structure is missing", (
   assert.equal(adapter.findAnchor({ querySelector() { throw new Error("bad selector"); } }), null);
 });
 
-test("mountButton inserts right after the like/dislike group", () => {
+test("mountButton inserts right before the like/dislike group", () => {
   const page = youtubePage();
   const host = sites.mountButton(adapter, page.doc, make);
-  assert.equal(page.group.nextElementSibling, host);
-  assert.equal(host.nextElementSibling, page.share);
+  assert.equal(page.group.previousElementSibling, host);
+  assert.equal(host.nextElementSibling, page.group);
 });
 
 test("mountButton is idempotent", () => {
@@ -79,7 +81,7 @@ test("remounts after the action bar is replaced", () => {
   page.bar.remove(); // button goes with the old bar
   const fresh = youtubePage();
   assert.equal(sites.mountButton(adapter, fresh.doc, () => host), host);
-  assert.equal(fresh.group.nextElementSibling, host);
+  assert.equal(fresh.group.previousElementSibling, host);
   assert.equal(fresh.doc.querySelectorAll("[data-md-button]").length, 1);
 });
 
@@ -106,4 +108,15 @@ test("placement: below, above, off-screen and tiny viewport", () => {
   assert.equal(sites.placement(rect(100), 1280, 300, 420).mode, "fixed");
   const tight = sites.placement(rect(400), 360, 700, 0);
   assert.ok(tight.maxH >= 240 && tight.top >= 8 && tight.left >= 16);
+});
+
+test("findAnchor skips hidden duplicates and returns null when none is rendered", () => {
+  const root = new Node("body");
+  const hidden = root.append(new Node("segmented-like-dislike-button-view-model"));
+  const shown = root.append(new Node("segmented-like-dislike-button-view-model"));
+  hidden.getClientRects = () => [];
+  shown.getClientRects = () => [{}];
+  assert.equal(adapter.findAnchor(fakeDocument(root)), shown);
+  shown.getClientRects = () => [];
+  assert.equal(adapter.findAnchor(fakeDocument(root)), null);
 });
