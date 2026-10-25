@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const lib = require("../lib.js");
 const i18n = require("../i18n.js");
+const errorText = (language, code) => i18n.translate(language, lib.errorKey(code));
 
 test("parseTime", () => {
   assert.equal(lib.parseTime(""), null);
@@ -51,11 +52,11 @@ test("2K and 4K are always offered", () => {
 test("custom name and errorText", () => {
   assert.equal(lib.buildDownloadRequest({ url: "u", name: " Mon clip " }).title, "Mon clip");
   assert.ok(!("title" in lib.buildDownloadRequest({ url: "u", name: "  " })));
-  assert.equal(lib.errorText("fr", "busy"), "Un téléchargement est déjà en cours.");
-  assert.equal(lib.errorText("en", "busy"), "A download is already in progress.");
-  assert.match(lib.errorText("fr", "invalid_message"), /trop ancien/);
+  assert.equal(errorText("fr", "busy"), "Un téléchargement est déjà en cours.");
+  assert.equal(errorText("en", "busy"), "A download is already in progress.");
+  assert.match(errorText("fr", "invalid_message"), /trop ancien/);
   // Unknown codes never leak the engine's raw text: they get the generic message.
-  assert.equal(lib.errorText("fr", "dependency_missing"), "Une erreur est survenue.");
+  assert.equal(errorText("fr", "dependency_missing"), "Une erreur est survenue.");
   assert.equal(lib.errorKey("size_exceeded"), "error.size_exceeded");
 });
 
@@ -201,11 +202,11 @@ test("sameFolder", () => {
   assert.ok(!lib.sameFolder("/home/u/Videos", "/home/u/videos")); // POSIX is case-sensitive
   assert.ok(!lib.sameFolder("/home/u/Videos", "/home/u/Videos2"));
   assert.ok(!lib.sameFolder("C:\\a", "D:\\a"));
-  assert.match(lib.errorText("fr", "pick_failed"), /sélecteur de dossier/);
+  assert.match(errorText("fr", "pick_failed"), /sélecteur de dossier/);
 });
 
 test("outputDirectory in request and error text", () => {
   assert.equal(lib.buildDownloadRequest({ url: "u", outputDirectory: " /v " }).outputDirectory, "/v");
   assert.ok(!("outputDirectory" in lib.buildDownloadRequest({ url: "u", outputDirectory: "  " })));
-  assert.match(lib.errorText("fr", "invalid_output_directory"), /réglages/);
+  assert.match(errorText("fr", "invalid_output_directory"), /réglages/);
 });

@@ -102,9 +102,6 @@
     const key = "error." + code;
     return i18n.hasKey(key) ? key : "error.generic";
   }
-  function errorText(language, code) {
-    return i18n.translate(language, errorKey(code));
-  }
 
   // YouTube pages that are not videos (home, search...) get no button. Other hosts: always.
   function isVideoPage(href) {
@@ -149,7 +146,7 @@
     return { text: i18n.translate(language, "progress.withPercent", { phase, percent: Math.round(overall) }), percent: overall };
   }
 
-  const api = { parseTime, validateRange, parseMaxSize, buildDownloadRequest, qualityOptions, errorKey, errorText, DEFAULT_SETTINGS, normalizeSettings, isCalm, validateOutputDirectory, sameFolder, MAX_SIZE_MB, isVideoPage, canonicalUrl, phaseLabel, overallPercent, progressView };
+  const api = { parseTime, validateRange, parseMaxSize, buildDownloadRequest, qualityOptions, errorKey, DEFAULT_SETTINGS, normalizeSettings, isCalm, validateOutputDirectory, sameFolder, MAX_SIZE_MB, isVideoPage, canonicalUrl, phaseLabel, overallPercent, progressView };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.MDLib = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);
