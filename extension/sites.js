@@ -188,7 +188,7 @@ svg { width: 24px; height: 24px; flex: none; fill: currentColor; }`,
 
   const unmountButton = (doc) => doc.querySelectorAll(MARK).forEach((node) => node.remove());
 
-  // Box position from the button rect: left right-aligned to the button (clamped), top below it when it fits, else above, else below.
+  // Box position from the button rect: left right-aligned to the button (clamped), top below it when it fits, else above, else pushed up to stay inside the viewport.
   // null = button not rendered; { close: true } = button fully outside the visible area.
   function placement(rect, vw, vh, panelHeight) {
     if (!(rect.width > 0) || !(rect.height > 0)) return null;
@@ -197,7 +197,9 @@ svg { width: 24px; height: 24px; flex: none; fill: currentColor; }`,
     const width = Math.min(400, vw - 32);
     const left = Math.max(16, Math.min(rect.right - width, vw - width - 16));
     const below = rect.bottom + 8;
-    return { top: Math.max(8, below + height <= vh - 8 || rect.top - 8 - height < 8 ? below : rect.top - 8 - height), left };
+    if (below + height <= vh - 8) return { top: below, left };
+    const above = rect.top - 8 - height;
+    return { top: above >= 8 ? above : Math.max(8, vh - 8 - height), left }; // neither side fits: fully visible, may overlap the button
   }
 
   const api = { ADAPTERS, adapterFor, mountButton, unmountButton, placement };

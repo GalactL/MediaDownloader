@@ -124,7 +124,12 @@ test("placement: below, above, close when off-screen, null when unrendered", () 
   const rect = (top) => ({ width: 100, height: 36, top, bottom: top + 36, right: 700 });
   assert.deepEqual(sites.placement(rect(100), 1280, 800, 420), { top: 144, left: 300 });
   assert.deepEqual(sites.placement(rect(650), 1280, 800, 420), { top: 222, left: 300 });
-  assert.equal(sites.placement(rect(400), 1280, 800, 420).top, 444); // neither side fits: below
+  assert.equal(sites.placement(rect(400), 1280, 800, 420).top, 372); // neither side fits: pushed up, bottom edge at vh - 8
+  for (const top of [200, 300, 400, 500, 600]) {
+    const place = sites.placement(rect(top), 1280, 800, 700);
+    assert.ok(place.top >= 8 && place.top + 700 <= 800 - 8, "top " + top);
+  }
+  assert.equal(sites.placement(rect(100), 1280, 600, 700).top, 8); // taller than the viewport: top edge wins
   assert.deepEqual(sites.placement(rect(-500), 1280, 800, 420), { close: true });
   assert.deepEqual(sites.placement(rect(-36), 1280, 800, 420), { close: true });
   assert.deepEqual(sites.placement(rect(900), 1280, 800, 420), { close: true });

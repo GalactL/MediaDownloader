@@ -480,6 +480,7 @@
     if (!panel.hidden && !running && probedUrl !== pageUrl()) probe();
   }
   window.addEventListener("resize", placePanel);
+  new ResizeObserver(placePanel).observe(panel); // the box grows once the video is analysed or the view changes: keep it inside the viewport
   window.addEventListener("scroll", placePanel, { passive: true });
   const closeBox = () => { panel.hidden = true; setView("main"); };
   gear.addEventListener("click", () => setView("settings"));
