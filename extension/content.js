@@ -524,7 +524,7 @@
   let pageButton = null;
   function createPageButton() {
     if (!pageButton) {
-      pageButton = adapter.createButton(document, icon(...ICON.download), toggle);
+      pageButton = adapter.createButton(document, toggle);
       if (pageButton) adapter.labelButton(pageButton, t("button.download"));
       if (pageButton) for (const type of ["keydown", "keyup", "keypress"]) pageButton.addEventListener(type, (event) => event.stopPropagation());
     }

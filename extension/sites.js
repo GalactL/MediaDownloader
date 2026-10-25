@@ -1,6 +1,6 @@
 "use strict";
 // Per-site adapters: the ONLY place with page selectors. Adding a site = adding one object to ADAPTERS (+ its host match in manifest.json).
-// An adapter is { id, matches(hostname), findAnchor(document), observeTarget(document), createButton(document, svg, onClick), labelButton(node, text) }: the button is inserted right before the anchor.
+// An adapter is { id, matches(hostname), findAnchor(document), observeTarget(document), createButton(document, onClick), labelButton(node, text) }: the button is inserted right before the anchor.
 (function (root) {
   // YouTube keeps hidden duplicate action bars, so only a rendered node counts (no getClientRects = fake DOM, treated as rendered).
   const rendered = (node) => typeof node.getClientRects !== "function" || node.getClientRects().length > 0;
@@ -23,6 +23,7 @@
   ];
   // Native pill hosts to clone, then bare buttons.
   const YT_TEMPLATES = ["#top-level-buttons-computed yt-button-view-model", "#actions yt-button-view-model", "yt-button-view-model", "button-view-model", "ytd-button-renderer", "button.yt-spec-button-shape-next"];
+  const DOWNLOAD_PATH = "M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z"; // Material "download", filled like the native icons
   const ICON_BOX = ".yt-spec-button-shape-next__icon";
 
   const youtube = {
@@ -34,34 +35,54 @@
     diagnose: (doc) => [...YT_ANCHORS, ...YT_TEMPLATES].map((selector) => { try { return selector + "=" + doc.querySelectorAll(selector).length; } catch { return selector + "=err"; } }).join(" | "),
     // Where to watch for the action bar being recreated (narrow layout, navigation).
     observeTarget: (doc) => first(doc, ["ytd-watch-flexy", "ytd-page-manager"]) || doc.body,
-    // Clone of a native action button (Share...) so YouTube's own CSS gives the pill, hover, theme and spacing; icon only. null = no template found.
-    createButton(doc, svg, onClick) {
+    // Clone of a native icon-only action button ("..." menu, else Share) so YouTube's own CSS gives the size, centring, chip background and hover.
+    // Only the icon's vector content is swapped. null = no template found.
+    createButton(doc, onClick) {
       const skip = ["segmented-like-dislike-button-view-model", "ytd-segmented-like-dislike-button-renderer"];
       const inside = (node) => { for (let up = node; up; up = up.parentElement) if (up.hasAttribute && (up.hasAttribute("data-md-button") || skip.includes(up.localName))) return true; return false; };
       const hasIcon = (node) => node.querySelector(ICON_BOX) || node.querySelector("svg");
-      const template = YT_TEMPLATES
-        .map((selector) => [...doc.querySelectorAll(selector)].find((node) => rendered(node) && !inside(node) && hasIcon(node))).find(Boolean);
+      const innerButton = (node) => (node.localName === "button" ? node : node.querySelector("button"));
+      const iconOnly = (node) => { const b = innerButton(node); return !!b && b.className.includes("--icon-button"); };
+      const candidates = YT_TEMPLATES.flatMap((selector) => [...doc.querySelectorAll(selector)].filter((node) => rendered(node) && !inside(node) && hasIcon(node)));
+      const template = candidates.find(iconOnly) || candidates[0];
       if (!template) return null;
       const clone = template.cloneNode(true);
       for (const node of [clone, ...clone.querySelectorAll("*")]) {
         for (const { name } of [...node.attributes]) if (name === "id" || name === "href" || name.startsWith("aria-")) node.removeAttribute(name);
       }
-      const button = clone.localName === "button" ? clone : clone.querySelector("button");
+      const button = innerButton(clone);
       const icon = clone.querySelector(ICON_BOX) || (clone.querySelector("svg") || {}).parentElement;
       if (!button || !icon) return null;
-      // Icon only without trusting class names: keep just the chain from the button down to the icon box, drop every other branch and text node.
-      const chain = [];
-      for (let up = icon; up && up !== button.parentElement; up = up.parentElement) chain.push(up);
-      for (const node of chain) for (const child of [...(node.childNodes || node.children)]) if (!chain.includes(child) && node !== icon) child.remove();
-      button.className = button.className.replace("yt-spec-button-shape-next--icon-leading", "yt-spec-button-shape-next--icon-button");
-      // Square 36x36 whatever YouTube's classes say (inline !important); the native border-radius is kept.
-      for (const [name, value] of [["width", "36px"], ["min-width", "36px"], ["max-width", "36px"], ["height", "36px"], ["padding", "0"], ["box-sizing", "border-box"], ["display", "inline-flex"], ["align-items", "center"], ["justify-content", "center"]])
-        button.style.setProperty(name, value, "important");
-      for (const [name, value] of [["margin", "0"], ["padding", "0"], ["width", "24px"], ["height", "24px"]]) icon.style.setProperty(name, value, "important");
-      svg.setAttribute("width", "24");
-      svg.setAttribute("height", "24");
-      svg.style.display = "block";
-      icon.replaceChildren(svg);
+      if (!iconOnly(template)) {
+        // Share-like fallback: keep just the chain from the button down to the icon box, drop every other branch and text node.
+        const chain = [];
+        for (let up = icon; up && up !== button.parentElement; up = up.parentElement) chain.push(up);
+        for (const node of chain) for (const child of [...(node.childNodes || node.children)]) if (!chain.includes(child) && node !== icon) child.remove();
+      }
+      // Same chip look as the neighbouring pills: tonal + mono, size M, icon-only; any other token (e.g. experiment flags) is kept.
+      const P = "yt-spec-button-shape-next";
+      const variant = new RegExp("^" + P + "--(?:text|outline|filled|call-to-action|overlay|tonal|mono|icon-leading|icon-trailing|icon-button|size-\\w+)$");
+      button.className = [...button.className.split(/\s+/).filter((token) => token && !variant.test(token)), P + "--tonal", P + "--mono", P + "--size-m", P + "--icon-button"].join(" ");
+      button.removeAttribute("style"); // nothing inline that could make it transparent
+      // Swap only the drawing: keep the native svg (size, viewBox, wrappers) and put our filled glyph in it.
+      let svg = icon.querySelector("svg");
+      if (!svg) {
+        svg = doc.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.setAttribute("viewBox", "0 0 24 24");
+        svg.setAttribute("width", "24");
+        svg.setAttribute("height", "24");
+        icon.replaceChildren(svg);
+      }
+      const path = doc.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", DOWNLOAD_PATH);
+      path.setAttribute("fill", "currentColor");
+      const size = Number((svg.getAttribute("viewBox") || "").split(/\s+/)[2]);
+      if (size > 0 && size !== 24) { // our glyph is drawn on 24 units
+        const group = doc.createElementNS("http://www.w3.org/2000/svg", "g");
+        group.setAttribute("transform", "scale(" + size / 24 + ")");
+        group.append(path);
+        svg.replaceChildren(group);
+      } else svg.replaceChildren(path);
       button.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); onClick(); });
       // Zero-size wrapper: the clone hangs to the left of the like group without taking space, so YouTube's like bar keeps its position.
       const wrapper = doc.createElement("div");
