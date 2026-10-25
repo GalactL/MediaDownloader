@@ -35,7 +35,7 @@ jobs:
         with:
           node-version: 22
       - name: Tests de l'extension
-        run: node --test extension/test/lib.test.js
+        run: node --test extension/test/*.test.js
       - name: Vérifier la syntaxe JS et le manifeste
         shell: bash
         run: |

@@ -9,6 +9,7 @@
   const MESSAGES = {
     fr: {
       "app.name": "MediaDownloader",
+      "button.download": "Télécharger",
       "main.title": "Télécharger la vidéo",
       "settings.title": "Réglages",
       "action.close": "Fermer",
@@ -64,7 +65,6 @@
       "settings.languageAuto": "Automatique (langue du navigateur)",
       "settings.lowResources": "Optimiser l'application (économie de ressources)",
       "settings.lowResourcesHint": "FFmpeg tourne en priorité basse avec 2 threads, les animations sont réduites et rien ne s'exécute en arrière-plan quand aucun téléchargement n'est en cours.",
-      "settings.saved": "Réglages enregistrés.",
       "settings.saveFailed": "Impossible d'enregistrer les réglages.",
       "lang.fr": "Français",
       "lang.en": "English",
@@ -96,6 +96,7 @@
     },
     en: {
       "app.name": "MediaDownloader",
+      "button.download": "Download",
       "main.title": "Download the video",
       "settings.title": "Settings",
       "action.close": "Close",
@@ -151,7 +152,6 @@
       "settings.languageAuto": "Automatic (browser language)",
       "settings.lowResources": "Optimize the application (save resources)",
       "settings.lowResourcesHint": "FFmpeg runs at low priority with 2 threads, animations are reduced and nothing runs in the background while no download is in progress.",
-      "settings.saved": "Settings saved.",
       "settings.saveFailed": "Could not save the settings.",
       "lang.fr": "Français",
       "lang.en": "English",

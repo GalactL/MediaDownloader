@@ -3,6 +3,7 @@
 (function () {
   const lib = globalThis.MDLib;
   const i18n = globalThis.MDI18n;
+  const sites = globalThis.MDSites;
   // Every visible string comes from the catalogue (i18n.js). `bind` registers a renderer that runs now and again on a language change.
   let language = i18n.resolveLanguage("auto", navigator.languages);
   const t = (key, params) => i18n.translate(language, key, params);
@@ -44,8 +45,6 @@
   }
 
   const style = el("link", { rel: "stylesheet", href: browser.runtime.getURL("content.css") });
-  const fab = el("button", { className: "fab", hidden: true, type: "button", textContent: "⬇" });
-  text(fab, "app.name", "title");
 
   // Outline icons (currentColor).
   function icon(...paths) {
@@ -253,7 +252,7 @@
   // Two sibling cards in one clipped box: the view switch slides them (CSS, off with reduced motion).
   const panel = el("div", { className: "dialog", hidden: true }, [mainCard, settingsCard]);
   panel.dataset.view = "main";
-  shadow.append(style, fab, panel);
+  shadow.append(style, panel);
   // Typing in the box must not trigger the page's shortcuts (space, k, f, arrows...): events leave the shadow root retargeted to the host.
   for (const type of ["keydown", "keyup", "keypress"]) host.addEventListener(type, (event) => event.stopPropagation());
 
@@ -309,9 +308,9 @@
   function applySettings(next) {
     settings = next;
     host.dataset.theme = next.theme;
-    fab.hidden = next.buttonMode === "icon";
     applyMotion();
     applyPolling();
+    syncButton();
     const resolved = i18n.resolveLanguage(next.language, navigator.languages);
     if (resolved !== language) {
       language = resolved;
@@ -467,10 +466,13 @@
     sync(); // catches a navigation missed while polling is off
     if (!host.isConnected) return; // not on a video page: no box to show
     panel.hidden = !panel.hidden;
+    for (const name of ["top", "left", "right", "bottom"]) panel.style[name] = ""; // fresh spot on each open
+    placePanel();
     if (panel.hidden) setView("main");
     if (!panel.hidden && !running && probedUrl !== location.href) probe();
   }
-  fab.addEventListener("click", toggle);
+  window.addEventListener("resize", placePanel);
+  window.addEventListener("scroll", placePanel, { passive: true });
   const closeBox = () => { panel.hidden = true; setView("main"); };
   gear.addEventListener("click", () => setView("settings"));
   back.addEventListener("click", () => setView("main"));
@@ -496,7 +498,6 @@
     browser.storage.local.set({ settings: next }).then(() => {
       applySettings(next);
       setView("main");
-      say("settings.saved", "ok");
     }).catch(() => say("settings.saveFailed", "error", settingsNotice));
   });
   browser.storage.local.get("settings").then((stored) => applySettings(lib.normalizeSettings(stored.settings))).catch(() => applySettings(settings));
@@ -518,9 +519,64 @@
 
   setView("main"); // marks the settings card inert from the start
 
+  // Page button (site adapter in sites.js): a zero-width host (closed shadow root) carrying a 36px square button; created once and reused.
+  const adapter = sites.adapterFor(location.hostname);
+  let pageButton = null; // the host element
+  let pageControl = null; // the <button> inside its shadow root
+  function createPageButton() {
+    if (!pageButton) {
+      pageButton = document.createElement("div");
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      svg.setAttribute("viewBox", "0 0 24 24");
+      svg.setAttribute("aria-hidden", "true");
+      path.setAttribute("d", adapter.iconPath);
+      svg.append(path);
+      pageControl = el("button", { type: "button" }, [svg]);
+      pageControl.addEventListener("click", toggle);
+      pageButton.attachShadow({ mode: "closed" }).append(el("style", { textContent: adapter.css }), pageControl);
+      for (const type of ["keydown", "keyup", "keypress"]) pageButton.addEventListener(type, (event) => event.stopPropagation());
+      bind(() => { pageControl.title = t("button.download"); pageControl.setAttribute("aria-label", t("button.download")); });
+    }
+    return pageButton;
+  }
+  let watcher = null;
+  let watched = null;
+  let timer = 0;
+  // Mounts or removes the page button; a missing anchor does nothing (the toolbar icon still works).
+  function syncButton() {
+    const want = adapter && settings.buttonMode === "page" && lib.isVideoPage(location.href);
+    if (!want || !sites.mountButton(adapter, document, createPageButton)) {
+      sites.unmountButton(document);
+      if (!want && watcher) { watcher.disconnect(); watched = null; }
+    }
+    if (want) {
+      if (pageButton) pageButton.toggleAttribute("data-dark", adapter.isDark(document));
+      const target = adapter.observeTarget(document);
+      if (target && target !== watched) {
+        watcher = watcher || new MutationObserver(() => { clearTimeout(timer); timer = setTimeout(syncButton, 300); });
+        watcher.disconnect();
+        watcher.observe(target, { childList: true, subtree: true });
+        watched = target;
+      }
+    }
+  }
+  // The open box stays glued to the page button (scroll and resize) and closes when the button leaves the viewport.
+  // Opened without a usable button (toolbar icon, button off-screen or missing) it stays in the fixed corner and is never glued.
+  function placePanel() {
+    if (panel.hidden || !pageButton || !pageButton.isConnected) return;
+    const place = sites.placement(pageControl.getBoundingClientRect(), innerWidth, innerHeight, panel.offsetHeight);
+    const glued = panel.style.left !== "";
+    if (!place || place.close) return glued ? closeBox() : undefined;
+    panel.style.right = panel.style.bottom = "auto";
+    panel.style.left = place.left + "px";
+    panel.style.top = place.top + "px";
+  }
+
   // SPA navigation: YouTube changes the URL without reloading.
   function sync() {
     const visible = lib.isVideoPage(location.href);
+    syncButton();
     if (visible && !host.isConnected) document.documentElement.append(host);
     if (!visible && host.isConnected) host.remove();
     if (location.href !== currentUrl) {

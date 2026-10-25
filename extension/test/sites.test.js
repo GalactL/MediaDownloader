@@ -1,0 +1,167 @@
+"use strict";
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const sites = require("../sites.js");
+
+// Minimal fake DOM: nodes with a parent/children list, enough for before/remove/nextElementSibling/querySelector(All).
+class Node {
+  constructor(name, attrs = {}) { this.name = name; this.localName = name; this.attrs = { ...attrs }; this.children = []; this.parent = null; this.handlers = {}; this.style = { setProperty: (name, value) => { this.style[name] = value; } }; }
+  get parentElement() { return this.parent; }
+  get childNodes() { return this.children; }
+  get attributes() { return Object.keys(this.attrs).map((name) => ({ name })); }
+  get className() { return this.attrs.class || ""; }
+  set className(value) { this.attrs.class = value; }
+  getAttribute(name) { return this.attrs[name] ?? null; }
+  hasAttribute(name) { return name in this.attrs; }
+  removeAttribute(name) { delete this.attrs[name]; }
+  addEventListener(type, handler) { this.handlers[type] = handler; }
+  append(child) { child.remove(); child.parent = this; this.children.push(child); return child; }
+  replaceChildren(...nodes) { this.children.forEach((child) => { child.parent = null; }); this.children = []; nodes.forEach((node) => this.append(node)); }
+  setAttribute(name, value) { this.attrs[name] = value; }
+  cloneNode() { const copy = new Node(this.name, this.attrs); this.children.forEach((child) => copy.append(child.cloneNode())); return copy; }
+  remove() { if (this.parent) this.parent.children.splice(this.parent.children.indexOf(this), 1); this.parent = null; }
+  before(node) { node.remove(); node.parent = this.parent; this.parent.children.splice(this.parent.children.indexOf(this), 0, node); }
+  get previousElementSibling() { return this.parent ? this.parent.children[this.parent.children.indexOf(this) - 1] || null : null; }
+  get nextElementSibling() { return this.parent ? this.parent.children[this.parent.children.indexOf(this) + 1] || null : null; }
+  all() { return this.children.flatMap((child) => [child, ...child.all()]); }
+  querySelectorAll(selector) { return find(this, selector); }
+  querySelector(selector) { return find(this, selector)[0] || null; }
+}
+// Selector shapes used here: "tag", "#id", ".class", "[attr]", and descendant chains of those.
+const matches = (node, simple) =>
+  simple[0] === "#" ? node.attrs.id === simple.slice(1)
+    : simple[0] === "." ? (node.attrs.class || "").split(" ").includes(simple.slice(1))
+      : simple[0] === "[" ? simple.slice(1, -1) in node.attrs
+        : simple === "*" || simple === node.name;
+function find(root, selector) {
+  const parts = selector.split(" ");
+  return root.all().filter((node) => {
+    if (!matches(node, parts[parts.length - 1])) return false;
+    let up = node.parent;
+    for (let i = parts.length - 2; i >= 0; i--) { while (up && !matches(up, parts[i])) up = up.parent; if (!up) return false; up = up.parent; }
+    return true;
+  });
+}
+const fakeDocument = (root) => ({ createElement: (name) => new Node(name), createElementNS: (ns, name) => new Node(name), body: root, querySelector: (selector) => find(root, selector)[0] || null, querySelectorAll: (selector) => find(root, selector) });
+function youtubePage() {
+  const root = new Node("body");
+  const bar = root.append(new Node("div", { id: "top-level-buttons-computed" }));
+  const group = bar.append(new Node("segmented-like-dislike-button-view-model"));
+  const share = bar.append(new Node("yt-button-view-model", { id: "share-host" }));
+  const shareButton = share.append(new Node("button", { class: "yt-spec-button-shape-next yt-spec-button-shape-next--icon-leading", "aria-label": "Partager", id: "sb" }));
+  shareButton.append(new Node("div", { class: "yt-spec-button-shape-next__icon" })).append(new Node("svg"));
+  shareButton.append(new Node("div", { class: "yt-spec-button-shape-next__button-text-content" }));
+  return { root, bar, group, share, doc: fakeDocument(root) };
+}
+const adapter = sites.adapterFor("www.youtube.com");
+const make = () => new Node("div");
+
+test("adapterFor matches YouTube hosts only", () => {
+  assert.equal(sites.adapterFor("m.youtube.com").id, "youtube");
+  assert.equal(sites.adapterFor("youtu.be").id, "youtube");
+  assert.equal(sites.adapterFor("youtube.com.evil.example"), null);
+});
+
+test("findAnchor returns null without throwing when the structure is missing", () => {
+  const doc = fakeDocument(new Node("body"));
+  assert.equal(adapter.findAnchor(doc), null);
+  assert.equal(sites.mountButton(adapter, doc, make), null);
+  assert.equal(adapter.findAnchor({ querySelector() { throw new Error("bad selector"); } }), null);
+});
+
+test("mountButton inserts right before the like/dislike group", () => {
+  const page = youtubePage();
+  const host = sites.mountButton(adapter, page.doc, make);
+  assert.equal(page.group.previousElementSibling, host);
+  assert.equal(host.nextElementSibling, page.group);
+});
+
+test("mountButton is idempotent", () => {
+  const page = youtubePage();
+  sites.mountButton(adapter, page.doc, make);
+  sites.mountButton(adapter, page.doc, make);
+  assert.equal(page.doc.querySelectorAll("[data-md-button]").length, 1);
+});
+
+test("mountButton removes stray duplicates", () => {
+  const page = youtubePage();
+  sites.mountButton(adapter, page.doc, make);
+  const stray = page.root.append(make());
+  stray.setAttribute("data-md-button", "");
+  sites.mountButton(adapter, page.doc, make);
+  assert.equal(page.doc.querySelectorAll("[data-md-button]").length, 1);
+});
+
+test("remounts after the action bar is replaced", () => {
+  const page = youtubePage();
+  const host = sites.mountButton(adapter, page.doc, make);
+  page.bar.remove(); // button goes with the old bar
+  const fresh = youtubePage();
+  assert.equal(sites.mountButton(adapter, fresh.doc, () => host), host);
+  assert.equal(fresh.group.previousElementSibling, host);
+  assert.equal(fresh.doc.querySelectorAll("[data-md-button]").length, 1);
+});
+
+test("a stale button is removed when the anchor disappears; unmountButton removes it (buttonMode icon)", () => {
+  const page = youtubePage();
+  sites.mountButton(adapter, page.doc, make);
+  sites.unmountButton(page.doc);
+  assert.equal(page.doc.querySelectorAll("[data-md-button]").length, 0);
+  sites.mountButton(adapter, page.doc, make);
+  page.group.remove();
+  assert.equal(sites.mountButton(adapter, page.doc, make), null);
+  assert.equal(page.doc.querySelectorAll("[data-md-button]").length, 0);
+});
+
+test("placement: below, above, close when off-screen, null when unrendered", () => {
+  const rect = (top) => ({ width: 100, height: 36, top, bottom: top + 36, right: 700 });
+  assert.deepEqual(sites.placement(rect(100), 1280, 800, 420), { top: 144, left: 300 });
+  assert.deepEqual(sites.placement(rect(650), 1280, 800, 420), { top: 222, left: 300 });
+  assert.equal(sites.placement(rect(400), 1280, 800, 420).top, 444); // neither side fits: below
+  assert.deepEqual(sites.placement(rect(-500), 1280, 800, 420), { close: true });
+  assert.deepEqual(sites.placement(rect(-36), 1280, 800, 420), { close: true });
+  assert.deepEqual(sites.placement(rect(900), 1280, 800, 420), { close: true });
+  assert.equal(sites.placement(rect(100), 360, 700, 0).left, 16);
+  assert.equal(sites.placement({ ...rect(100), width: 0 }, 1280, 800, 420), null);
+  assert.equal(sites.placement({ ...rect(100), height: 0 }, 1280, 800, 420), null);
+});
+
+test("adapter css: zero-width host, 36px square button, explicit colours; isDark reads <html dark>", () => {
+  assert.match(adapter.css, /width: 0 !important/);
+  assert.match(adapter.css, /width: 36px; height: 36px/);
+  assert.match(adapter.css, /:host\(\[data-dark\]\)/);
+  assert.match(adapter.iconPath, /^M5 20h14/);
+  const doc = (dark) => ({ documentElement: { hasAttribute: (name) => dark && name === "dark" } });
+  assert.equal(adapter.isDark(doc(true)), true);
+  assert.equal(adapter.isDark(doc(false)), false);
+  assert.equal(adapter.isDark({}), false);
+});
+
+test("mount puts the wrapper right before the like group", () => {
+  const page = youtubePage();
+  const host = sites.mountButton(adapter, page.doc, () => new Node("div"));
+  assert.equal(page.group.previousElementSibling, host);
+  assert.ok(host.hasAttribute("data-md-button"));
+});
+
+test("mountButton mounts nothing when create() returns null", () => {
+  const page = youtubePage();
+  assert.equal(sites.mountButton(adapter, page.doc, () => null), null);
+  assert.equal(page.doc.querySelectorAll("[data-md-button]").length, 0);
+});
+
+test("findAnchor skips hidden duplicates and returns null when none is rendered", () => {
+  const root = new Node("body");
+  const hidden = root.append(new Node("segmented-like-dislike-button-view-model"));
+  const shown = root.append(new Node("segmented-like-dislike-button-view-model"));
+  hidden.getClientRects = () => [];
+  shown.getClientRects = () => [{}];
+  assert.equal(adapter.findAnchor(fakeDocument(root)), shown);
+  shown.getClientRects = () => [];
+  assert.equal(adapter.findAnchor(fakeDocument(root)), null);
+});
+
+test("diagnose lists every selector with its match count", () => {
+  const out = adapter.diagnose(youtubePage().doc);
+  assert.match(out, /segmented-like-dislike-button-view-model=1/);
+});
