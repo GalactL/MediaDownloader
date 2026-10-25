@@ -133,7 +133,6 @@
     form.disabled = download.disabled = value;
     download.classList.remove("complete");
     download.classList.toggle("loading", value);
-    download.classList.remove("started");
     download.toggleAttribute("aria-busy", value);
     setSide(value ? "cancel" : "close"); // a successful run then switches it to the folder
     status.textContent = value ? "En cours…" : "Prêt à télécharger";
@@ -190,26 +189,37 @@
     if (rangeError) return say(rangeError, "error");
     if (Number.isNaN(size)) return say("La taille maximale doit être comprise entre 0 et " + lib.MAX_SIZE_MB + " Mo.", "error");
     setRunning(true);
-    fill.style.removeProperty("width"); // an inline width would hide the CSS start animation
+    fill.style.transition = "";
+    fill.style.width = "0";
     label.textContent = "Démarrage…";
+    const startedAt = Date.now();
     say("");
     request(lib.buildDownloadRequest({
       url: lib.canonicalUrl(location.href), quality: quality.value, maxSizeMb: size, start: startTime, end: endTime, name: nameInput.value,
     }), (reply) => {
       if (reply.type === "progress") {
-        download.classList.add("started");
         fill.style.width = Math.min(100, Math.max(0, Number(reply.percent) || 0)) + "%";
         label.textContent = lib.progressText(reply.stage, reply.percent, reply.pass).replace(" : ", "… ");
       } else if (reply.type === "completed") {
-        setRunning(false);
-        download.classList.add("complete");
-        download.disabled = true;
-        label.textContent = "Terminé";
-        status.textContent = "Téléchargement terminé";
-        say("Vidéo téléchargée.", "ok");
-        setSide("folder");
+        // Very short jobs still show a full left-to-right run: the bar fills to 100 % over whatever is left of one second.
+        const left = Math.max(0, 1000 - (Date.now() - startedAt));
+        const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
+        label.textContent = lib.progressText("download", 100);
+        fill.style.transition = calm ? "none" : "width " + Math.max(left, 200) + "ms linear";
+        fill.style.width = "100%";
+        setTimeout(() => {
+          fill.style.transition = "";
+          setRunning(false);
+          download.classList.add("complete");
+          download.disabled = true;
+          label.textContent = "Terminé";
+          status.textContent = "Téléchargement terminé";
+          say("Vidéo téléchargée.", "ok");
+          setSide("folder");
+        }, calm ? 0 : Math.max(left, 200));
       } else if (reply.type === "error") {
         setRunning(false);
+        fill.style.transition = "";
         status.textContent = "Interrompu";
         say(lib.errorText(reply.code, reply.message), "error");
       }
