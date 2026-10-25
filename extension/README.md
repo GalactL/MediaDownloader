@@ -20,6 +20,8 @@ YouTube classique sont écrits d'après la structure connue de leur page et n'on
 | TikTok | `/@<compte>/video/<id>` | colonne j'aime / commentaires / partage |
 | Instagram | `/reel/<id>`, `/p/<id>` (avec vidéo) | rangée d'actions de la publication |
 
+Le bouton de YouTube garde le pictogramme « télécharger » ; sur Shorts, X, TikTok et Instagram il affiche le logo de l'extension (`icons/icon.svg`, tracé en SVG intégré dans la couleur du texte : clair sur thème sombre, sombre sur thème clair, comme les variantes `icon-light.svg` / `icon-dark.svg` de la barre d'outils).
+
 L'URL envoyée au moteur est toujours celle de la page (`lib.canonicalUrl` : sur YouTube sans `list=`/`index=`, ailleurs
 le chemin de la publication sans paramètres de suivi), jamais l'adresse d'un flux vidéo ; yt-dlp l'interprète.
 L'extension ne lit aucun cookie et ne demande aucun identifiant ; `cookiesFromBrowser` reste réservé à YouTube côté

@@ -13,7 +13,8 @@
   };
 
   const counts = (doc, selectors) => selectors.map((selector) => { try { return selector + "=" + doc.querySelectorAll(selector).length; } catch { return selector + "=err"; } }).join(" | ");
-  const DOWNLOAD_ICON = "M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z"; // filled download glyph (24x24 viewBox), Material "download"
+  const DOWNLOAD_ICON = "M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z"; // filled download glyph (24x24 viewBox), Material "download" (YouTube)
+  const LOGO_PATH = "M12 4v11M7 11l5 5 5-5M5 20h14"; // the extension's own logo (icons/icon.svg, stroked 24x24): the other sites draw it with CSS strokes in the text colour, light or dark like the toolbar variants
   const isYouTube = (hostname) => /^(?:[a-z0-9-]+\.)*youtube\.com$/i.test(hostname) || hostname.toLowerCase() === "youtu.be";
   // Sites without a theme attribute: dark when the page background is.
   function darkBackground(doc) {
@@ -40,7 +41,7 @@
 button { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--fg); cursor: pointer; }
 button:hover { background: var(--bg-hover); }
 button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
-svg { width: 22px; height: 22px; flex: none; fill: currentColor; }`;
+svg { width: 22px; height: 22px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }`;
   // Round 48px button at the top of a vertical action column (Shorts, TikTok): in the flow, so the column keeps its spacing.
   const COLUMN_CSS = `
 :host { display: flex !important; justify-content: center; flex: none !important; width: 100% !important; margin: 0 0 12px !important; padding: 0 !important;
@@ -49,7 +50,7 @@ svg { width: 22px; height: 22px; flex: none; fill: currentColor; }`;
 button { display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; padding: 0; border: 0; border-radius: 50%; background: var(--bg); color: var(--fg); cursor: pointer; }
 button:hover { background: var(--bg-hover); }
 button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
-svg { width: 24px; height: 24px; flex: none; fill: currentColor; }`;
+svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }`;
 
   const YT_ANCHORS = [
     "#top-level-buttons-computed segmented-like-dislike-button-view-model",
@@ -99,7 +100,7 @@ svg { width: 24px; height: 24px; flex: none; fill: currentColor; }`,
     findAnchor: (doc) => first(doc, SHORTS_ANCHORS),
     diagnose: (doc) => counts(doc, SHORTS_ANCHORS),
     observeTarget: (doc) => first(doc, ["ytd-shorts", "ytd-page-manager"]) || doc.body,
-    iconPath: DOWNLOAD_ICON,
+    iconPath: LOGO_PATH,
     isDark: youtube.isDark,
     css: COLUMN_CSS,
   };
@@ -118,7 +119,7 @@ svg { width: 24px; height: 24px; flex: none; fill: currentColor; }`,
     insert: "after",
     diagnose: (doc) => counts(doc, ["article", "article video", ...X_BARS]),
     observeTarget: (doc) => first(doc, ["main", '[data-testid="primaryColumn"]']) || doc.body,
-    iconPath: DOWNLOAD_ICON,
+    iconPath: LOGO_PATH,
     isDark: darkBackground,
     css: ROW_CSS,
   };
@@ -142,7 +143,7 @@ svg { width: 24px; height: 24px; flex: none; fill: currentColor; }`,
     },
     diagnose: (doc) => counts(doc, TT_LIKES),
     observeTarget: (doc) => first(doc, ["main", "#app"]) || doc.body,
-    iconPath: DOWNLOAD_ICON,
+    iconPath: LOGO_PATH,
     isDark: darkBackground,
     css: COLUMN_CSS,
     panel: "right", // the column hugs the right side of the video: open the box beside the button
@@ -156,7 +157,7 @@ svg { width: 24px; height: 24px; flex: none; fill: currentColor; }`,
     findAnchor: (doc) => barOf(doc, "article", IG_BARS) || barOf(doc, "main", IG_BARS),
     diagnose: (doc) => counts(doc, ["article video", "main video", ...IG_BARS.map((bar) => "article " + bar), ...IG_BARS.map((bar) => "main " + bar)]),
     observeTarget: (doc) => first(doc, ["main"]) || doc.body,
-    iconPath: DOWNLOAD_ICON,
+    iconPath: LOGO_PATH,
     isDark: darkBackground,
     css: ROW_CSS,
   };

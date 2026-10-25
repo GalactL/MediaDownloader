@@ -363,3 +363,14 @@ test("TikTok: the button is a sibling of the column items, whether the like butt
   add(column, "button");
   assert.equal(tiktok.findAnchor(fakeDocument(root, "/@a/video/1")), share); // fallback when the like icon is not found
 });
+
+test("page button icon: YouTube keeps the download glyph, the other sites draw the extension logo with strokes in the text colour", () => {
+  assert.match(sites.adapterFor("www.youtube.com", "/watch").iconPath, /^M5 20h14/);
+  for (const [host, path] of [["www.youtube.com", "/shorts/a"], ["x.com", "/"], ["www.tiktok.com", "/"], ["www.instagram.com", "/"]]) {
+    const a = sites.adapterFor(host, path);
+    assert.equal(a.iconPath, "M12 4v11M7 11l5 5 5-5M5 20h14", a.id); // same path as icons/icon.svg
+    assert.match(a.css, /fill: none; stroke: currentColor; stroke-width: 2/, a.id);
+    assert.match(a.css, /--fg:/, a.id);
+  }
+  assert.match(require("node:fs").readFileSync(require("node:path").join(__dirname, "../icons/icon.svg"), "utf8"), /d="M12 4v11M7 11l5 5 5-5M5 20h14"/);
+});
