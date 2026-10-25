@@ -63,23 +63,16 @@ svg { fill: none; stroke: currentColor; width: 20px; height: 20px; flex: none; }
 
   const unmountButton = (doc) => doc.querySelectorAll(MARK).forEach((node) => node.remove());
 
-  // Where the box goes relative to the button rect: below it, above it, or "fixed" (corner) when the button is off-screen or there is no room.
-  // -> { mode, top, left, maxH } (top/left/maxH are null when fixed). maxH is never under 240.
+  // Where the box goes relative to the button rect: below it, above it, or "fixed" (corner) when the button is off-screen or neither side fits
+  // the box's real height (it is never resized). -> { mode, top, left } (null when fixed).
   function placement(rect, vw, vh, panelHeight) {
-    const fixed = { mode: "fixed", top: null, left: null, maxH: null };
+    const fixed = { mode: "fixed", top: null, left: null };
     if (!(rect.width > 0) || rect.bottom < 0 || rect.top > vh) return fixed;
     const height = panelHeight > 0 ? panelHeight : 420;
-    const need = Math.min(height, 320);
     const width = Math.min(400, vw - 32);
     const left = Math.max(16, Math.min(rect.right - width, vw - width - 16));
-    if (vh - rect.bottom - 16 >= need) {
-      const top = Math.max(8, rect.bottom + 8);
-      return { mode: "below", top, left, maxH: Math.max(240, vh - top - 16) };
-    }
-    if (rect.top - 16 >= need) {
-      const maxH = Math.max(240, rect.top - 16);
-      return { mode: "above", top: Math.max(8, rect.top - 8 - Math.min(height, maxH)), left, maxH };
-    }
+    if (vh - rect.bottom - 16 >= height) return { mode: "below", top: Math.max(8, rect.bottom + 8), left };
+    if (rect.top - 16 >= height) return { mode: "above", top: Math.max(8, rect.top - 8 - height), left };
     return fixed;
   }
 

@@ -96,18 +96,16 @@ test("a stale button is removed when the anchor disappears; unmountButton remove
   assert.equal(page.doc.querySelectorAll("[data-md-button]").length, 0);
 });
 
-test("placement: below, above, off-screen and tiny viewport", () => {
+test("placement: below, above, off-screen, and corner when nothing fits", () => {
   const rect = (top) => ({ width: 100, top, bottom: top + 36, right: 700 });
   const normal = sites.placement(rect(100), 1280, 800, 420);
-  assert.equal(normal.mode, "below");
-  assert.equal(normal.top, 144);
-  assert.equal(normal.left, 300);
-  assert.equal(sites.placement(rect(650), 1280, 800, 420).mode, "above");
+  assert.deepEqual(normal, { mode: "below", top: 144, left: 300 });
+  assert.deepEqual(sites.placement(rect(650), 1280, 800, 420), { mode: "above", top: 222, left: 300 });
   assert.equal(sites.placement(rect(900), 1280, 800, 420).mode, "fixed");
   assert.equal(sites.placement({ ...rect(100), width: 0 }, 1280, 800, 420).mode, "fixed");
   assert.equal(sites.placement(rect(100), 1280, 300, 420).mode, "fixed");
-  const tight = sites.placement(rect(400), 360, 700, 0);
-  assert.ok(tight.maxH >= 240 && tight.top >= 8 && tight.left >= 16);
+  assert.equal(sites.placement(rect(300), 1280, 800, 420).mode, "fixed"); // 464 below, 284 above: neither fits
+  assert.equal(sites.placement(rect(100), 360, 700, 0).left, 16);
 });
 
 test("isDark reads the dark attribute on <html>", () => {

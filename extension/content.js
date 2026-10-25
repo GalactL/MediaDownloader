@@ -556,14 +556,12 @@
   // It then stays put (no scroll tracking).
   function placePanel() {
     for (const name of ["top", "left", "right", "bottom"]) panel.style[name] = "";
-    panel.style.removeProperty("--max-h");
     if (panel.hidden || !buttonHost.isConnected) return;
     const place = sites.placement(buttonHost.getBoundingClientRect(), innerWidth, innerHeight, panel.offsetHeight);
     if (place.mode === "fixed") return;
     panel.style.right = panel.style.bottom = "auto";
     panel.style.left = place.left + "px";
     panel.style.top = place.top + "px";
-    panel.style.setProperty("--max-h", place.maxH + "px");
   }
   for (const type of ["keydown", "keyup", "keypress"]) buttonHost.addEventListener(type, (event) => event.stopPropagation());
 
