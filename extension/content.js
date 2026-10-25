@@ -498,7 +498,6 @@
     browser.storage.local.set({ settings: next }).then(() => {
       applySettings(next);
       setView("main");
-      say("settings.saved", "ok");
     }).catch(() => say("settings.saveFailed", "error", settingsNotice));
   });
   browser.storage.local.get("settings").then((stored) => applySettings(lib.normalizeSettings(stored.settings))).catch(() => applySettings(settings));
