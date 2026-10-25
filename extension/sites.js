@@ -13,8 +13,7 @@
   };
 
   const counts = (doc, selectors) => selectors.map((selector) => { try { return selector + "=" + doc.querySelectorAll(selector).length; } catch { return selector + "=err"; } }).join(" | ");
-  const DOWNLOAD_ICON = "M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z"; // filled download glyph (24x24 viewBox), Material "download" (YouTube)
-  const LOGO_PATH = "M12 4v11M7 11l5 5 5-5M5 20h14"; // the extension's own logo (icons/icon.svg, stroked 24x24): the other sites draw it with CSS strokes in the text colour, light or dark like the toolbar variants
+  const LOGO_PATH = "M12 4v11M7 11l5 5 5-5M5 20h14"; // the extension's own logo (icons/icon.svg, stroked 24x24), drawn by the CSS with strokes in the text colour: light or dark like the toolbar variants
   const isYouTube = (hostname) => /^(?:[a-z0-9-]+\.)*youtube\.com$/i.test(hostname) || hostname.toLowerCase() === "youtu.be";
   // Sites without a theme attribute: dark when the page background is.
   function darkBackground(doc) {
@@ -71,8 +70,7 @@ svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; s
     diagnose: (doc) => counts(doc, YT_ANCHORS),
     // Where to watch for the action bar being recreated (narrow layout, navigation).
     observeTarget: (doc) => first(doc, ["ytd-watch-flexy", "ytd-page-manager"]) || doc.body,
-    // Filled download glyph (24x24 viewBox), Material "download".
-    iconPath: DOWNLOAD_ICON,
+    iconPath: LOGO_PATH,
     isDark: (doc) => !!(doc.documentElement && doc.documentElement.hasAttribute("dark")),
     // Self-contained button, explicit colours (YouTube's variables are not reliable). The host takes no space (width 0) so the native row and
     // its like bar keep their layout; the 36px square hangs to the left of the like group.
@@ -85,7 +83,7 @@ button { position: absolute; right: 8px; top: 0; display: flex; align-items: cen
   border: 0; border-radius: 10px; background: var(--bg); color: var(--fg); cursor: pointer; }
 button:hover { background: var(--bg-hover); }
 button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
-svg { width: 24px; height: 24px; flex: none; fill: currentColor; }`,
+svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }`,
   };
 
   // YouTube Shorts (/shorts/<id>): the button leads the vertical actions column of the active short. Listed before `youtube`, which keeps every other YouTube page.
@@ -127,12 +125,19 @@ svg { width: 24px; height: 24px; flex: none; fill: currentColor; }`,
   // TikTok (/@<account>/video/<id>): the button leads the like / comment / share column of the video.
   // Most specific first; the icon sits in a button, itself (or its wrapper with the count) one item of the column.
   const TT_LIKES = ['[data-e2e="like-icon"]', '[data-e2e="browse-like-icon"]', '[data-e2e*="like-icon"]', 'button[aria-label*="like" i]', 'button[aria-label*="aimer" i]', '[data-e2e="share-icon"]'];
-  // The column item holding `node`: climbs while the parent holds no other button (the column holds like, comment, share...).
+  // The column item holding `node`: the like button, or its wrapper (button + count) when the parent holds the other items' icons (comment, share...).
+  // The structure is not verified: when no parent within 3 levels holds more icons than the item, the button itself is the item (never a far ancestor).
+  // Our own button is not counted (it sits in the column once mounted); the count must not change between syncs.
+  const iconsIn = (node) => [...node.querySelectorAll('[data-e2e*="icon"]')].filter((icon) => !icon.closest("[data-md-button]")).length;
   function columnItem(node) {
-    let item = node.closest("button");
-    if (!item) return node.parentElement || node;
-    for (let i = 0; i < 4 && item.parentElement && item.parentElement.querySelectorAll("button").length < 2; i++) item = item.parentElement;
-    return item;
+    const button = node.closest("button");
+    if (!button) return node.parentElement || node;
+    let item = button;
+    for (let i = 0; i < 3 && item.parentElement; i++) {
+      if (iconsIn(item.parentElement) > iconsIn(item)) return item;
+      item = item.parentElement;
+    }
+    return button;
   }
   const tiktok = {
     id: "tiktok",

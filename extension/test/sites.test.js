@@ -29,7 +29,7 @@ class Node {
   querySelector(selector) { return find(this, selector)[0] || null; }
   closest(selector) { for (let node = this; node; node = node.parent) if (selector.split(" ").length === 1 && matches(node, selector)) return node; return null; }
 }
-// Selector shapes used here: "tag", "#id", ".class", "[attr]", "[attr=value]", compounds of those ("tag[attr]") and descendant chains. Anything else (":has", ">") matches nothing.
+// Selector shapes used here: "tag", "#id", ".class", "[attr]", "[attr=value]", "[attr*=value]", compounds of those ("tag[attr]") and descendant chains. Anything else (":has", ">") matches nothing.
 const PARTS = /[#.][\w-]+|\[[^\]]+\]/g;
 const matches = (node, simple) => {
   const m = /^([\w-]*|\*)((?:[#.][\w-]+|\[[^\]]+\])*)$/.exec(simple);
@@ -37,8 +37,10 @@ const matches = (node, simple) => {
   return (m[2].match(PARTS) || []).every((part) => {
     if (part[0] === "#") return node.attrs.id === part.slice(1);
     if (part[0] === ".") return (node.attrs.class || "").split(" ").includes(part.slice(1));
-    const [name, value] = part.slice(1, -1).split("=");
-    return value === undefined ? name in node.attrs : node.attrs[name] === value.replace(/"/g, "");
+    const [, name, op, value] = /^\[([\w-]+)(\*?=)?(.*)\]$/.exec(part);
+    if (!op) return name in node.attrs;
+    const wanted = value.replace(/ i$/, "").replace(/"/g, "");
+    return op === "*=" ? String(node.attrs[name] ?? "").includes(wanted) : node.attrs[name] === wanted;
   });
 };
 function find(root, selector) {
@@ -155,7 +157,6 @@ test("adapter css: zero-width host, 36px square button, explicit colours; isDark
   assert.match(adapter.css, /width: 0 !important/);
   assert.match(adapter.css, /width: 36px; height: 36px/);
   assert.match(adapter.css, /:host\(\[data-dark\]\)/);
-  assert.match(adapter.iconPath, /^M5 20h14/);
   const doc = (dark) => ({ documentElement: { hasAttribute: (name) => dark && name === "dark" } });
   assert.equal(adapter.isDark(doc(true)), true);
   assert.equal(adapter.isDark(doc(false)), false);
@@ -364,13 +365,34 @@ test("TikTok: the button is a sibling of the column items, whether the like butt
   assert.equal(tiktok.findAnchor(fakeDocument(root, "/@a/video/1")), share); // fallback when the like icon is not found
 });
 
-test("page button icon: YouTube keeps the download glyph, the other sites draw the extension logo with strokes in the text colour", () => {
-  assert.match(sites.adapterFor("www.youtube.com", "/watch").iconPath, /^M5 20h14/);
-  for (const [host, path] of [["www.youtube.com", "/shorts/a"], ["x.com", "/"], ["www.tiktok.com", "/"], ["www.instagram.com", "/"]]) {
+test("page button icon: every adapter draws the extension logo with strokes in the text colour", () => {
+  for (const [host, path] of [["www.youtube.com", "/watch"], ["www.youtube.com", "/shorts/a"], ["x.com", "/"], ["www.tiktok.com", "/"], ["www.instagram.com", "/"]]) {
     const a = sites.adapterFor(host, path);
     assert.equal(a.iconPath, "M12 4v11M7 11l5 5 5-5M5 20h14", a.id); // same path as icons/icon.svg
     assert.match(a.css, /fill: none; stroke: currentColor; stroke-width: 2/, a.id);
     assert.match(a.css, /--fg:/, a.id);
   }
   assert.match(require("node:fs").readFileSync(require("node:path").join(__dirname, "../icons/icon.svg"), "utf8"), /d="M12 4v11M7 11l5 5 5-5M5 20h14"/);
+});
+
+test("TikTok: mounted 3 times with our own button in the column, the anchor never jumps (other items are not <button>s)", () => {
+  const tiktok = sites.adapterFor("www.tiktok.com", "/@a/video/1");
+  const root = new Node("body");
+  const player = add(add(root, "main"), "div");
+  const column = add(add(player, "section"), "div");
+  const likeButton = add(column, "button");
+  add(likeButton, "span", { "data-e2e": "like-icon" });
+  add(add(column, "div", { role: "button" }), "span", { "data-e2e": "comment-icon" });
+  add(add(column, "div", { role: "button" }), "span", { "data-e2e": "share-icon" });
+  const doc = fakeDocument(root, "/@a/video/1");
+  const ours = () => { const host = new Node("div"); add(host, "button", { "data-e2e": "own-icon" }); return host; };
+  assert.equal(tiktok.findAnchor(doc), likeButton);
+  const host = sites.mountButton(tiktok, doc, ours);
+  assert.equal(host.parent, column);
+  for (let i = 0; i < 3; i++) {
+    assert.equal(tiktok.findAnchor(doc), likeButton);
+    assert.equal(sites.mountButton(tiktok, doc, ours), host);
+  }
+  assert.equal(doc.querySelectorAll("[data-md-button]").length, 1);
+  assert.equal(likeButton.previousElementSibling, host);
 });
