@@ -361,13 +361,14 @@ namespace
 
         host.Send(R"({"type":"download","id":"h2","url":"https://example.com/v"})");
         host.Send(R"({"type":"probe","id":"h3","url":"https://example.com/v"})");
+        host.Send(R"({"type":"pickFolder","id":"h4"})");
         // Skip the started/log events of the running job; busy answers carry the new request ids.
         int busy = 0;
-        while (busy < 2)
+        while (busy < 3)
         {
             auto m = host.Recv();
             if (!m) { Check(false, "busy: missing busy answers"); break; }
-            if (Contains(*m, "\"code\":\"busy\"")) { ++busy; Check(Contains(*m, "\"id\":\"h2\"") || Contains(*m, "\"id\":\"h3\""), "busy: id echoed"); }
+            if (Contains(*m, "\"code\":\"busy\"")) { ++busy; Check(Contains(*m, "\"id\":\"h2\"") || Contains(*m, "\"id\":\"h3\"") || Contains(*m, "\"id\":\"h4\""), "busy: id echoed (pickFolder included)"); }
             else Check(Contains(*m, "\"id\":\"h1\""), "busy: other messages belong to h1: " + *m);
         }
 
@@ -383,6 +384,21 @@ namespace
         Check(reply && reply->starts_with("{\"type\":\"doctor\",\"id\":\"again\""), "cancel: host alive afterwards");
         Check(host.Finish() == 0, "cancel: EOF exits 0");
     }
+
+#ifdef __linux__
+    // HostProcess passes an explicit env (no DISPLAY/WAYLAND_DISPLAY, whatever the parent has): every chooser fails (or is absent), which must be a framed error, not a hang.
+    void TestPickFolderWithoutDisplay()
+    {
+        HostProcess host;
+        host.Send(R"({"type":"pickFolder","id":"p1"})");
+        auto reply = host.Recv();
+        Check(reply && reply->starts_with("{\"type\":\"error\",\"id\":\"p1\",\"code\":\"pick_failed\""), "pickFolder: pick_failed without display: " + reply.value_or("<none>"));
+        host.Send(R"({"type":"doctor","id":"after"})");
+        reply = host.Recv();
+        Check(reply && reply->starts_with("{\"type\":\"doctor\",\"id\":\"after\""), "pickFolder: host alive afterwards");
+        Check(host.Finish() == 0, "pickFolder: EOF exits 0");
+    }
+#endif
 
     void TestCancelFfmpeg()
     {
@@ -446,6 +462,9 @@ int main()
     TestDownloadFailure();
     TestInvalidMessages();
     TestBusyAndCancelYtDlp();
+#ifdef __linux__
+    TestPickFolderWithoutDisplay();
+#endif
     TestCancelFfmpeg();
     TestEofCancelsJob();
     TestSigtermCancelsJob();

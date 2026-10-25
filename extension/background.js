@@ -1,8 +1,8 @@
 "use strict";
 
 const HOST_NAME = "media_downloader";
-const FORWARDED_TYPES = new Set(["probe", "download", "cancel", "doctor", "openFolder"]);
-const TERMINAL_TYPES = new Set(["completed", "error", "probe", "doctor", "opened"]);
+const FORWARDED_TYPES = new Set(["probe", "download", "cancel", "doctor", "openFolder", "pickFolder"]);
+const TERMINAL_TYPES = new Set(["completed", "error", "probe", "doctor", "opened", "folderPicked"]);
 
 let port = null;
 let counter = 0;
@@ -54,4 +54,9 @@ browser.runtime.onMessage.addListener((request, sender) => {
     port = null;
     sendToTab(sender.tab.id, { type: "error", id: String(request.id), code: "host_disconnected", message: "Impossible de joindre l'hôte MediaDownloader." });
   }
+});
+
+// Toolbar icon: toggles the box of the current tab (ignored where no content script runs).
+browser.browserAction.onClicked.addListener((tab) => {
+  browser.tabs.sendMessage(tab.id, { kind: "toggle" }).catch(() => {});
 });

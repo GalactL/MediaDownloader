@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <charconv>
+#include <chrono>
+#include <fstream>
 #include <cctype>
 #include <cmath>
 #include <cwctype>
@@ -375,5 +377,27 @@ namespace media_downloader
         std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
         return converter.from_bytes(value.data(), value.data() + value.size());
 #endif
+    }
+
+    bool EnsureOutputDirectory(std::filesystem::path const& requested, std::filesystem::path& resolved)
+    {
+        std::error_code error;
+        resolved = std::filesystem::absolute(requested, error);
+        if (error) return false;
+        std::filesystem::create_directories(resolved, error);
+        if (error) return false;
+        // create_directories renvoie false sans erreur si le chemin existe déjà, y compris comme fichier.
+        if (!std::filesystem::is_directory(resolved, error) || error) return false;
+        // Sondage d'écriture : un dossier existant peut être en lecture seule ou refuser la création de fichiers.
+        auto const probe = resolved / (L".mediadownloader-probe-" + std::to_wstring(std::chrono::steady_clock::now().time_since_epoch().count()));
+        bool written;
+        {
+            std::ofstream file(probe, std::ios::binary | std::ios::trunc);
+            file.put('x');
+            file.flush();
+            written = file.good();
+        }
+        std::filesystem::remove(probe, error);
+        return written;
     }
 }

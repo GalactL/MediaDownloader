@@ -58,6 +58,9 @@ namespace media_downloader
     std::string BuildNativeManifest(std::string_view exePath, std::string_view extensionId);
     // Emplacement du manifeste : Windows à côté de l'exécutable, sinon sous le dossier personnel.
     std::filesystem::path NativeManifestPath(HostPlatform platform, std::filesystem::path const& home, std::filesystem::path const& exeDirectory);
+    // Résout `requested` en chemin absolu et crée le dossier et vérifie l'écriture (fichier témoin créé puis supprimé) ;
+    // false si inutilisable (fichier, droits, lecture seule, chemin invalide). Ne lève jamais.
+    bool EnsureOutputDirectory(std::filesystem::path const& requested, std::filesystem::path& resolved);
     bool IsSupportedUrl(std::wstring_view value);
     bool IsYouTubeUrl(std::wstring_view value);
     std::wstring BuildFormatSelector(std::wstring const& quality);

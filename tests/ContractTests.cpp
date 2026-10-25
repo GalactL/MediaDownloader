@@ -276,6 +276,18 @@ namespace
         Check(NoTempDirs(videos), "temp dir removed in $HOME/Videos");
     }
 
+    void TestOutputFallback()
+    {
+        auto bad = g_tmp / "not-a-dir.txt";
+        { std::ofstream(bad) << "x"; }
+        auto r = Run({ "download", "--url", "https://example.com/v", "--output", bad.string() });
+        auto videos = g_home / "Videos";
+        Check(r.code == 0, "unusable --output falls back to Videos and exits 0");
+        Check(r.out.find("\"level\":\"warning\",\"message\":\"Dossier de sortie inutilisable (" + bad.string() + "), enregistrement dans le dossier Vidéos : " + videos.string() + "\"") != std::string::npos, "fallback warning names both paths");
+        Check(r.out.find("{\"type\":\"started\",\"outputDirectory\":\"" + videos.string() + "\"}") != std::string::npos, "started reports the Videos folder");
+        Check(fs::exists(videos / "Fake Title [abc].mp4"), "file lands in Videos after fallback");
+    }
+
     void TestDownloadEncode()
     {
         auto out = NewDir("out");
@@ -488,6 +500,7 @@ int main()
     TestDownloadPlain();
     TestInstallHost();
     TestDefaultOutput();
+    TestOutputFallback();
     TestDownloadEncode();
     TestDownloadFailure();
     TestArguments();
