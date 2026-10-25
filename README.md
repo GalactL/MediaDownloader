@@ -15,7 +15,7 @@ ainsi que l'extension Firefox et son hôte natif. YouTube, TikTok et X sont pris
 charge dans la mesure où la version installée de `yt-dlp` les prend en charge et
 où le contenu est accessible sans contourner de DRM.
 
-## Plateformes de la v0.5.0
+## Plateformes de la v0.4.0
 
 - Windows x64, macOS Apple Silicon et Intel, Linux x64 : CLI, hôte de messagerie native et extension Firefox.
 
