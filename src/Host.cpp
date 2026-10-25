@@ -1,4 +1,6 @@
 #include "Host.h"
+#include "ChildProcess.h"
+#include "Core.h"
 
 #ifdef _WIN32
 #include <fcntl.h>
@@ -14,6 +16,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <functional>
 #include <iomanip>
 #include <locale>
@@ -332,13 +335,15 @@ namespace media_downloader
         class HostSink : public EventSink
         {
         public:
-            HostSink(Output& output, std::optional<std::string> id, std::function<void()> onTerminal = {})
-                : output_(output), id_(std::move(id)), onTerminal_(std::move(onTerminal)) {}
+            HostSink(Output& output, std::optional<std::string> id, std::function<void()> onTerminal = {},
+                std::function<void(std::string const&)> onCompleted = {})
+                : output_(output), id_(std::move(id)), onTerminal_(std::move(onTerminal)), onCompleted_(std::move(onCompleted)) {}
 
             void On(Event const& event) override
             {
                 bool terminal = std::holds_alternative<CompletedEvent>(event) || std::holds_alternative<ErrorEvent>(event) ||
                     std::holds_alternative<ProbeEvent>(event);
+                if (auto const* completed = std::get_if<CompletedEvent>(&event); completed && onCompleted_) onCompleted_(completed->path);
                 std::string json;
                 if (auto const* probe = std::get_if<ProbeEvent>(&event))
                 {
@@ -355,7 +360,31 @@ namespace media_downloader
             Output& output_;
             std::optional<std::string> id_;
             std::function<void()> onTerminal_;
+            std::function<void(std::string const&)> onCompleted_;
         };
+
+        // Opens a folder in the system file manager. execv-based RunProcess needs absolute paths.
+        bool OpenFolder(std::string const& directory)
+        {
+            std::filesystem::path opener;
+#ifdef _WIN32
+            wchar_t* root = nullptr;
+            _wdupenv_s(&root, nullptr, L"SystemRoot");
+            opener = std::filesystem::path(root ? root : L"C:\\Windows") / L"explorer.exe";
+            std::free(root);
+#elif defined(__APPLE__)
+            opener = "/usr/bin/open";
+#else
+            opener = "/usr/bin/xdg-open";
+#endif
+            std::atomic_bool never{};
+            try
+            {
+                auto result = RunProcess(opener, { Utf8ToWide(directory) }, std::filesystem::path(Utf8ToWide(directory)), [](std::string const&) {}, never);
+                return result.exitCode == 0 || (opener.filename() == "explorer.exe" && result.exitCode == 1); // explorer returns 1 on success
+            }
+            catch (...) { return false; } // e.g. the folder was deleted
+        }
 
         // ---- requests ----------------------------------------------------------------------------------
 
@@ -459,11 +488,18 @@ namespace media_downloader
 #endif
         Output output(stdout);
         std::atomic_bool cancel{}, busy{}, finished{};
-        std::thread worker;
+        std::thread worker, opener; // opener: the file manager may stay alive, so never wait for it on the receive loop
+        std::mutex folderMutex;
+        std::string lastFolder; // folder of the latest completed download: the only folder a client can ask to open
 
         auto runJob = [&](Options const& options, std::optional<std::string> id, bool inlineJob)
         {
-            HostSink sink(output, id, [&busy, inlineJob] { if (!inlineJob) busy = false; });
+            HostSink sink(output, id, [&busy, inlineJob] { if (!inlineJob) busy = false; },
+                [&](std::string const& path)
+                {
+                    std::lock_guard<std::mutex> lock(folderMutex);
+                    lastFolder = WideToUtf8(std::filesystem::path(Utf8ToWide(path)).parent_path().wstring());
+                });
             Engine engine(sink, cancel);
             auto report = [&sink](char const* code, char const* message)
             {
@@ -531,6 +567,22 @@ namespace media_downloader
                 if (busy) cancel = true;
                 return true;
             }
+            if (type == "openFolder")
+            {
+                std::string folder;
+                { std::lock_guard<std::mutex> lock(folderMutex); folder = lastFolder; }
+                if (folder.empty()) output.Send(ErrorJson("no_folder", "Aucun dossier de téléchargement à ouvrir."), id);
+                else
+                {
+                    if (opener.joinable()) opener.join();
+                    opener = std::thread([&output, folder, id]
+                    {
+                        if (OpenFolder(folder)) output.Send("{\"type\":\"opened\"}", id);
+                        else output.Send(ErrorJson("open_failed", "Impossible d'ouvrir le dossier."), id);
+                    });
+                }
+                return !output.Failed();
+            }
             if (type != "doctor" && type != "probe" && type != "download")
             {
                 output.Send(ErrorJson("invalid_message", "Type de message inconnu : " + type), id);
@@ -577,6 +629,7 @@ namespace media_downloader
 
         if (busy) cancel = true;
         if (worker.joinable()) worker.join();
+        if (opener.joinable()) opener.join();
         finished = true;
         watcher.join();
         return 0;

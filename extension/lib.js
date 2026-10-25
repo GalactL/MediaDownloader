@@ -19,16 +19,19 @@
     return "";
   }
 
-  // "" -> null; positive number -> number; invalid -> NaN.
+  const MAX_SIZE_MB = 20; // Discord
+
+  // "" -> null (no limit asked); number in ]0, 20] -> number; invalid -> NaN.
   function parseMaxSize(text) {
     const value = String(text ?? "").trim().replace(",", ".");
     if (value === "") return null;
     const number = /^\d+(?:\.\d+)?$/.test(value) ? Number(value) : NaN;
-    return number > 0 ? number : NaN;
+    return number > 0 && number <= MAX_SIZE_MB ? number : NaN;
   }
 
-  function buildDownloadRequest({ url, quality, maxSizeMb, start, end }) {
+  function buildDownloadRequest({ url, quality, maxSizeMb, start, end, name }) {
     const request = { type: "download", url };
+    if (name && name.trim()) request.title = name.trim(); // empty -> the engine keeps the video title
     if (quality && quality !== "best") request.quality = String(quality);
     if (maxSizeMb !== null && maxSizeMb !== undefined) request.maxSizeMb = maxSizeMb;
     if (start !== null && start !== undefined) {
@@ -41,8 +44,29 @@
   function qualityOptions(heights) {
     const list = Array.isArray(heights) ? heights.filter((h) => Number.isInteger(h) && h > 0) : [];
     const unique = [...new Set(list)].sort((a, b) => b - a);
+    // 2K and 4K are always offered; the engine falls back to the best available height.
+    const all = [...new Set([...unique, 2160, 1440])].sort((a, b) => b - a);
+    const labels = { 2160: "4K (2160p)", 1440: "2K (1440p)" };
     return [{ value: "best", label: "Meilleure qualité" }].concat(
-      unique.map((h) => ({ value: String(h), label: h + "p" })));
+      all.map((h) => ({ value: String(h), label: labels[h] || h + "p" })));
+  }
+
+  // Host error code -> French text. Engine codes relay raw yt-dlp output, so they are always mapped.
+  const ERRORS = {
+    busy: "Un téléchargement est déjà en cours.",
+    cancelled: "Téléchargement annulé.",
+    invalid_arguments: "Paramètres invalides.",
+    host_disconnected: "L'hôte MediaDownloader est introuvable. Lancez « MediaDownloader.Cli install-host ».",
+    invalid_message: "L'hôte MediaDownloader installé est trop ancien : mettez à jour MediaDownloader.Cli puis relancez « install-host ».",
+    no_folder: "Aucun dossier à ouvrir.",
+    open_failed: "Impossible d'ouvrir le dossier.",
+    processing_failed: "Le téléchargement a échoué.",
+    download_failed: "Le téléchargement a échoué.",
+    probe_failed: "Impossible d'analyser cette vidéo.",
+    tool_missing: "Un outil requis (yt-dlp ou FFmpeg) est introuvable.",
+  };
+  function errorText(code, fallback) {
+    return ERRORS[code] || fallback || "Une erreur est survenue.";
   }
 
   // YouTube pages that are not videos (home, search...) get no button. Other hosts: always.
@@ -71,7 +95,7 @@
     return label + passText + " : " + Math.round(Number(percent) || 0) + " %";
   }
 
-  const api = { parseTime, validateRange, parseMaxSize, buildDownloadRequest, qualityOptions, isVideoPage, canonicalUrl, progressText };
+  const api = { parseTime, validateRange, parseMaxSize, buildDownloadRequest, qualityOptions, errorText, MAX_SIZE_MB, isVideoPage, canonicalUrl, progressText };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.MDLib = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);
