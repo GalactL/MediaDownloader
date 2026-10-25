@@ -168,6 +168,69 @@ int main()
     std::error_code cleanupError;
     std::filesystem::remove_all(testRoot, cleanupError);
 
+    // --low-resources: optional flag, off by default.
+    {
+        auto plain = ParseArguments({ L"download", L"--url", L"https://example.test/v" });
+        auto low = ParseArguments({ L"download", L"--url", L"https://example.test/v", L"--low-resources" });
+        Check(plain.options && !plain.options->lowResources, "--low-resources est désactivé par défaut");
+        Check(low.options && low.options->lowResources, "--low-resources est reconnu");
+    }
+
+    // FFmpeg arguments: unchanged without low resources; "-threads 2" only with it.
+    {
+        std::filesystem::path source{ "/t/in.mp4" }, destination{ "/t/out.mp4" }, passLog{ "/t/pass" };
+        auto pass1 = BuildEncodeArguments(source, destination, passLog, 800, 96, L"best", 1, false);
+        std::vector<std::wstring> expected1{ L"-y", L"-i", L"/t/in.mp4", L"-map", L"0:v:0", L"-c:v", L"libx264", L"-preset", L"medium",
+            L"-b:v", L"800k", L"-pass", L"1", L"-passlogfile", L"/t/pass", L"-progress", L"pipe:1", L"-nostats", L"-an", L"-f", L"null",
+#ifdef _WIN32
+            L"NUL"
+#else
+            L"/dev/null"
+#endif
+        };
+        Check(pass1 == expected1, "arguments FFmpeg passe 1 inchangés sans économie de ressources");
+        auto pass2 = BuildEncodeArguments(source, destination, passLog, 800, 96, L"720", 2, false);
+        std::vector<std::wstring> expected2{ L"-y", L"-i", L"/t/in.mp4", L"-map", L"0:v:0", L"-vf", L"scale=-2:min(ih\\,720)", L"-c:v", L"libx264",
+            L"-preset", L"medium", L"-b:v", L"800k", L"-pass", L"2", L"-passlogfile", L"/t/pass", L"-progress", L"pipe:1", L"-nostats",
+            L"-map", L"0:a:0?", L"-c:a", L"aac", L"-b:a", L"96k", L"-movflags", L"+faststart", L"/t/out.mp4" };
+        Check(pass2 == expected2, "arguments FFmpeg passe 2 (hauteur 720) inchangés sans économie de ressources");
+        auto lowPass1 = BuildEncodeArguments(source, destination, passLog, 800, 96, L"best", 1, true);
+        std::vector<std::wstring> withThreads = pass1;
+        withThreads.insert(withThreads.begin() + 15, { L"-threads", L"2" });
+        Check(lowPass1 == withThreads, "économie de ressources : seul -threads 2 est ajouté");
+    }
+
+    // yt-dlp progress lines produced by the engine's --progress-template (frozen contract).
+    {
+        auto line = ParseDownloadProgressLine("__MD_PROGRESS__:downloading|1024|2048|NA|NA|NA|137");
+        Check(line && line->status == "downloading" && line->downloadedBytes == 1024.0 && line->totalBytes == 2048.0
+            && !line->fragmentIndex && !line->fragmentCount && line->formatId == "137", "ligne de progression yt-dlp analysée");
+        auto estimate = ParseDownloadProgressLine("__MD_PROGRESS__:downloading|10.5|NA|400|NA|NA|NA");
+        Check(estimate && estimate->totalBytes == 400.0 && estimate->formatId.empty(), "taille estimée utilisée à défaut de la taille exacte");
+        auto fragments = ParseDownloadProgressLine("__MD_PROGRESS__:downloading|10|NA|NA|3|12|251");
+        Check(fragments && fragments->fragmentIndex == 3.0 && fragments->fragmentCount == 12.0 && !fragments->totalBytes, "fragments analysés");
+        Check(!ParseDownloadProgressLine("[download]  42.0% of 1.00MiB"), "ligne yt-dlp classique ignorée");
+        Check(!ParseDownloadProgressLine("__MD_PROGRESS__:downloading|1|2"), "ligne tronquée refusée");
+        Check(!ParseDownloadProgressLine("__MD_PROGRESS__:|1|2|3|4|5|6"), "statut vide refusé");
+        auto garbage = ParseDownloadProgressLine("__MD_PROGRESS__:downloading|abc|-5|NA|x|NA|18");
+        Check(garbage && !garbage->downloadedBytes && !garbage->totalBytes && !garbage->fragmentIndex, "champs invalides ignorés");
+
+        Check(ParsePostprocessorStart("__MD_POST__:started|Merger") == std::optional<std::string>("Merger"), "post-traitement démarré");
+        Check(!ParsePostprocessorStart("__MD_POST__:finished|Merger"), "post-traitement terminé ignoré");
+        Check(!ParsePostprocessorStart("[Merger] Merging formats"), "ligne Merger classique ignorée");
+
+        // Video (0-85) then audio (85-100), monotonic, no percent without a size.
+        DownloadProgressSmoother smoother;
+        auto at = [&](char const* text) { return smoother.Update(*ParseDownloadProgressLine(text)); };
+        Check(at("__MD_PROGRESS__:downloading|0|1000|NA|NA|NA|137") == 0.0, "lissage : début de la vidéo à 0");
+        Check(at("__MD_PROGRESS__:downloading|500|1000|NA|NA|NA|137") == 42.5, "lissage : moitié de la vidéo");
+        Check(at("__MD_PROGRESS__:finished|1000|1000|NA|NA|NA|137") == 85.0, "lissage : vidéo terminée");
+        Check(at("__MD_PROGRESS__:downloading|0|100|NA|NA|NA|140") == 85.0, "lissage : le second flux ne fait pas reculer");
+        Check(at("__MD_PROGRESS__:downloading|50|100|NA|NA|NA|140") == 92.5, "lissage : moitié de l'audio");
+        Check(!at("__MD_PROGRESS__:downloading|50|NA|NA|NA|NA|140"), "lissage : pas de pourcentage sans taille");
+        Check(at("__MD_PROGRESS__:finished|100|100|NA|NA|NA|140") == 100.0, "lissage : audio terminé = 100");
+    }
+
     Check(IsNativeHostLaunch({ L"C:\\x\\media_downloader.json", L"mediadownloader@localhost" }), "lancement Firefox : manifeste + id");
     Check(IsNativeHostLaunch({ L"/home/u/.mozilla/native-messaging-hosts/media_downloader.json" }), "lancement Firefox : manifeste seul");
     Check(IsNativeHostLaunch({ L"mediadownloader@localhost" }), "lancement Firefox : id seul");

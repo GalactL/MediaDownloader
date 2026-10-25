@@ -99,6 +99,16 @@ int main()
         Check(got == 3 && std::string(buffer, 3) == "XYZ", "parent stdin data is not consumed by the child");
     }
 
+    {
+        // Low priority = nice 19, inherited by the child's own children; normal priority is left alone.
+        auto niceOf = [&](ProcessPriority priority)
+        {
+            return RunProcess("/bin/sh", { L"-c", L"ps -o ni= -p $$" }, {}, nullptr, never, priority).output;
+        };
+        Check(niceOf(ProcessPriority::Low).find("19") != std::string::npos, "Low priority runs at nice 19");
+        Check(niceOf(ProcessPriority::Normal).find("19") == std::string::npos, "Normal priority keeps the parent's nice value");
+    }
+
     if (failures == 0) std::cout << "All process tests passed\n";
     return failures == 0 ? 0 : 1;
 }

@@ -81,6 +81,7 @@ namespace
             "  --cookies-from-browser NOM Utiliser auto, Firefox, Edge, Chrome…\n"
             "  --output DOSSIER           Dossier cible (Videos par defaut)\n"
             "  --overwrite                Remplacer un fichier homonyme\n"
+            "  --low-resources            FFmpeg en priorite basse, 2 threads\n"
             "  --yt-dlp CHEMIN            Chemin de yt-dlp.exe\n"
             "  --ffmpeg CHEMIN            Chemin de ffmpeg.exe\n"
             "  --ffprobe CHEMIN           Chemin de ffprobe.exe\n";

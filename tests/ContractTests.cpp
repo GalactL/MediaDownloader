@@ -224,8 +224,12 @@ namespace
         CheckAllJson(r, "download");
         auto file = (out / "Fake Title [abc].mp4").string();
         Check(r.lines.front() == "{\"type\":\"started\",\"outputDirectory\":\"" + out.string() + "\"}", "started is first: " + r.lines.front());
-        int p42 = IndexOf(r, "{\"type\":\"progress\",\"stage\":\"download\",\"percent\":42.0}");
-        Check(p42 > 0, "download progress 42.0 parsed from yt-dlp line (no pass field)");
+        int p42 = IndexOf(r, "{\"type\":\"progress\",\"stage\":\"download\",\"percent\":42.5}");
+        Check(p42 > 0, "download progress 42.5 (500/1000 of the first stream, 0-85 scale; no pass field)");
+        int phase = IndexOf(r, "{\"type\":\"progress\",\"stage\":\"inspection\"}");
+        int merge = IndexOf(r, "{\"type\":\"progress\",\"stage\":\"merge\"}");
+        Check(phase == 1 && phase < p42 && p42 < merge, "phase events: inspection right after started, merge after the download lines: " + r.out);
+        Check(!Has(r, "__MD_PROGRESS__") && !Has(r, "__MD_POST__") && !Has(r, "__MD_DL__"), "progress markers are not echoed");
         Check(Has(r, "{\"type\":\"progress\",\"stage\":\"download\",\"percent\":0.0}"), "download progress 0.0");
         Check(Has(r, "{\"type\":\"log\",\"level\":\"info\",\"message\":\"[info] abc: Downloading 1 format(s)\"}"), "other yt-dlp lines become info logs");
         Check(!Has(r, "[download] Destination:"), "Destination line is swallowed");
@@ -244,6 +248,35 @@ namespace
         r = Run({ "download", "--url", "https://example.com/v", "--output", out.string(), "--title", "My: Clip?" });
         Check(r.code == 0 && Has(r, "/My") && Has(r, ".mp4\",\"bytes\""), "--title renames output: " + r.lines.back());
         Check(NoTempDirs(out), "temp dir removed after all runs");
+    }
+
+    // The yt-dlp command line must keep progress alive under --print (which implies --quiet).
+    void TestProgressArguments()
+    {
+        auto out = NewDir("out");
+        auto r = Run({ "download", "--url", "https://example.com/v", "--output", out.string() });
+        Check(r.code == 0 && Has(r, "\"stage\":\"download\""), "download ok");
+        Check(r.argv.find(" --progress ") != std::string::npos, "yt-dlp gets --progress: " + r.argv);
+        Check(r.argv.find("--progress-template download:__MD_PROGRESS__:") != std::string::npos, "yt-dlp gets the download progress template");
+        Check(r.argv.find("--progress-template postprocess:__MD_POST__:") != std::string::npos, "yt-dlp gets the postprocess progress template");
+    }
+
+    void TestLowResources()
+    {
+        auto run = [](std::vector<std::string> extra)
+        {
+            auto out = NewDir("out");
+            std::vector<std::string> args{ "download", "--url", "https://example.com/v", "--output", out.string(), "--max-size-mb", "10" };
+            args.insert(args.end(), extra.begin(), extra.end());
+            return Run(args, { "FAKE_DURATION=10", "FAKE_ENCODED_BYTES=4096", "FAKE_SOURCE_BYTES=100000" });
+        };
+        auto normal = run({});
+        auto low = run({ "--low-resources" });
+        Check(normal.code == 0 && low.code == 0, "encode with and without --low-resources exits 0");
+        Check(normal.argv.find("-threads") == std::string::npos, "default encode has no -threads: " + normal.argv);
+        Check(low.argv.find("-passlogfile") != std::string::npos && low.argv.find(" -threads 2 ") != std::string::npos, "--low-resources adds -threads 2: " + low.argv);
+        Check(normal.out.find("\"stage\":\"encode\",\"percent\":0.0,\"pass\":1") != std::string::npos, "pass 1 is announced at 0 %");
+        Check(normal.out.find("\"stage\":\"encode\",\"percent\":50.0,\"pass\":2") != std::string::npos, "pass 2 is announced at 50 %");
     }
 
     void TestInstallHost()
@@ -498,6 +531,8 @@ int main()
     TestDoctor();
     TestProbe();
     TestDownloadPlain();
+    TestProgressArguments();
+    TestLowResources();
     TestInstallHost();
     TestDefaultOutput();
     TestOutputFallback();

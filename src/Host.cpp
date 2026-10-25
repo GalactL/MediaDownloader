@@ -521,6 +521,11 @@ namespace media_downloader
                 if (overwrite->type != Json::Type::Bool) { error = "Le champ overwrite doit être un booléen."; return false; }
                 if (overwrite->boolean) args.push_back(L"--overwrite");
             }
+            if (auto const* low = request.Get("lowResources"); low && low->type != Json::Type::Null)
+            {
+                if (low->type != Json::Type::Bool) { error = "Le champ lowResources doit être un booléen."; return false; }
+                if (low->boolean) args.push_back(L"--low-resources");
+            }
             return true;
         }
     }
@@ -537,8 +542,8 @@ namespace media_downloader
             else if constexpr (std::is_same_v<T, ProgressEvent>)
             {
                 std::ostringstream json;
-                json << "{\"type\":\"progress\",\"stage\":\"" << e.stage << "\",\"percent\":"
-                     << std::fixed << std::setprecision(1) << e.percent;
+                json << "{\"type\":\"progress\",\"stage\":\"" << e.stage << '"';
+                if (e.percent) json << ",\"percent\":" << std::fixed << std::setprecision(1) << *e.percent;
                 if (e.pass > 0) json << ",\"pass\":" << e.pass;
                 json << '}';
                 return json.str();

@@ -122,11 +122,24 @@ label.check input:disabled { opacity: 1; cursor: default; }
 }
 .secondary:hover { background: var(--hover); border-color: var(--accent); }
 .secondary svg { width: 21px; height: 21px; }
+/* Indeterminate phase (no percentage available): the whole bar is a slowly moving stripe, never a frozen 0 %. */
+.primary .fill.indeterminate {
+  width: 100% !important; transition: none;
+  background: repeating-linear-gradient(115deg, var(--accent) 0 14px, var(--accent-hover) 14px 28px) 0 0 / 56px 100%;
+  animation: stripes 1s linear infinite;
+}
+@keyframes stripes { to { background-position: 56px 0; } }
+/* Reduced animations: the system asks for it, or the resource-saving option sets [data-calm] on the host. */
 @media (prefers-reduced-motion: reduce) {
   .card, .dialog[data-view] .card { transition: none; }
   label.check input, .primary .fill { transition: none; }
   .check-mark path { animation: none; stroke-dashoffset: 0; }
+  .primary .fill.indeterminate { animation: none; }
 }
+:host([data-calm]) .card, :host([data-calm]) .dialog[data-view] .card { transition: none; }
+:host([data-calm]) label.check input, :host([data-calm]) .primary .fill { transition: none; }
+:host([data-calm]) .check-mark path { animation: none; stroke-dashoffset: 0; }
+:host([data-calm]) .primary .fill.indeterminate { animation: none; }
 
 /* Header: title block on the left, actions on the right (main: gear | ×; settings: back arrow on the left, × on the right). */
 .head-left, .head-right { display: flex; gap: 14px; align-items: center; }
@@ -139,7 +152,8 @@ label.check input:disabled { opacity: 1; cursor: default; }
 .body > .actions { margin-top: auto; padding-top: 16px; }
 hr { margin: 0 0 18px; border: 0; border-top: 1px solid var(--border); }
 legend { padding: 0; margin-bottom: 12px; font-weight: 600; }
-.hint { display: block; margin-top: 8px; font-size: 13px; }
+.hint { display: block; margin-top: 8px; font-size: 13px; line-height: 1.45; }
+label.check + .hint { margin-top: -4px; }
 .choices { display: flex; gap: 40px; }
 .choices.stack { flex-direction: column; gap: 16px; }
 .choice { display: flex; align-items: center; gap: 12px; margin: 0; font-weight: 400; cursor: pointer; }

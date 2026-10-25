@@ -284,6 +284,11 @@ namespace
         Check(Last(messages).starts_with("{\"type\":\"completed\",\"id\":\"d1\",\"path\":\""), "download: completed last: " + Last(messages));
         Check(NoTempDirs(out), "download: no temp dir left");
 
+        // lowResources is an optional boolean that maps to --low-resources.
+        host.Send("{\"type\":\"download\",\"id\":\"d2\",\"url\":\"https://example.com/v\",\"maxSizeMb\":10,\"lowResources\":true,\"outputDirectory\":\"" + out.string() + "\"}");
+        auto lowMessages = host.RecvJob();
+        Check(Last(lowMessages).starts_with("{\"type\":\"completed\",\"id\":\"d2\""), "lowResources: download completes: " + Last(lowMessages));
+
         // The host stays alive for the next request, and doctor needs no id.
         host.Send(R"({"type":"doctor"})");
         auto doctor = host.RecvJob();
@@ -315,6 +320,7 @@ namespace
             { R"({"type":"download","id":"i4"})", "{\"type\":\"error\",\"id\":\"i4\",\"code\":\"invalid_arguments\"" },
             { R"({"type":"download","id":"i5","url":"https://example.com/v","maxSizeMb":"10"})", "{\"type\":\"error\",\"id\":\"i5\",\"code\":\"invalid_arguments\"" },
             { R"({"type":"probe","id":"i6","url":"https://example.com/v","cookiesFromBrowser":"netscape"})", "{\"type\":\"error\",\"id\":\"i6\",\"code\":\"invalid_arguments\"" },
+            { R"({"type":"download","id":"i9","url":"https://example.com/v","lowResources":"yes"})", "{\"type\":\"error\",\"id\":\"i9\",\"code\":\"invalid_arguments\"" },
             { R"({"type":"bogus","id":"i7"})", "{\"type\":\"error\",\"id\":\"i7\",\"code\":\"invalid_message\"" },
             { R"({"id":"i8"})", "{\"type\":\"error\",\"code\":\"invalid_message\"" },
             { R"({"type":"download",)", "{\"type\":\"error\",\"code\":\"invalid_message\"" },

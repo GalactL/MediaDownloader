@@ -43,10 +43,14 @@ Chaque requête peut contenir une chaîne `id`, recopiée dans toutes les répon
 |---|---|
 | `{"type":"doctor"}` | aucun |
 | `{"type":"probe"}` | `url`, `cookiesFromBrowser` facultatif |
-| `{"type":"download"}` | `url`, puis facultatifs : `quality`, `format`, `title`, `startTime`, `endTime`, `maxSizeMb`, `cookiesFromBrowser`, `outputDirectory`, `overwrite` |
+| `{"type":"download"}` | `url`, puis facultatifs : `quality`, `format`, `title`, `startTime`, `endTime`, `maxSizeMb`, `cookiesFromBrowser`, `outputDirectory`, `overwrite`, `lowResources` |
 | `{"type":"cancel"}` | aucun |
 | `{"type":"openFolder"}` | aucun : ouvre le dossier de sortie du dernier téléchargement dans le gestionnaire de fichiers |
 | `{"type":"pickFolder"}` | aucun : ouvre le sélecteur de dossier du système |
+
+`lowResources` (booléen facultatif, `false` par défaut) équivaut à `--low-resources` du CLI : FFmpeg en priorité basse
+avec 2 threads (voir [CLI_PROTOCOL.md](CLI_PROTOCOL.md)). Absent ou `false`, les arguments et les événements sont
+inchangés ; un autre type est refusé par `invalid_arguments`. L'hôte traite de toute façon un seul travail à la fois.
 
 La validation est celle du CLI : `startTime` et `endTime` vont ensemble,
 `endTime` > `startTime`, seules les URL `http(s)` sont acceptées. Sinon l'hôte
@@ -55,7 +59,10 @@ répond `invalid_arguments`.
 ## Réponses
 
 Ce sont les événements du CLI (`started`, `log`, `progress`, `encodingPlan`,
-`completed`, `error`, `doctor`) avec le champ `id` ajouté juste après `type`.
+`completed`, `error`, `doctor`) avec le champ `id` ajouté juste après `type`. `progress` porte `stage`
+(`inspection`, `download`, `merge`, `encode`) et, quand la phase a un pourcentage, `percent` ; `pass` s'y ajoute pour
+`encode` (détails dans [CLI_PROTOCOL.md](CLI_PROTOCOL.md)). Un `progress` sans `percent` signale seulement le début
+d'une phase.
 
 `openFolder` répond `{"type":"opened","id":"…"}`. Aucun chemin n'est accepté du client : seul le dernier dossier de sortie est ouvrable, sinon `no_folder`.
 
@@ -111,7 +118,8 @@ dépendance manquante) ; voir [CLI_PROTOCOL.md](CLI_PROTOCOL.md).
 ```text
 -> {"type":"download","id":"7","url":"https://example.com/v","quality":"1080","maxSizeMb":10}
 <- {"type":"started","id":"7","outputDirectory":"C:\\Users\\Moi\\Videos"}
-<- {"type":"progress","id":"7","stage":"download","percent":42.0}
+<- {"type":"progress","id":"7","stage":"inspection"}
+<- {"type":"progress","id":"7","stage":"download","percent":42.5}
 <- {"type":"completed","id":"7","path":"C:\\Users\\Moi\\Videos\\v.mp4","bytes":9853214}
 -> {"type":"download","id":"8","url":"https://example.com/w"}
 <- {"type":"error","id":"8","code":"busy","message":"Un traitement est déjà en cours."}

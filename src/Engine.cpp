@@ -20,7 +20,6 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
-#include <regex>
 
 namespace media_downloader
 {
@@ -36,6 +35,8 @@ namespace
         {
             sink.On(ProgressEvent{ stage, std::clamp(percent, 0.0, 100.0), pass });
         }
+        // Phase-only event: the stage is known, the percentage is not.
+        void Phase(std::string const& stage, int pass = 0) const { sink.On(ProgressEvent{ stage, std::nullopt, pass }); }
     };
 
 #ifdef _WIN32
@@ -172,15 +173,6 @@ namespace
         return value.substr(first, last - first + 1);
     }
 
-    std::optional<double> ParseDownloadPercent(std::string const& line)
-    {
-        static std::regex const pattern(R"(\[download\]\s+([0-9]+(?:\.[0-9]+)?)%)");
-        std::smatch match;
-        if (!std::regex_search(line, match, pattern)) return std::nullopt;
-        try { return std::stod(match[1].str()); }
-        catch (...) { return std::nullopt; }
-    }
-
     std::optional<std::filesystem::path> FindDownloadedFile(std::filesystem::path const& directory)
     {
         std::error_code error;
@@ -288,41 +280,14 @@ namespace
         std::filesystem::path const& destination,
         double duration,
         EncodePlan const& plan,
-        std::wstring const& quality)
+        std::wstring const& quality,
+        bool lowResources)
     {
         auto passLog = source.parent_path() / L"ffmpeg-pass";
-        auto videoRate = std::to_wstring(plan.videoKbps) + L"k";
-        auto audioRate = std::to_wstring(plan.audioKbps) + L"k";
-
         for (int pass = 1; pass <= 2; ++pass)
         {
-            std::vector<std::wstring> arguments{
-                L"-y", L"-i", source.wstring(), L"-map", L"0:v:0", L"-c:v", L"libx264",
-                L"-preset", L"medium", L"-b:v", videoRate, L"-pass", std::to_wstring(pass),
-                L"-passlogfile", passLog.wstring(), L"-progress", L"pipe:1", L"-nostats"
-            };
-            if (quality != L"best")
-            {
-                arguments.insert(arguments.begin() + 5, { L"-vf", L"scale=-2:min(ih\\," + quality + L")" });
-            }
-            if (pass == 1)
-            {
-                arguments.insert(arguments.end(), { L"-an", L"-f", L"null",
-#ifdef _WIN32
-                    L"NUL"
-#else
-                    L"/dev/null"
-#endif
-                });
-            }
-            else
-            {
-                arguments.insert(arguments.end(), {
-                    L"-map", L"0:a:0?", L"-c:a", L"aac", L"-b:a", audioRate,
-                    L"-movflags", L"+faststart", destination.wstring()
-                });
-            }
-
+            auto arguments = BuildEncodeArguments(source, destination, passLog, plan.videoKbps, plan.audioKbps, quality, pass, lowResources);
+            c.Progress("encode", (pass - 1) * 50.0, pass); // announces the pass before FFmpeg's first progress line
             auto result = RunProcess(ffmpeg, arguments, source.parent_path(), [&c, duration, pass](std::string const& line)
             {
                 if (!line.starts_with("out_time_us=")) return;
@@ -334,7 +299,7 @@ namespace
                     c.Progress("encode", overall, pass);
                 }
                 catch (...) {}
-            }, c.cancel);
+            }, c.cancel, lowResources ? ProcessPriority::Low : ProcessPriority::Normal);
             if (result.cancelled) throw std::runtime_error("Traitement annulé");
             if (result.exitCode != 0) throw std::runtime_error("FFmpeg a échoué pendant l'encodage passe " + std::to_string(pass));
         }
@@ -416,6 +381,7 @@ namespace
             c.Log("warning", "Impossible de nettoyer " + WideToUtf8(path.wstring()) + " : " + error);
         auto temporary = CreateTemporaryDirectory(c, output);
         c.sink.On(StartedEvent{ WideToUtf8(output.wstring()) });
+        c.Phase("inspection");
 
         std::filesystem::path reportedPath;
         std::vector<std::wstring> arguments{
@@ -424,6 +390,13 @@ namespace
             L"--ffmpeg-location", ffmpeg->parent_path().wstring(),
             L"--merge-output-format", options.format,
             L"--output", (temporary.path / L"%(title).180B [%(id)s].%(ext)s").wstring(),
+            // --print implies --quiet, which also silences the progress lines: --progress brings them back and the
+            // templates give them a stable, parseable shape (ParseDownloadProgressLine / ParsePostprocessorStart).
+            L"--progress",
+            L"--progress-template", L"download:__MD_PROGRESS__:%(progress.status)s|%(progress.downloaded_bytes)s|%(progress.total_bytes)s|"
+                L"%(progress.total_bytes_estimate)s|%(progress.fragment_index)s|%(progress.fragment_count)s|%(info.format_id)s",
+            L"--progress-template", L"postprocess:__MD_POST__:%(progress.status)s|%(progress.postprocessor)s",
+            L"--print", L"before_dl:__MD_DL__:%(id)s",
             L"--print", L"after_move:__MD_FILE__:%(filepath)s"
         };
         if (!AppendJavaScriptRuntimeArguments(arguments))
@@ -437,9 +410,27 @@ namespace
             });
         }
         arguments.push_back(options.url);
+        DownloadProgressSmoother smoother;
+        std::string stage = "inspection";
+        long lastTenth = -1;
+        auto enter = [&](char const* next) { if (stage != next) { stage = next; c.Phase(stage); } };
         auto download = RunProcess(*ytDlp, arguments, temporary.path, [&](std::string const& line)
         {
-            if (auto percent = ParseDownloadPercent(line)) c.Progress("download", *percent);
+            if (auto progress = ParseDownloadProgressLine(line))
+            {
+                if (auto percent = smoother.Update(*progress))
+                {
+                    stage = "download";
+                    // One event per 0.1 % at most: yt-dlp reports far more often than a UI can use.
+                    if (auto tenth = std::lround(*percent * 10.0); tenth != lastTenth) { lastTenth = tenth; c.Progress(stage, *percent); }
+                }
+                else enter("download");
+            }
+            else if (line.starts_with("__MD_DL__:")) enter("download"); // metadata done, the transfer starts
+            else if (line.starts_with("__MD_POST__:"))
+            {
+                if (auto name = ParsePostprocessorStart(line); name && *name == "Merger") enter("merge");
+            }
             else if (line.starts_with("__MD_FILE__:"))
             {
                 try { reportedPath = Utf8ToWide(line.substr(12)); } catch (...) {}
@@ -466,7 +457,7 @@ namespace
             }
             completedSource = temporary.path / (source->stem().wstring() + L".compressed.mp4");
             c.sink.On(EncodingPlanEvent{ duration, plan->videoKbps, plan->audioKbps });
-            EncodeToSize(c, *ffmpeg, *source, completedSource, duration, *plan, options.quality);
+            EncodeToSize(c, *ffmpeg, *source, completedSource, duration, *plan, options.quality, options.lowResources);
             if (!std::filesystem::is_regular_file(completedSource))
                 throw std::runtime_error("FFmpeg n'a pas produit le fichier attendu");
             auto maximumBytes = static_cast<std::uint64_t>(std::floor(*options.maxSizeMb * 1024.0 * 1024.0));

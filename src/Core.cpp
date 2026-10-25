@@ -130,6 +130,11 @@ namespace media_downloader
                 result.overwrite = true;
                 continue;
             }
+            if (name == L"--low-resources")
+            {
+                result.lowResources = true;
+                continue;
+            }
             if (index + 1 >= arguments.size()) return { std::nullopt, L"Valeur manquante après " + name };
             auto const& value = arguments[++index];
             if (name == L"--url") result.url = value;
@@ -318,6 +323,115 @@ namespace media_downloader
             audioKbps,
             static_cast<std::uint32_t>(std::floor(totalKbps - audioKbps))
         };
+    }
+
+    std::vector<std::wstring> BuildEncodeArguments(
+        std::filesystem::path const& source, std::filesystem::path const& destination, std::filesystem::path const& passLog,
+        std::uint32_t videoKbps, std::uint32_t audioKbps, std::wstring const& quality, int pass, bool lowResources)
+    {
+        std::vector<std::wstring> arguments{
+            L"-y", L"-i", source.wstring(), L"-map", L"0:v:0", L"-c:v", L"libx264",
+            L"-preset", L"medium", L"-b:v", std::to_wstring(videoKbps) + L"k", L"-pass", std::to_wstring(pass),
+            L"-passlogfile", passLog.wstring()
+        };
+        if (lowResources) arguments.insert(arguments.end(), { L"-threads", L"2" });
+        arguments.insert(arguments.end(), { L"-progress", L"pipe:1", L"-nostats" });
+        if (quality != L"best")
+            arguments.insert(arguments.begin() + 5, { L"-vf", L"scale=-2:min(ih\\," + quality + L")" });
+        if (pass == 1)
+        {
+            arguments.insert(arguments.end(), { L"-an", L"-f", L"null",
+#ifdef _WIN32
+                L"NUL"
+#else
+                L"/dev/null"
+#endif
+            });
+        }
+        else
+        {
+            arguments.insert(arguments.end(), {
+                L"-map", L"0:a:0?", L"-c:a", L"aac", L"-b:a", std::to_wstring(audioKbps) + L"k",
+                L"-movflags", L"+faststart", destination.wstring()
+            });
+        }
+        return arguments;
+    }
+
+    namespace
+    {
+        constexpr std::string_view ProgressPrefix = "__MD_PROGRESS__:";
+        constexpr std::string_view PostprocessPrefix = "__MD_POST__:";
+
+        std::vector<std::string_view> SplitPipe(std::string_view text)
+        {
+            std::vector<std::string_view> fields;
+            for (size_t start = 0;;)
+            {
+                auto bar = text.find('|', start);
+                fields.push_back(text.substr(start, bar == std::string_view::npos ? bar : bar - start));
+                if (bar == std::string_view::npos) return fields;
+                start = bar + 1;
+            }
+        }
+
+        // "NA" (yt-dlp's marker for a missing field), empty or non-numeric -> nullopt.
+        std::optional<double> ParseField(std::string_view text)
+        {
+            if (text.empty() || text == "NA") return std::nullopt;
+            try
+            {
+                std::string copy(text);
+                size_t consumed{};
+                double value = std::stod(copy, &consumed);
+                if (consumed != copy.size() || !std::isfinite(value) || value < 0.0) return std::nullopt;
+                return value;
+            }
+            catch (...) { return std::nullopt; }
+        }
+    }
+
+    std::optional<DownloadProgressLine> ParseDownloadProgressLine(std::string_view line)
+    {
+        if (!line.starts_with(ProgressPrefix)) return std::nullopt;
+        // status|downloaded_bytes|total_bytes|total_bytes_estimate|fragment_index|fragment_count|format_id
+        auto fields = SplitPipe(line.substr(ProgressPrefix.size()));
+        if (fields.size() != 7 || fields[0].empty()) return std::nullopt;
+        DownloadProgressLine result;
+        result.status = std::string(fields[0]);
+        result.downloadedBytes = ParseField(fields[1]);
+        result.totalBytes = ParseField(fields[2]);
+        if (!result.totalBytes) result.totalBytes = ParseField(fields[3]);
+        result.fragmentIndex = ParseField(fields[4]);
+        result.fragmentCount = ParseField(fields[5]);
+        if (fields[6] != "NA") result.formatId = std::string(fields[6]);
+        return result;
+    }
+
+    std::optional<std::string> ParsePostprocessorStart(std::string_view line)
+    {
+        if (!line.starts_with(PostprocessPrefix)) return std::nullopt;
+        auto fields = SplitPipe(line.substr(PostprocessPrefix.size()));
+        if (fields.size() != 2 || fields[0] != "started" || fields[1].empty()) return std::nullopt;
+        return std::string(fields[1]);
+    }
+
+    std::optional<double> DownloadProgressSmoother::Update(DownloadProgressLine const& line)
+    {
+        if (started_ && line.formatId != formatId_) ++stream_;
+        started_ = true;
+        formatId_ = line.formatId;
+
+        std::optional<double> fraction;
+        if (line.status == "finished") fraction = 1.0;
+        else if (line.downloadedBytes && line.totalBytes && *line.totalBytes > 0.0) fraction = *line.downloadedBytes / *line.totalBytes;
+        else if (line.fragmentIndex && line.fragmentCount && *line.fragmentCount > 0.0) fraction = *line.fragmentIndex / *line.fragmentCount;
+        if (!fraction) return std::nullopt;
+
+        auto within = std::clamp(*fraction, 0.0, 1.0);
+        auto percent = stream_ == 0 ? within * 85.0 : 85.0 + within * 15.0;
+        last_ = std::max(last_, percent);
+        return last_;
     }
 
     std::string JsonEscape(std::string_view value)

@@ -14,7 +14,8 @@ namespace media_downloader
     // All strings are UTF-8. Events mirror the CLI protocol (docs/CLI_PROTOCOL.md).
     struct StartedEvent { std::string outputDirectory; };
     struct LogEvent { std::string level; std::string message; };
-    struct ProgressEvent { std::string stage; double percent{}; int pass{}; }; // pass 0 = absent
+    // pass 0 = absent; no percent = phase-only event (indeterminate). stage: inspection | download | merge | encode.
+    struct ProgressEvent { std::string stage; std::optional<double> percent; int pass{}; };
     struct EncodingPlanEvent { double durationSeconds{}; std::uint32_t videoKbps{}; std::uint32_t audioKbps{}; };
     struct CompletedEvent { std::string path; std::uint64_t bytes{}; };
     struct ErrorEvent { std::string code; std::string message; };

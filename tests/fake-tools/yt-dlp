@@ -27,11 +27,15 @@ if [ -n "$probe" ]; then
 fi
 dir=${out%/*}
 file="$dir/Fake Title [abc].mp4"
+# Same shapes as the --progress-template / --print templates passed by the engine (one stream, so 0-85 % overall).
 echo "[info] abc: Downloading 1 format(s)"
 echo "[download] Destination: $file"
-echo "[download]   0.0% of 1.00MiB at 1.00MiB/s ETA 00:01"
-echo "[download]  42.0% of 1.00MiB at 1.00MiB/s ETA 00:01"
-echo "[download] 100.0% of 1.00MiB at 1.00MiB/s ETA 00:00"
+echo "__MD_DL__:abc"
+echo "__MD_PROGRESS__:downloading|0|1000|NA|NA|NA|18"
+echo "__MD_PROGRESS__:downloading|500|1000|NA|NA|NA|18"
+echo "__MD_PROGRESS__:finished|1000|1000|NA|NA|NA|18"
+echo "__MD_POST__:started|Merger"
+echo "__MD_POST__:finished|Merger"
 head -c "${FAKE_SOURCE_BYTES:-2048}" /dev/zero > "$file"
 echo "__MD_FILE__:$file"
 exit 0
