@@ -110,6 +110,13 @@ test("placement: below, above, off-screen and tiny viewport", () => {
   assert.ok(tight.maxH >= 240 && tight.top >= 8 && tight.left >= 16);
 });
 
+test("isDark reads the dark attribute on <html>", () => {
+  const doc = (dark) => ({ documentElement: { hasAttribute: (name) => dark && name === "dark" } });
+  assert.equal(adapter.isDark(doc(true)), true);
+  assert.equal(adapter.isDark(doc(false)), false);
+  assert.equal(adapter.isDark({}), false);
+});
+
 test("findAnchor skips hidden duplicates and returns null when none is rendered", () => {
   const root = new Node("body");
   const hidden = root.append(new Node("segmented-like-dislike-button-view-model"));

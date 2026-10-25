@@ -25,14 +25,17 @@
     ]),
     // Where to watch for the action bar being recreated (narrow layout, navigation).
     observeTarget: (doc) => first(doc, ["ytd-watch-flexy", "ytd-page-manager"]) || doc.body,
-    // Follows YouTube's own light/dark theme through its CSS variables (they inherit into the shadow root).
+    // YouTube's own dark mode is the `dark` attribute on <html>; content.js mirrors it on the host as [data-dark] (fallback colours only).
+    isDark: (doc) => !!(doc.documentElement && doc.documentElement.hasAttribute("dark")),
+    // Icon-only pill like YouTube's own. Colours use YouTube's variables with explicit theme fallbacks (some vars are undefined on the live site).
     css: `
-:host { display: inline-flex !important; visibility: visible !important; opacity: 1 !important; flex: none; align-self: center;
-  align-items: center; margin-right: 8px; position: relative; z-index: 1; }
-button { display: inline-flex; min-width: 36px; align-items: center; gap: 6px; height: 36px; padding: 0 16px; border: 0; border-radius: 18px;
-  background: var(--yt-spec-badge-chip-background, #f2f2f2); color: var(--yt-spec-text-primary, #0f0f0f);
-  font: 500 14px/36px "Roboto", "Arial", sans-serif; white-space: nowrap; cursor: pointer; }
-button:hover { background: var(--yt-spec-10-percent-layer, rgba(0, 0, 0, .1)); }
+:host { --md-bg: #f2f2f2; --md-bg-hover: #e5e5e5; --md-fg: #0f0f0f;
+  display: inline-flex !important; visibility: visible !important; opacity: 1 !important; flex: none; align-self: center;
+  align-items: center; margin: 0 8px 0 0 !important; position: relative; z-index: 1; }
+:host([data-dark]) { --md-bg: #272727; --md-bg-hover: #3f3f3f; --md-fg: #fff; }
+button { display: inline-flex; align-items: center; justify-content: center; width: 36px; min-width: 36px; height: 36px; padding: 0; border: 0; border-radius: 18px;
+  background: var(--yt-spec-button-chip-background, var(--md-bg)); color: var(--yt-spec-text-primary, var(--md-fg)); cursor: pointer; }
+button:hover { background: var(--yt-spec-button-chip-background-hover, var(--md-bg-hover)); }
 button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 svg { fill: none; stroke: currentColor; width: 20px; height: 20px; flex: none; }`,
   };

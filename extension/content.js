@@ -470,7 +470,13 @@
     if (panel.hidden) setView("main");
     if (!panel.hidden && !running && probedUrl !== location.href) probe();
   }
-  window.addEventListener("resize", placePanel);
+  // Resize only re-clamps the current spot; it never jumps to the corner.
+  window.addEventListener("resize", () => {
+    if (panel.hidden || !panel.style.left) return;
+    const width = Math.min(400, innerWidth - 32);
+    panel.style.left = Math.max(16, Math.min(parseFloat(panel.style.left), innerWidth - width - 16)) + "px";
+    panel.style.top = Math.max(8, Math.min(parseFloat(panel.style.top), innerHeight - 100)) + "px";
+  });
   const closeBox = () => { panel.hidden = true; setView("main"); };
   gear.addEventListener("click", () => setView("settings"));
   back.addEventListener("click", () => setView("main"));
@@ -521,8 +527,8 @@
   // Page button (site adapter in sites.js): its own closed shadow root, styled by the adapter from the page's CSS variables.
   const adapter = sites.adapterFor(location.hostname);
   const buttonHost = document.createElement("div");
-  const pageButton = el("button", { type: "button" }, [icon("M12 4v11", "M7.5 11L12 15.5 16.5 11", "M5 20h14"), el("span")]);
-  text(pageButton.lastChild, "button.download");
+  const pageButton = el("button", { type: "button" }, [icon(...ICON.download)]);
+  bind(() => { pageButton.title = t("button.download"); pageButton.setAttribute("aria-label", t("button.download")); });
   buttonHost.attachShadow({ mode: "closed" }).append(el("style", { textContent: adapter ? adapter.css : "" }), pageButton);
   pageButton.addEventListener("click", toggle);
   let watcher = null;
@@ -536,6 +542,7 @@
       if (!want && watcher) { watcher.disconnect(); watched = null; }
     }
     if (want) {
+      buttonHost.toggleAttribute("data-dark", adapter.isDark(document));
       const target = adapter.observeTarget(document);
       if (target && target !== watched) {
         watcher = watcher || new MutationObserver(() => { clearTimeout(timer); timer = setTimeout(syncButton, 300); });
@@ -544,9 +551,9 @@
         watched = target;
       }
     }
-    placePanel();
   }
-  // The box hangs under the page button, right-aligned and clamped to the viewport; without a button it keeps its fixed corner.
+  // Positioned once when opened: under (or above) the page button, right-aligned and clamped; corner if the button is not visible then.
+  // It then stays put (no scroll tracking).
   function placePanel() {
     for (const name of ["top", "left", "right", "bottom"]) panel.style[name] = "";
     panel.style.removeProperty("--max-h");
@@ -558,8 +565,6 @@
     panel.style.top = place.top + "px";
     panel.style.setProperty("--max-h", place.maxH + "px");
   }
-  // Open box follows the button while the page scrolls or resizes.
-  window.addEventListener("scroll", placePanel, { passive: true });
   for (const type of ["keydown", "keyup", "keypress"]) buttonHost.addEventListener(type, (event) => event.stopPropagation());
 
   // SPA navigation: YouTube changes the URL without reloading.

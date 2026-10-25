@@ -1,6 +1,6 @@
 # Extension Firefox MediaDownloader
 
-Menu dans la page (bouton « Télécharger » avant le groupe « J'aime / Je n'aime pas », ou icône de la barre d'outils) pour télécharger la vidéo de l'onglet
+Menu dans la page (bouton icône « Télécharger » avant le groupe « J'aime / Je n'aime pas », ou icône de la barre d'outils) pour télécharger la vidéo de l'onglet
 via l'hôte de messagerie native `media_downloader` (voir `docs/NATIVE_HOST_PROTOCOL.md`).
 JavaScript pur, sans étape de build. Pour l'instant uniquement YouTube.
 
@@ -30,7 +30,7 @@ stockés avec `storage.local` et appliqués immédiatement sans recharger :
 - **Optimiser l'application (économie de ressources)** : désactivée par défaut. Activée, le moteur lance FFmpeg en
   priorité basse avec 2 threads (champ `lowResources` de la requête `download`), les animations sont supprimées (comme
   `prefers-reduced-motion`, qui est aussi respecté sans le réglage) et le sondage de navigation de la page est arrêté.
-- **Affichage du bouton** : « Sur la page » (bouton « Télécharger » inséré juste avant le groupe J'aime / Je n'aime pas
+- **Affichage du bouton** : « Sur la page » (bouton à icône seule « Télécharger » inséré juste avant le groupe J'aime / Je n'aime pas
   de la page vidéo ; la boîte s'ouvre sous lui) ou « Icône de la barre uniquement ». Le bouton reprend le thème clair ou
   sombre de YouTube (variables CSS `--yt-spec-*`), pas le réglage de l'extension, qui ne concerne que la boîte. Il est
   réinséré après chaque navigation ou reconstruction de la barre d'actions ; si YouTube change sa structure et que
@@ -57,7 +57,7 @@ Release : voir l'étape 3 de l'installation dans le `README.md` racine (glisser
    pour l'identifiant `mediadownloader@localhost`).
 2. Dans Firefox, ouvrir `about:debugging#/runtime/this-firefox`.
 3. « Charger un module complémentaire temporaire… » puis choisir `extension/manifest.json`.
-4. Ouvrir une vidéo YouTube et cliquer sur le bouton « Télécharger » avant le groupe « J'aime / Je n'aime pas ».
+4. Ouvrir une vidéo YouTube et cliquer sur le bouton à icône « Télécharger » avant le groupe « J'aime / Je n'aime pas ».
 
 Le chargement temporaire disparaît au redémarrage de Firefox.
 
