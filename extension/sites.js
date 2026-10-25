@@ -11,35 +11,45 @@
     return null;
   };
 
+  const YT_ANCHORS = [
+    "#top-level-buttons-computed segmented-like-dislike-button-view-model",
+    "#actions segmented-like-dislike-button-view-model",
+    "ytd-watch-metadata segmented-like-dislike-button-view-model",
+    "#top-level-buttons-computed ytd-segmented-like-dislike-button-renderer",
+    "#actions ytd-segmented-like-dislike-button-renderer",
+    "segmented-like-dislike-button-view-model",
+    "ytd-segmented-like-dislike-button-renderer",
+    "#top-level-buttons-computed > :first-child", // last resort: the like group leads the row
+  ];
+  // Native pill hosts to clone, then bare buttons.
+  const YT_TEMPLATES = ["#top-level-buttons-computed yt-button-view-model", "#actions yt-button-view-model", "yt-button-view-model", "button-view-model", "ytd-button-renderer", "button.yt-spec-button-shape-next"];
+  const ICON_BOX = ".yt-spec-button-shape-next__icon";
+
   const youtube = {
     id: "youtube",
     matches: (hostname) => /^(?:[a-z0-9-]+\.)*youtube\.com$/i.test(hostname) || hostname.toLowerCase() === "youtu.be",
     // Like/dislike group (the button goes before it so the native buttons do not move), most specific first (YouTube renames these often; unverified on the live site).
-    findAnchor: (doc) => first(doc, [
-      "#top-level-buttons-computed segmented-like-dislike-button-view-model",
-      "#actions segmented-like-dislike-button-view-model",
-      "ytd-watch-metadata segmented-like-dislike-button-view-model",
-      "#top-level-buttons-computed ytd-segmented-like-dislike-button-renderer",
-      "#actions ytd-segmented-like-dislike-button-renderer",
-      "segmented-like-dislike-button-view-model",
-    ]),
+    findAnchor: (doc) => first(doc, YT_ANCHORS),
+    // What matched, for the one-time console.debug when mounting fails (the owner can paste it).
+    diagnose: (doc) => [...YT_ANCHORS, ...YT_TEMPLATES].map((selector) => { try { return selector + "=" + doc.querySelectorAll(selector).length; } catch { return selector + "=err"; } }).join(" | "),
     // Where to watch for the action bar being recreated (narrow layout, navigation).
     observeTarget: (doc) => first(doc, ["ytd-watch-flexy", "ytd-page-manager"]) || doc.body,
     // Clone of a native action button (Share...) so YouTube's own CSS gives the pill, hover, theme and spacing; icon only. null = no template found.
     createButton(doc, svg, onClick) {
       const skip = ["segmented-like-dislike-button-view-model", "ytd-segmented-like-dislike-button-renderer"];
       const inside = (node) => { for (let up = node; up; up = up.parentElement) if (up.hasAttribute && (up.hasAttribute("data-md-button") || skip.includes(up.localName))) return true; return false; };
-      const template = ["#top-level-buttons-computed yt-button-view-model", "#actions yt-button-view-model", "yt-button-view-model", "button-view-model"]
-        .map((selector) => [...doc.querySelectorAll(selector)].find((node) => rendered(node) && !inside(node))).find(Boolean);
+      const hasIcon = (node) => node.querySelector(ICON_BOX) || node.querySelector("svg");
+      const template = YT_TEMPLATES
+        .map((selector) => [...doc.querySelectorAll(selector)].find((node) => rendered(node) && !inside(node) && hasIcon(node))).find(Boolean);
       if (!template) return null;
       const clone = template.cloneNode(true);
       for (const node of [clone, ...clone.querySelectorAll("*")]) {
         for (const { name } of [...node.attributes]) if (name === "id" || name === "href" || name.startsWith("aria-")) node.removeAttribute(name);
       }
       const button = clone.localName === "button" ? clone : clone.querySelector("button");
-      const icon = clone.querySelector(".yt-spec-button-shape-next__icon");
+      const icon = clone.querySelector(ICON_BOX) || (clone.querySelector("svg") || {}).parentElement;
       if (!button || !icon) return null;
-      const label = clone.querySelector(".yt-spec-button-shape-next__button-text-content");
+      const label = clone.querySelector(".yt-spec-button-shape-next__button-text-content") || clone.querySelector('[class*="button-text-content"]');
       if (label) label.remove();
       button.className = button.className.replace("yt-spec-button-shape-next--icon-leading", "yt-spec-button-shape-next--icon-button");
       svg.setAttribute("width", "24");
@@ -61,6 +71,11 @@
   const adapterFor = (hostname) => ADAPTERS.find((adapter) => adapter.matches(hostname)) || null;
 
   let warned = false; // one diagnostic line per page load
+  function report(what, adapter, doc) {
+    if (warned) return;
+    warned = true;
+    console.debug("[MediaDownloader] bouton: " + what + (adapter.diagnose ? " (" + adapter.diagnose(doc) + ")" : ""));
+  }
   const MARK = "[data-md-button]";
 
   // Keeps exactly one button, directly before the anchor. `create()` returns the element (the same one every time is fine) or null (no template).
@@ -68,12 +83,12 @@
   function mountButton(adapter, doc, create) {
     const anchor = adapter.findAnchor(doc);
     const existing = [...doc.querySelectorAll(MARK)];
-    if (!anchor) { if (!warned) { warned = true; console.debug("[MediaDownloader] bouton: ancre introuvable"); } existing.forEach((node) => node.remove()); return null; }
+    if (!anchor) { report("ancre introuvable", adapter, doc); existing.forEach((node) => node.remove()); return null; }
     const kept = existing.find((node) => anchor.previousElementSibling === node);
     existing.forEach((node) => { if (node !== kept) node.remove(); });
     if (kept) return kept;
     const host = create();
-    if (!host) { if (!warned) { warned = true; console.debug("[MediaDownloader] bouton: bouton natif modèle introuvable"); } return null; }
+    if (!host) { report("bouton natif modèle introuvable", adapter, doc); return null; }
     host.setAttribute("data-md-button", "");
     anchor.before(host);
     return host;

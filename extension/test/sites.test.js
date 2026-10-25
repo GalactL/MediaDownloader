@@ -161,3 +161,9 @@ test("findAnchor skips hidden duplicates and returns null when none is rendered"
   shown.getClientRects = () => [];
   assert.equal(adapter.findAnchor(fakeDocument(root)), null);
 });
+
+test("diagnose lists every selector with its match count", () => {
+  const out = adapter.diagnose(youtubePage().doc);
+  assert.match(out, /segmented-like-dislike-button-view-model=1/);
+  assert.match(out, /yt-button-view-model=1/);
+});
