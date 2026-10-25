@@ -34,9 +34,11 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .card {
   grid-area: 1 / 1; display: flex; flex-direction: column; max-height: calc(100vh - 90px); overflow: hidden auto;
   padding: 24px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg); color: var(--fg); font-size: 14px;
-  visibility: hidden; transition: transform .3s ease, visibility 0s .3s; /* leaving: hidden once the slide ends */
+  visibility: hidden; transition: transform .3s ease, visibility 0s .3s, max-height 0s .3s; /* leaving: hidden once the slide ends */
 }
-.dialog[data-view="main"] .main, .dialog[data-view="settings"] .settings { visibility: visible; transition: transform .3s ease, visibility 0s; }
+.dialog[data-view="main"] .main, .dialog[data-view="settings"] .settings { visibility: visible; transition: transform .3s ease, visibility 0s, max-height 0s; }
+/* The off-screen settings card must not stretch the shared grid row (blank area under the main card's buttons). */
+.dialog[data-view="main"] .settings { max-height: 0; }
 .dialog[data-view="main"] .settings { transform: translateX(100%); }
 .dialog[data-view="settings"] .main { transform: translateX(-100%); }
 header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 22px; }
