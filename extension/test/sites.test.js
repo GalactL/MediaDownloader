@@ -293,3 +293,52 @@ test("isDark reads the page background where the site has no theme attribute", (
     assert.equal(adapterOf.isDark({}), false);
   }
 });
+
+// The mounted button leads the action bar: the anchor must stay the native first item, or every sync would remove and re-add it (flicker on X).
+test("mounting is stable on X and Instagram: the button is never taken as its own anchor", () => {
+  const x = sites.adapterFor("x.com", "/user/status/123");
+  const page = xPage("/user/status/123");
+  const host = sites.mountButton(x, page.doc, make);
+  for (let i = 0; i < 3; i++) assert.equal(sites.mountButton(x, page.doc, make), host);
+  assert.equal(x.findAnchor(page.doc), page.reply);
+  assert.equal(page.doc.querySelectorAll("[data-md-button]").length, 1);
+  assert.equal(page.reply.previousElementSibling, host);
+
+  const instagram = sites.adapterFor("www.instagram.com", "/reel/abc");
+  const root = new Node("body");
+  const post = add(add(root, "main"), "article");
+  add(post, "video");
+  const row = add(post, "section");
+  const like = add(row, "div");
+  add(row, "div");
+  const doc = fakeDocument(root, "/reel/abc");
+  const mounted = sites.mountButton(instagram, doc, make);
+  assert.equal(sites.mountButton(instagram, doc, make), mounted);
+  assert.equal(instagram.findAnchor(doc), like);
+});
+
+test("TikTok: the button is a sibling of the column items, whether the like button is wrapped with its count or not", () => {
+  const tiktok = sites.adapterFor("www.tiktok.com", "/@a/video/1");
+  const build = (wrapped) => {
+    const root = new Node("body");
+    const column = add(add(root, "section"), "div");
+    const item = (icon) => { const box = wrapped ? add(column, "div") : column; const button = add(box, "button"); add(button, "span", { "data-e2e": icon }); add(box, "strong"); return wrapped ? box : button; };
+    const like = item("browse-like-icon");
+    item("comment-icon");
+    return { like, column, doc: fakeDocument(root, "/@a/video/1") };
+  };
+  for (const wrapped of [false, true]) {
+    const page = build(wrapped);
+    assert.equal(tiktok.findAnchor(page.doc), page.like);
+    const host = sites.mountButton(tiktok, page.doc, make);
+    assert.equal(host.parent, page.column);
+    assert.equal(sites.mountButton(tiktok, page.doc, make), host); // stable
+    assert.equal(tiktok.findAnchor(page.doc), page.like);
+  }
+  const root = new Node("body");
+  const column = add(root, "div");
+  const share = add(column, "button");
+  add(share, "span", { "data-e2e": "share-icon" });
+  add(column, "button");
+  assert.equal(tiktok.findAnchor(fakeDocument(root, "/@a/video/1")), share); // fallback when the like icon is not found
+});

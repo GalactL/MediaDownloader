@@ -21,12 +21,14 @@
     const [r, g, b] = (doc.defaultView.getComputedStyle(doc.body).backgroundColor.match(/\d+/g) || [255, 255, 255]).map(Number);
     return r * 0.299 + g * 0.587 + b * 0.114 < 128;
   }
-  // First rendered post (matching `box`) with a video, `accept` and an action bar (from `bars`); -> the bar's first child (the button goes before it).
+  // First rendered post (matching `box`) with a video, `accept` and an action bar (from `bars`); -> the bar's first child that is not our own button
+  // (our button leads the bar once mounted: taking it as the anchor would remove and re-add it on every sync, a flicker).
   function barOf(doc, box, bars, accept = () => true) {
     for (const post of doc.querySelectorAll(box)) {
       if (!rendered(post) || !accept(post) || !first(post, ["video"])) continue;
       const bar = first(post, bars);
-      if (bar && bar.children[0]) return bar.children[0];
+      const child = bar && [...bar.children].find((node) => !node.hasAttribute("data-md-button"));
+      if (child) return child;
     }
     return null;
   }
@@ -57,7 +59,7 @@ svg { width: 24px; height: 24px; flex: none; fill: currentColor; }`;
     "#actions ytd-segmented-like-dislike-button-renderer",
     "segmented-like-dislike-button-view-model",
     "ytd-segmented-like-dislike-button-renderer",
-    "#top-level-buttons-computed > :first-child", // last resort: the like group leads the row
+    "#top-level-buttons-computed > :not([data-md-button])", // last resort: the like group leads the row (never our own button, or it would be re-mounted in a loop)
   ];
   const youtube = {
     id: "youtube",
@@ -89,7 +91,7 @@ svg { width: 24px; height: 24px; flex: none; fill: currentColor; }`,
   const SHORTS_ANCHORS = [
     "ytd-reel-video-renderer[is-active] like-button-view-model",
     "ytd-reel-video-renderer[is-active] #like-button",
-    "ytd-reel-video-renderer[is-active] #actions > :first-child",
+    "ytd-reel-video-renderer[is-active] #actions > :not([data-md-button])",
   ];
   const shorts = {
     id: "youtube-shorts",
@@ -121,13 +123,21 @@ svg { width: 24px; height: 24px; flex: none; fill: currentColor; }`,
   };
 
   // TikTok (/@<account>/video/<id>): the button leads the like / comment / share column of the video.
-  const TT_LIKES = ['[data-e2e="like-icon"]', '[data-e2e="browse-like-icon"]'];
+  // Most specific first; the icon sits in a button, itself (or its wrapper with the count) one item of the column.
+  const TT_LIKES = ['[data-e2e="like-icon"]', '[data-e2e="browse-like-icon"]', '[data-e2e*="like-icon"]', 'button[aria-label*="like" i]', 'button[aria-label*="aimer" i]', '[data-e2e="share-icon"]'];
+  // The column item holding `node`: climbs while the parent holds no other button (the column holds like, comment, share...).
+  function columnItem(node) {
+    let item = node.closest("button");
+    if (!item) return node.parentElement || node;
+    for (let i = 0; i < 4 && item.parentElement && item.parentElement.querySelectorAll("button").length < 2; i++) item = item.parentElement;
+    return item;
+  }
   const tiktok = {
     id: "tiktok",
     matches: (hostname) => /^(?:[a-z0-9-]+\.)*tiktok\.com$/i.test(hostname),
     findAnchor: (doc) => {
       const icon = first(doc, TT_LIKES);
-      return icon && (icon.closest("button") || icon.parentElement);
+      return icon && columnItem(icon);
     },
     diagnose: (doc) => counts(doc, TT_LIKES),
     observeTarget: (doc) => first(doc, ["main", "#app"]) || doc.body,
