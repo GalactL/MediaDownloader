@@ -57,6 +57,7 @@
     cancelled: "Téléchargement annulé.",
     invalid_arguments: "Paramètres invalides.",
     host_disconnected: "L'hôte MediaDownloader est introuvable. Lancez « MediaDownloader.Cli install-host ».",
+    invalid_message: "L'hôte MediaDownloader installé est trop ancien : mettez à jour MediaDownloader.Cli puis relancez « install-host ».",
     no_folder: "Aucun dossier à ouvrir.",
     open_failed: "Impossible d'ouvrir le dossier.",
     processing_failed: "Le téléchargement a échoué.",

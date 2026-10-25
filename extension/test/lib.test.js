@@ -47,6 +47,7 @@ test("custom name and errorText", () => {
   assert.equal(lib.buildDownloadRequest({ url: "u", name: " Mon clip " }).title, "Mon clip");
   assert.ok(!("title" in lib.buildDownloadRequest({ url: "u", name: "  " })));
   assert.equal(lib.errorText("busy"), "Un téléchargement est déjà en cours.");
+  assert.match(lib.errorText("invalid_message", "Type de message inconnu : openFolder"), /trop ancien/);
   assert.equal(lib.errorText("dependency_missing", "Outil manquant."), "Outil manquant.");
 });
 
