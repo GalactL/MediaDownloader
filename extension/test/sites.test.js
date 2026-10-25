@@ -93,3 +93,17 @@ test("a stale button is removed when the anchor disappears; unmountButton remove
   assert.equal(sites.mountButton(adapter, page.doc, make), null);
   assert.equal(page.doc.querySelectorAll("[data-md-button]").length, 0);
 });
+
+test("placement: below, above, off-screen and tiny viewport", () => {
+  const rect = (top) => ({ width: 100, top, bottom: top + 36, right: 700 });
+  const normal = sites.placement(rect(100), 1280, 800, 420);
+  assert.equal(normal.mode, "below");
+  assert.equal(normal.top, 144);
+  assert.equal(normal.left, 300);
+  assert.equal(sites.placement(rect(650), 1280, 800, 420).mode, "above");
+  assert.equal(sites.placement(rect(900), 1280, 800, 420).mode, "fixed");
+  assert.equal(sites.placement({ ...rect(100), width: 0 }, 1280, 800, 420).mode, "fixed");
+  assert.equal(sites.placement(rect(100), 1280, 300, 420).mode, "fixed");
+  const tight = sites.placement(rect(400), 360, 700, 0);
+  assert.ok(tight.maxH >= 240 && tight.top >= 8 && tight.left >= 16);
+});

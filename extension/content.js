@@ -548,17 +548,19 @@
   }
   // The box hangs under the page button, right-aligned and clamped to the viewport; without a button it keeps its fixed corner.
   function placePanel() {
-    const anchored = !panel.hidden && buttonHost.isConnected && buttonHost.getBoundingClientRect().width > 0;
-    for (const name of ["top", "left", "right", "bottom"]) panel.style[name] = anchored ? "auto" : "";
+    for (const name of ["top", "left", "right", "bottom"]) panel.style[name] = "";
     panel.style.removeProperty("--max-h");
-    if (!anchored) return;
-    const rect = buttonHost.getBoundingClientRect();
-    const width = Math.min(400, innerWidth - 32);
-    const top = Math.max(8, rect.bottom + 8);
-    panel.style.left = Math.max(16, Math.min(rect.right - width, innerWidth - width - 16)) + "px";
-    panel.style.top = top + "px";
-    panel.style.setProperty("--max-h", `calc(100vh - ${top + 16}px)`);
+    if (panel.hidden || !buttonHost.isConnected) return;
+    const place = sites.placement(buttonHost.getBoundingClientRect(), innerWidth, innerHeight, panel.offsetHeight);
+    if (place.mode === "fixed") return;
+    panel.style.right = panel.style.bottom = "auto";
+    panel.style.left = place.left + "px";
+    panel.style.top = place.top + "px";
+    panel.style.setProperty("--max-h", place.maxH + "px");
   }
+  // Open box follows the button while the page scrolls or resizes.
+  window.addEventListener("scroll", placePanel, { passive: true });
+  for (const type of ["keydown", "keyup", "keypress"]) buttonHost.addEventListener(type, (event) => event.stopPropagation());
 
   // SPA navigation: YouTube changes the URL without reloading.
   function sync() {
