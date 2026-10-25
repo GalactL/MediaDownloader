@@ -97,29 +97,47 @@
       all.map((h) => ({ value: String(h), label: labels[h] || h + "p" })));
   }
 
+  // 75 -> "00:01:15" (placeholder example of a time field); invalid or <= 0 -> "00:00:00".
+  function timecode(seconds) {
+    const total = Math.max(0, Math.round(Number(seconds)) || 0);
+    return [Math.floor(total / 3600), Math.floor((total % 3600) / 60), total % 60].map((n) => String(n).padStart(2, "0")).join(":");
+  }
+
   // Engine/host error code -> catalogue key. Engine messages relay raw yt-dlp output, so only the code is ever shown.
   function errorKey(code) {
     const key = "error." + code;
     return i18n.hasKey(key) ? key : "error.generic";
   }
 
-  // YouTube pages that are not videos (home, search...) get no button. Other hosts: always.
+  // Non-YouTube sites: host, and the path of a post page (its match is also the canonical page URL). Unknown hosts: every page counts.
+  const SITES = [
+    { host: /^(?:[a-z0-9-]+\.)*(?:x|twitter)\.com$/i, post: /^\/[^/]+\/status\/\d+/ },
+    { host: /^(?:[a-z0-9-]+\.)*tiktok\.com$/i, post: /^\/@[^/]+\/video\/\d+/ },
+    { host: /^(?:[a-z0-9-]+\.)*instagram\.com$/i, post: /^\/(?:[^/]+\/)?(?:reel|p)\/[^/]+/ },
+  ];
+  const siteOf = (url) => SITES.find((site) => site.host.test(url.hostname));
+
+  // YouTube and the other supported sites: pages that are not videos (home, search, profile...) get no button. Whether a post really holds a video is the adapter's DOM check.
   function isVideoPage(href) {
     let url;
     try { url = new URL(href); } catch { return false; }
     if (!/^https?:$/.test(url.protocol)) return false;
     if (url.hostname.toLowerCase() === "youtu.be") return url.pathname.length > 1;
+    const site = siteOf(url);
+    if (site) return site.post.test(url.pathname);
     if (!YOUTUBE_HOST.test(url.hostname)) return true;
     return (url.pathname === "/watch" && url.searchParams.has("v")) || /^\/(?:shorts|live)\/[^/]+/.test(url.pathname);
   }
 
-  // Drops list=/index= so a playlist context never leaks into the download.
+  // The page URL (never a stream URL). YouTube: drops list=/index= so a playlist context never leaks. Other sites: the post path only (no tracking query, no /photo/1 suffix).
   function canonicalUrl(href) {
     let url;
     try { url = new URL(href); } catch { return href; }
     if (url.pathname === "/watch" && YOUTUBE_HOST.test(url.hostname) && url.searchParams.has("v"))
       return url.origin + "/watch?v=" + encodeURIComponent(url.searchParams.get("v"));
-    return href;
+    const site = siteOf(url);
+    const post = site && site.post.exec(url.pathname);
+    return post ? url.origin + post[0] : href;
   }
 
   // Phase name from a `progress` or `phase` event (stage + optional pass). Unknown stages from a newer engine -> generic label.
@@ -146,7 +164,7 @@
     return { text: i18n.translate(language, "progress.withPercent", { phase, percent: Math.round(overall) }), percent: overall };
   }
 
-  const api = { parseTime, validateRange, parseMaxSize, buildDownloadRequest, qualityOptions, errorKey, DEFAULT_SETTINGS, normalizeSettings, isCalm, validateOutputDirectory, sameFolder, MAX_SIZE_MB, isVideoPage, canonicalUrl, phaseLabel, overallPercent, progressView };
+  const api = { timecode, parseTime, validateRange, parseMaxSize, buildDownloadRequest, qualityOptions, errorKey, DEFAULT_SETTINGS, normalizeSettings, isCalm, validateOutputDirectory, sameFolder, MAX_SIZE_MB, isVideoPage, canonicalUrl, phaseLabel, overallPercent, progressView };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.MDLib = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

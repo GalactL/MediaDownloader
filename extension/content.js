@@ -94,9 +94,9 @@
   const maxSize = el("input", { id: "size", type: "text", inputMode: "decimal" });
   text(maxSize, "field.optional", "placeholder");
   const clip = el("input", { id: "trim", type: "checkbox", role: "switch" });
-  // The timecode examples are not language-dependent.
+  // The timecode examples are not language-dependent; the end one follows the analysed video (reset with it).
   const startInput = el("input", { id: "start", type: "text", placeholder: "00:00:00", disabled: true });
-  const endInput = el("input", { id: "end", type: "text", placeholder: "00:12:48", disabled: true });
+  const endInput = el("input", { id: "end", type: "text", placeholder: "00:00:00", disabled: true });
   text(startInput, "field.startAria", "ariaLabel");
   text(endInput, "field.endAria", "ariaLabel");
   const group = (...children) => el("div", { className: "group" }, children);
@@ -352,7 +352,8 @@
   let probedUrl = null;   // page URL already probed (or being probed)
   let running = false;
   let nameEdited = false;
-  let currentUrl = location.href;
+  const pageUrl = () => lib.canonicalUrl(location.href); // same post = same URL (X /photo/1, tracking parameters)
+  let currentUrl = pageUrl();
 
   function setRunning(value) {
     running = value;
@@ -381,22 +382,31 @@
     thumb.removeAttribute("src");
     video = { titleKey: "app.name", titleText: "", duration: "", shown: false };
     renderVideo();
+    endInput.placeholder = lib.timecode(0);
   }
 
+  let probing = false; // a probe is in flight; the host runs one job at a time, so a new one waits for it to end
   function probe() {
-    const url = lib.canonicalUrl(location.href);
-    probedUrl = location.href;
+    if (probing) return void (probedUrl === pageUrl() || request({ type: "cancel" }, () => {})); // a stale probe is cancelled; its last reply restarts this one (below)
+    const url = pageUrl();
+    probedUrl = url;
+    probing = true;
     video = { titleKey: "video.analyzing", titleText: "", duration: "", shown: false };
     renderVideo();
     setQualities([]);
     say("");
     request({ type: "probe", url }, (reply) => {
-      if (probedUrl !== location.href) return; // navigated away meanwhile
+      if (reply.type === "probe" || reply.type === "error") probing = false;
+      if (url !== pageUrl() || reply.code === "cancelled") { // navigated away meanwhile (or cancelled for that): drop the answer, analyse the page if the box is open
+        if (!probing && !panel.hidden && !running && probedUrl !== pageUrl() && lib.isVideoPage(location.href)) probe();
+        return;
+      }
       if (reply.type === "probe" && reply.data) {
         video = { titleKey: "video.word", titleText: String(reply.data.title || ""), duration: duration(reply.data.duration), shown: true };
         renderVideo();
         if (/^https:\/\//.test(reply.data.thumbnail || "")) { thumb.src = reply.data.thumbnail; }
         setQualities(reply.data.heights);
+        endInput.placeholder = lib.timecode(reply.data.duration);
         if (!nameEdited) nameInput.value = String(reply.data.title || ""); // never overwrite what the user typed
       } else if (reply.type === "error") {
         resetVideo();
@@ -469,9 +479,10 @@
     for (const name of ["top", "left", "right", "bottom"]) panel.style[name] = ""; // fresh spot on each open
     placePanel();
     if (panel.hidden) setView("main");
-    if (!panel.hidden && !running && probedUrl !== location.href) probe();
+    if (!panel.hidden && !running && probedUrl !== pageUrl()) probe();
   }
   window.addEventListener("resize", placePanel);
+  new ResizeObserver(placePanel).observe(panel); // the box grows once the video is analysed or the view changes: keep it inside the viewport
   window.addEventListener("scroll", placePanel, { passive: true });
   const closeBox = () => { panel.hidden = true; setView("main"); };
   gear.addEventListener("click", () => setView("settings"));
@@ -519,8 +530,8 @@
 
   setView("main"); // marks the settings card inert from the start
 
-  // Page button (site adapter in sites.js): a zero-width host (closed shadow root) carrying a 36px square button; created once and reused.
-  const adapter = sites.adapterFor(location.hostname);
+  // Page button (site adapter in sites.js): a host element (closed shadow root) carrying the button; created once per adapter and reused.
+  let adapter = sites.adapterFor(location.hostname, location.pathname);
   let pageButton = null; // the host element
   let pageControl = null; // the <button> inside its shadow root
   function createPageButton() {
@@ -536,7 +547,8 @@
       pageControl.addEventListener("click", toggle);
       pageButton.attachShadow({ mode: "closed" }).append(el("style", { textContent: adapter.css }), pageControl);
       for (const type of ["keydown", "keyup", "keypress"]) pageButton.addEventListener(type, (event) => event.stopPropagation());
-      bind(() => { pageControl.title = t("button.download"); pageControl.setAttribute("aria-label", t("button.download")); });
+      const control = pageControl; // the module-level one is nulled when the adapter changes
+      bind(() => { control.title = t("button.download"); control.setAttribute("aria-label", t("button.download")); });
     }
     return pageButton;
   }
@@ -545,6 +557,12 @@
   let timer = 0;
   // Mounts or removes the page button; a missing anchor does nothing (the toolbar icon still works).
   function syncButton() {
+    const next = sites.adapterFor(location.hostname, location.pathname); // YouTube <-> Shorts changes adapter without a reload
+    if (next !== adapter) {
+      sites.unmountButton(document);
+      adapter = next;
+      pageButton = pageControl = watched = null;
+    }
     const want = adapter && settings.buttonMode === "page" && lib.isVideoPage(location.href);
     if (!want || !sites.mountButton(adapter, document, createPageButton)) {
       sites.unmountButton(document);
@@ -554,7 +572,7 @@
       if (pageButton) pageButton.toggleAttribute("data-dark", adapter.isDark(document));
       const target = adapter.observeTarget(document);
       if (target && target !== watched) {
-        watcher = watcher || new MutationObserver(() => { clearTimeout(timer); timer = setTimeout(syncButton, 300); });
+        watcher = watcher || new MutationObserver(() => { clearTimeout(timer); timer = setTimeout(sync, 300); });
         watcher.disconnect();
         watcher.observe(target, { childList: true, subtree: true });
         watched = target;
@@ -565,7 +583,7 @@
   // Opened without a usable button (toolbar icon, button off-screen or missing) it stays in the fixed corner and is never glued.
   function placePanel() {
     if (panel.hidden || !pageButton || !pageButton.isConnected) return;
-    const place = sites.placement(pageControl.getBoundingClientRect(), innerWidth, innerHeight, panel.offsetHeight);
+    const place = sites.placement(pageControl.getBoundingClientRect(), innerWidth, innerHeight, panel.offsetHeight, adapter.panel);
     const glued = panel.style.left !== "";
     if (!place || place.close) return glued ? closeBox() : undefined;
     panel.style.right = panel.style.bottom = "auto";
@@ -573,14 +591,14 @@
     panel.style.top = place.top + "px";
   }
 
-  // SPA navigation: YouTube changes the URL without reloading.
+  // SPA navigation: these sites change the URL without reloading.
   function sync() {
     const visible = lib.isVideoPage(location.href);
     syncButton();
     if (visible && !host.isConnected) document.documentElement.append(host);
     if (!visible && host.isConnected) host.remove();
-    if (location.href !== currentUrl) {
-      currentUrl = location.href;
+    if (pageUrl() !== currentUrl) {
+      currentUrl = pageUrl();
       if (!running) {
         probedUrl = null;
         nameInput.value = "";

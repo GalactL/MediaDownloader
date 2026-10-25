@@ -74,6 +74,7 @@ test("isVideoPage and canonicalUrl", () => {
   assert.ok(!lib.isVideoPage("not a url"));
   assert.equal(lib.canonicalUrl("https://www.youtube.com/watch?v=abc&list=x&t=5"), "https://www.youtube.com/watch?v=abc");
   assert.equal(lib.canonicalUrl("https://youtu.be/abc"), "https://youtu.be/abc");
+  assert.equal(lib.canonicalUrl("https://www.youtube.com/shorts/abc"), "https://www.youtube.com/shorts/abc");
 });
 
 test("phase labels", () => {
@@ -209,4 +210,29 @@ test("outputDirectory in request and error text", () => {
   assert.equal(lib.buildDownloadRequest({ url: "u", outputDirectory: " /v " }).outputDirectory, "/v");
   assert.ok(!("outputDirectory" in lib.buildDownloadRequest({ url: "u", outputDirectory: "  " })));
   assert.match(errorText("fr", "invalid_output_directory"), /réglages/);
+});
+
+test("isVideoPage and canonicalUrl on X, TikTok and Instagram", () => {
+  for (const href of [
+    "https://x.com/user/status/123", "https://twitter.com/user/status/123?s=20", "https://x.com/i/status/123/video/1",
+    "https://www.tiktok.com/@user/video/7123?lang=fr", "https://www.instagram.com/reel/Cabc/", "https://www.instagram.com/p/Cabc/?igsh=x", "https://www.instagram.com/user/reel/Cabc/",
+  ]) assert.ok(lib.isVideoPage(href), href);
+  for (const href of [
+    "https://x.com/", "https://x.com/home", "https://x.com/user", "https://x.com/user/status/", "https://x.com/search?q=a",
+    "https://www.tiktok.com/", "https://www.tiktok.com/@user", "https://www.tiktok.com/@user/video/", "https://www.tiktok.com/foryou",
+    "https://www.instagram.com/", "https://www.instagram.com/user/", "https://www.instagram.com/explore/", "https://www.instagram.com/reels/",
+  ]) assert.ok(!lib.isVideoPage(href), href);
+  assert.equal(lib.canonicalUrl("https://twitter.com/user/status/123?s=20"), "https://twitter.com/user/status/123");
+  assert.equal(lib.canonicalUrl("https://x.com/user/status/123/video/1#a"), "https://x.com/user/status/123");
+  assert.equal(lib.canonicalUrl("https://www.tiktok.com/@user/video/7123?lang=fr&is_from_webapp=1"), "https://www.tiktok.com/@user/video/7123");
+  assert.equal(lib.canonicalUrl("https://www.instagram.com/reel/Cabc/?igsh=x"), "https://www.instagram.com/reel/Cabc");
+  assert.equal(lib.canonicalUrl("https://www.instagram.com/p/Cabc/"), "https://www.instagram.com/p/Cabc");
+  assert.equal(lib.canonicalUrl("https://www.instagram.com/"), "https://www.instagram.com/");
+  assert.ok(lib.isVideoPage("https://example.com/anything")); // unknown hosts: unchanged
+});
+
+test("timecode formats a duration as a placeholder example", () => {
+  assert.equal(lib.timecode(10), "00:00:10");
+  assert.equal(lib.timecode(3725.4), "01:02:05");
+  for (const bad of [0, -5, NaN, undefined, "x"]) assert.equal(lib.timecode(bad), "00:00:00");
 });
