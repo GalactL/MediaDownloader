@@ -15,6 +15,8 @@ namespace media_downloader
     struct StartedEvent { std::string outputDirectory; };
     struct LogEvent { std::string level; std::string message; };
     struct ProgressEvent { std::string stage; double percent{}; int pass{}; }; // pass 0 = absent
+    // Phase without a known percentage (indeterminate). stage: inspection | download | merge.
+    struct PhaseEvent { std::string stage; };
     struct EncodingPlanEvent { double durationSeconds{}; std::uint32_t videoKbps{}; std::uint32_t audioKbps{}; };
     struct CompletedEvent { std::string path; std::uint64_t bytes{}; };
     struct ErrorEvent { std::string code; std::string message; };
@@ -22,7 +24,7 @@ namespace media_downloader
     struct DoctorEvent { DoctorTool ytDlp, ffmpeg, ffprobe, javascriptRuntime; };
     struct ProbeEvent { std::string json; }; // raw yt-dlp --dump-single-json object
 
-    using Event = std::variant<StartedEvent, LogEvent, ProgressEvent, EncodingPlanEvent,
+    using Event = std::variant<StartedEvent, LogEvent, ProgressEvent, PhaseEvent, EncodingPlanEvent,
         CompletedEvent, ErrorEvent, DoctorEvent, ProbeEvent>;
 
     // May be called from a process-reader thread; implementations must be thread-safe.

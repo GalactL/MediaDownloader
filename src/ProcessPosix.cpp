@@ -7,6 +7,7 @@
 #include <csignal>
 #include <fcntl.h>
 #include <stdexcept>
+#include <sys/resource.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <thread>
@@ -25,7 +26,8 @@ namespace media_downloader
         std::vector<std::wstring> const& arguments,
         std::filesystem::path const& workingDirectory,
         LineCallback const& onLine,
-        std::atomic_bool const& cancellationRequested)
+        std::atomic_bool const& cancellationRequested,
+        ProcessPriority priority)
     {
         // Everything the child needs is built before fork(): after it, only async-signal-safe calls are allowed.
         std::string const program = executable.string();
@@ -58,6 +60,7 @@ namespace media_downloader
             dup2(descriptors[1], STDERR_FILENO);
             close(descriptors[1]);
             if (!directory.empty() && chdir(directory.c_str()) != 0) _exit(127);
+            if (priority == ProcessPriority::Low) setpriority(PRIO_PROCESS, 0, 19); // best effort, inherited across exec
             execv(program.c_str(), rawArguments.data());
             _exit(127);
         }

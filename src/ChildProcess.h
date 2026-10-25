@@ -15,6 +15,9 @@ namespace media_downloader
         bool cancelled{};
     };
 
+    // Low = lowest scheduling priority (nice 19 / IDLE_PRIORITY_CLASS); inherited by the child's own children.
+    enum class ProcessPriority { Normal, Low };
+
     using LineCallback = std::function<void(std::string const&)>;
 
     ProcessResult RunProcess(
@@ -22,5 +25,6 @@ namespace media_downloader
         std::vector<std::wstring> const& arguments,
         std::filesystem::path const& workingDirectory,
         LineCallback const& onLine,
-        std::atomic_bool const& cancellationRequested);
+        std::atomic_bool const& cancellationRequested,
+        ProcessPriority priority = ProcessPriority::Normal);
 }

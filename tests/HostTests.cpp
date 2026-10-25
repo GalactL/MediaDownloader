@@ -2,6 +2,7 @@
 // command driven over pipes with the POSIX shell fake tools (never touches the network).
 #include "Host.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <iostream>
 #include <optional>
@@ -280,9 +281,16 @@ namespace
             progress |= m.starts_with("{\"type\":\"progress\",\"id\":\"d1\"");
         }
         Check(progress, "download: progress streamed");
+        Check(std::any_of(messages.begin(), messages.end(), [](auto const& m) { return m.starts_with("{\"type\":\"phase\",\"id\":\"d1\",\"stage\":\""); }),
+            "download: phase framed with the id");
         Check(messages.front().starts_with("{\"type\":\"started\",\"id\":\"d1\""), "download: started first: " + messages.front());
         Check(Last(messages).starts_with("{\"type\":\"completed\",\"id\":\"d1\",\"path\":\""), "download: completed last: " + Last(messages));
         Check(NoTempDirs(out), "download: no temp dir left");
+
+        // lowResources is an optional boolean that maps to --low-resources.
+        host.Send("{\"type\":\"download\",\"id\":\"d2\",\"url\":\"https://example.com/v\",\"maxSizeMb\":10,\"lowResources\":true,\"outputDirectory\":\"" + out.string() + "\"}");
+        auto lowMessages = host.RecvJob();
+        Check(Last(lowMessages).starts_with("{\"type\":\"completed\",\"id\":\"d2\""), "lowResources: download completes: " + Last(lowMessages));
 
         // The host stays alive for the next request, and doctor needs no id.
         host.Send(R"({"type":"doctor"})");
@@ -315,6 +323,7 @@ namespace
             { R"({"type":"download","id":"i4"})", "{\"type\":\"error\",\"id\":\"i4\",\"code\":\"invalid_arguments\"" },
             { R"({"type":"download","id":"i5","url":"https://example.com/v","maxSizeMb":"10"})", "{\"type\":\"error\",\"id\":\"i5\",\"code\":\"invalid_arguments\"" },
             { R"({"type":"probe","id":"i6","url":"https://example.com/v","cookiesFromBrowser":"netscape"})", "{\"type\":\"error\",\"id\":\"i6\",\"code\":\"invalid_arguments\"" },
+            { R"({"type":"download","id":"i9","url":"https://example.com/v","lowResources":"yes"})", "{\"type\":\"error\",\"id\":\"i9\",\"code\":\"invalid_arguments\"" },
             { R"({"type":"bogus","id":"i7"})", "{\"type\":\"error\",\"id\":\"i7\",\"code\":\"invalid_message\"" },
             { R"({"id":"i8"})", "{\"type\":\"error\",\"code\":\"invalid_message\"" },
             { R"({"type":"download",)", "{\"type\":\"error\",\"code\":\"invalid_message\"" },

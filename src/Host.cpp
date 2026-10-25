@@ -521,6 +521,11 @@ namespace media_downloader
                 if (overwrite->type != Json::Type::Bool) { error = "Le champ overwrite doit être un booléen."; return false; }
                 if (overwrite->boolean) args.push_back(L"--overwrite");
             }
+            if (auto const* low = request.Get("lowResources"); low && low->type != Json::Type::Null)
+            {
+                if (low->type != Json::Type::Bool) { error = "Le champ lowResources doit être un booléen."; return false; }
+                if (low->boolean) args.push_back(L"--low-resources");
+            }
             return true;
         }
     }
@@ -543,6 +548,8 @@ namespace media_downloader
                 json << '}';
                 return json.str();
             }
+            else if constexpr (std::is_same_v<T, PhaseEvent>)
+                return "{\"type\":\"phase\",\"stage\":\"" + e.stage + "\"}";
             else if constexpr (std::is_same_v<T, EncodingPlanEvent>)
                 return "{\"type\":\"encodingPlan\",\"durationSeconds\":" + std::to_string(e.durationSeconds) +
                     ",\"videoKbps\":" + std::to_string(e.videoKbps) + ",\"audioKbps\":" + std::to_string(e.audioKbps) + "}";

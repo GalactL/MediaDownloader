@@ -20,15 +20,10 @@ function onHostMessage(message) {
   sendToTab(route.tabId, { ...message, id: route.clientId });
 }
 
-function onDisconnect(p) {
-  const detail = p.error && p.error.message ? " (" + p.error.message + ")" : "";
+// Errors carry only a code: the page renders the text from its message catalogue (extension/i18n.js).
+function onDisconnect() {
   port = null;
-  for (const [id, route] of routes) {
-    sendToTab(route.tabId, {
-      type: "error", id: route.clientId, code: "host_disconnected",
-      message: "L'hôte MediaDownloader s'est arrêté ou est introuvable" + detail + ". Vérifiez que « MediaDownloader.Cli install-host » a été exécuté.",
-    });
-  }
+  for (const route of routes.values()) sendToTab(route.tabId, { type: "error", id: route.clientId, code: "host_disconnected" });
   routes.clear();
 }
 
@@ -52,7 +47,7 @@ browser.runtime.onMessage.addListener((request, sender) => {
   } catch (e) {
     routes.delete(hostId);
     port = null;
-    sendToTab(sender.tab.id, { type: "error", id: String(request.id), code: "host_disconnected", message: "Impossible de joindre l'hôte MediaDownloader." });
+    sendToTab(sender.tab.id, { type: "error", id: String(request.id), code: "host_disconnected" });
   }
 });
 

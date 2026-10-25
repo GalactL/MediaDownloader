@@ -68,7 +68,8 @@ namespace media_downloader
         std::vector<std::wstring> const& arguments,
         std::filesystem::path const& workingDirectory,
         LineCallback const& onLine,
-        std::atomic_bool const& cancellationRequested)
+        std::atomic_bool const& cancellationRequested,
+        ProcessPriority priority)
     {
         SECURITY_ATTRIBUTES attributes{ sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE };
         HANDLE rawRead{};
@@ -115,7 +116,7 @@ namespace media_downloader
         auto directory = workingDirectory.empty() ? std::wstring{} : workingDirectory.wstring();
 
         if (!CreateProcessW(executable.c_str(), mutableCommand.data(), nullptr, nullptr, TRUE,
-            CREATE_NO_WINDOW | CREATE_SUSPENDED, nullptr, directory.empty() ? nullptr : directory.c_str(), &startup, &process))
+            CREATE_NO_WINDOW | CREATE_SUSPENDED | (priority == ProcessPriority::Low ? IDLE_PRIORITY_CLASS : 0), nullptr, directory.empty() ? nullptr : directory.c_str(), &startup, &process))
         {
             throw std::runtime_error("Impossible de lancer le processus externe");
         }

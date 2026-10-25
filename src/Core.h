@@ -37,6 +37,7 @@ namespace media_downloader
         std::optional<std::filesystem::path> ffmpeg;
         std::optional<std::filesystem::path> ffprobe;
         bool overwrite{};
+        bool lowResources{}; // FFmpeg at lowest priority with 2 threads (--low-resources)
     };
 
     struct ParseResult
@@ -68,6 +69,35 @@ namespace media_downloader
     std::wstring SanitizeFileName(std::wstring_view value);
     std::string SummarizeDownloadFailure(std::string_view output);
     std::optional<EncodePlan> CalculateEncodePlan(double durationSeconds, double maxSizeMb);
+    // FFmpeg arguments of one x264 pass (1 or 2). `lowResources` only adds "-threads 2"; priority is the caller's concern.
+    std::vector<std::wstring> BuildEncodeArguments(
+        std::filesystem::path const& source, std::filesystem::path const& destination, std::filesystem::path const& passLog,
+        std::uint32_t videoKbps, std::uint32_t audioKbps, std::wstring const& quality, int pass, bool lowResources);
+
+    // One yt-dlp line produced by the --progress-template the engine passes (see docs/CLI_PROTOCOL.md).
+    struct DownloadProgressLine
+    {
+        std::string status; // downloading | finished | error
+        std::optional<double> downloadedBytes, totalBytes, fragmentIndex, fragmentCount;
+        std::string formatId;
+    };
+    std::optional<DownloadProgressLine> ParseDownloadProgressLine(std::string_view line);
+    // "__MD_POST__:started|Merger" -> "Merger"; any other line (including "finished") -> nullopt.
+    std::optional<std::string> ParsePostprocessorStart(std::string_view line);
+
+    // Turns per-stream yt-dlp progress into one monotonic 0-100 download percent: the first stream (video) covers
+    // 0-85, the following ones (audio) 85-100. shortcut: stream sizes are unknown up front, so a single-file
+    // download stops at 85 until the real end; refine if yt-dlp exposes the requested formats in the template.
+    class DownloadProgressSmoother
+    {
+    public:
+        std::optional<double> Update(DownloadProgressLine const& line);
+    private:
+        std::string formatId_;
+        bool started_{};
+        int stream_{};
+        double last_{};
+    };
     std::string JsonEscape(std::string_view value);
     std::string WideToUtf8(std::wstring_view value);
     std::wstring Utf8ToWide(std::string_view value);
