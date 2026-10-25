@@ -27,13 +27,14 @@
     observeTarget: (doc) => first(doc, ["ytd-watch-flexy", "ytd-page-manager"]) || doc.body,
     // YouTube's own dark mode is the `dark` attribute on <html>; content.js mirrors it on the host as [data-dark] (fallback colours only).
     isDark: (doc) => !!(doc.documentElement && doc.documentElement.hasAttribute("dark")),
+    // The host takes no space by design (width 0), so the native row and its like bar keep their layout; the button hangs to the left of it.
     // Icon-only pill like YouTube's own. Colours use YouTube's variables with explicit theme fallbacks (some vars are undefined on the live site).
     css: `
 :host { --md-bg: #f2f2f2; --md-bg-hover: #e5e5e5; --md-fg: #0f0f0f;
-  display: inline-flex !important; visibility: visible !important; opacity: 1 !important; flex: none; align-self: center;
-  align-items: center; margin: 0 8px 0 0 !important; position: relative; z-index: 1; }
+  display: block !important; position: relative !important; width: 0 !important; height: 36px !important; flex: none !important;
+  margin: 0 !important; padding: 0 !important; overflow: visible !important; align-self: center; visibility: visible !important; opacity: 1 !important; z-index: 1; }
 :host([data-dark]) { --md-bg: #272727; --md-bg-hover: #3f3f3f; --md-fg: #fff; }
-button { display: inline-flex; align-items: center; justify-content: center; width: 36px; min-width: 36px; height: 36px; padding: 0; border: 0; border-radius: 18px;
+button { position: absolute; right: 8px; top: 0; display: inline-flex; align-items: center; justify-content: center; width: 36px; min-width: 36px; height: 36px; padding: 0; border: 0; border-radius: 18px;
   background: var(--yt-spec-button-chip-background, var(--md-bg)); color: var(--yt-spec-text-primary, var(--md-fg)); cursor: pointer; }
 button:hover { background: var(--yt-spec-button-chip-background-hover, var(--md-bg-hover)); }
 button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
@@ -63,17 +64,16 @@ svg { fill: none; stroke: currentColor; width: 20px; height: 20px; flex: none; }
 
   const unmountButton = (doc) => doc.querySelectorAll(MARK).forEach((node) => node.remove());
 
-  // Where the box goes relative to the button rect: below it, above it, or "fixed" (corner) when the button is off-screen or neither side fits
-  // the box's real height (it is never resized). -> { mode, top, left } (null when fixed).
+  // Box position from the button rect: left right-aligned to the button (clamped), top below it when it fits, else above, else clamped
+  // into the viewport (never the corner just because the button scrolled away). null = button not rendered (caller keeps the last spot).
   function placement(rect, vw, vh, panelHeight) {
-    const fixed = { mode: "fixed", top: null, left: null };
-    if (!(rect.width > 0) || rect.bottom < 0 || rect.top > vh) return fixed;
+    if (!(rect.width > 0) || !(rect.height > 0)) return null;
     const height = panelHeight > 0 ? panelHeight : 420;
     const width = Math.min(400, vw - 32);
     const left = Math.max(16, Math.min(rect.right - width, vw - width - 16));
-    if (vh - rect.bottom - 16 >= height) return { mode: "below", top: Math.max(8, rect.bottom + 8), left };
-    if (rect.top - 16 >= height) return { mode: "above", top: Math.max(8, rect.top - 8 - height), left };
-    return fixed;
+    const below = rect.bottom + 8;
+    const wanted = below + height <= vh - 8 ? below : rect.top - 8 - height >= 8 ? rect.top - 8 - height : below;
+    return { top: Math.max(8, Math.min(wanted, vh - height - 8)), left };
   }
 
   const api = { ADAPTERS, adapterFor, mountButton, unmountButton, placement };

@@ -31,7 +31,7 @@ stockés avec `storage.local` et appliqués immédiatement sans recharger :
   priorité basse avec 2 threads (champ `lowResources` de la requête `download`), les animations sont supprimées (comme
   `prefers-reduced-motion`, qui est aussi respecté sans le réglage) et le sondage de navigation de la page est arrêté.
 - **Affichage du bouton** : « Sur la page » (bouton à icône seule « Télécharger » inséré juste avant le groupe J'aime / Je n'aime pas
-  de la page vidéo ; la boîte s'ouvre sous lui) ou « Icône de la barre uniquement ». Le bouton reprend le thème clair ou
+  de la page vidéo, sans prendre de place dans la barre ; la boîte s'ouvre sous lui et le suit au défilement) ou « Icône de la barre uniquement ». Le bouton reprend le thème clair ou
   sombre de YouTube (variables CSS `--yt-spec-*`), pas le réglage de l'extension, qui ne concerne que la boîte. Il est
   réinséré après chaque navigation ou reconstruction de la barre d'actions ; si YouTube change sa structure et que
   l'ancre est introuvable, rien n'est affiché et l'icône de la barre d'outils reste utilisable.

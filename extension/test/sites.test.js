@@ -96,16 +96,16 @@ test("a stale button is removed when the anchor disappears; unmountButton remove
   assert.equal(page.doc.querySelectorAll("[data-md-button]").length, 0);
 });
 
-test("placement: below, above, off-screen, and corner when nothing fits", () => {
-  const rect = (top) => ({ width: 100, top, bottom: top + 36, right: 700 });
-  const normal = sites.placement(rect(100), 1280, 800, 420);
-  assert.deepEqual(normal, { mode: "below", top: 144, left: 300 });
-  assert.deepEqual(sites.placement(rect(650), 1280, 800, 420), { mode: "above", top: 222, left: 300 });
-  assert.equal(sites.placement(rect(900), 1280, 800, 420).mode, "fixed");
-  assert.equal(sites.placement({ ...rect(100), width: 0 }, 1280, 800, 420).mode, "fixed");
-  assert.equal(sites.placement(rect(100), 1280, 300, 420).mode, "fixed");
-  assert.equal(sites.placement(rect(400), 1280, 800, 420).mode, "fixed"); // 348 below, 384 above: neither fits
+test("placement: below, above, clamped, and null for an unrendered button", () => {
+  const rect = (top) => ({ width: 100, height: 36, top, bottom: top + 36, right: 700 });
+  assert.deepEqual(sites.placement(rect(100), 1280, 800, 420), { top: 144, left: 300 });
+  assert.deepEqual(sites.placement(rect(650), 1280, 800, 420), { top: 222, left: 300 });
+  assert.equal(sites.placement(rect(-500), 1280, 800, 420).top, 8); // scrolled away above: clamped, not the corner
+  assert.equal(sites.placement(rect(900), 1280, 800, 420).top, 372); // below the fold: 800 - 420 - 8
+  assert.equal(sites.placement(rect(400), 1280, 800, 420).top, 372); // neither side fits
   assert.equal(sites.placement(rect(100), 360, 700, 0).left, 16);
+  assert.equal(sites.placement({ ...rect(100), width: 0 }, 1280, 800, 420), null);
+  assert.equal(sites.placement({ ...rect(100), height: 0 }, 1280, 800, 420), null);
 });
 
 test("isDark reads the dark attribute on <html>", () => {

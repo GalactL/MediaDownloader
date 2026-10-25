@@ -466,17 +466,13 @@
     sync(); // catches a navigation missed while polling is off
     if (!host.isConnected) return; // not on a video page: no box to show
     panel.hidden = !panel.hidden;
+    for (const name of ["top", "left", "right", "bottom"]) panel.style[name] = ""; // fresh spot on each open
     placePanel();
     if (panel.hidden) setView("main");
     if (!panel.hidden && !running && probedUrl !== location.href) probe();
   }
-  // Resize only re-clamps the current spot; it never jumps to the corner.
-  window.addEventListener("resize", () => {
-    if (panel.hidden || !panel.style.left) return;
-    const width = Math.min(400, innerWidth - 32);
-    panel.style.left = Math.max(16, Math.min(parseFloat(panel.style.left), innerWidth - width - 16)) + "px";
-    panel.style.top = Math.max(8, Math.min(parseFloat(panel.style.top), innerHeight - 100)) + "px";
-  });
+  window.addEventListener("resize", placePanel);
+  window.addEventListener("scroll", placePanel, { passive: true });
   const closeBox = () => { panel.hidden = true; setView("main"); };
   gear.addEventListener("click", () => setView("settings"));
   back.addEventListener("click", () => setView("main"));
@@ -552,13 +548,11 @@
       }
     }
   }
-  // Positioned once when opened: under (or above) the page button, right-aligned and clamped; corner if the button is not visible then.
-  // It then stays put (no scroll tracking).
+  // The open box stays glued to the page button (scroll and resize); no button rendered = keep the last spot, or the fixed corner.
   function placePanel() {
-    for (const name of ["top", "left", "right", "bottom"]) panel.style[name] = "";
     if (panel.hidden || !buttonHost.isConnected) return;
-    const place = sites.placement(buttonHost.getBoundingClientRect(), innerWidth, innerHeight, panel.offsetHeight);
-    if (place.mode === "fixed") return;
+    const place = sites.placement(pageButton.getBoundingClientRect(), innerWidth, innerHeight, panel.offsetHeight);
+    if (!place) return;
     panel.style.right = panel.style.bottom = "auto";
     panel.style.left = place.left + "px";
     panel.style.top = place.top + "px";
