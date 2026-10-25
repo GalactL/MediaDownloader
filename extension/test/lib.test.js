@@ -230,3 +230,9 @@ test("isVideoPage and canonicalUrl on X, TikTok and Instagram", () => {
   assert.equal(lib.canonicalUrl("https://www.instagram.com/"), "https://www.instagram.com/");
   assert.ok(lib.isVideoPage("https://example.com/anything")); // unknown hosts: unchanged
 });
+
+test("timecode formats a duration as a placeholder example", () => {
+  assert.equal(lib.timecode(10), "00:00:10");
+  assert.equal(lib.timecode(3725.4), "01:02:05");
+  for (const bad of [0, -5, NaN, undefined, "x"]) assert.equal(lib.timecode(bad), "00:00:00");
+});

@@ -12,11 +12,11 @@ YouTube classique sont écrits d'après la structure connue de leur page et n'on
 (ces sites renomment souvent leur DOM) : si l'ancre est introuvable, rien n'est ajouté à la page, une seule ligne
 `console.debug` donne le nombre de correspondances de chaque sélecteur et l'icône de la barre d'outils reste utilisable.
 
-| Site | Pages avec bouton | Ancre (le bouton est inséré juste avant) |
+| Site | Pages avec bouton | Ancre (le bouton est inséré juste avant, sauf mention) |
 | --- | --- | --- |
 | YouTube | `/watch?v=`, `youtu.be/<id>`, `/live/<id>` | groupe J'aime / Je n'aime pas |
 | YouTube Shorts | `/shorts/<id>` | colonne verticale d'actions du short actif |
-| X (`x.com`, `twitter.com`) | `/<compte>/status/<id>`, seulement si la publication contient une vidéo | barre d'actions de la publication (répondre, reposter, aimer…) |
+| X (`x.com`, `twitter.com`) | `/<compte>/status/<id>`, seulement si la publication contient une vidéo | dernier élément de la barre d'actions de la publication (après partager ; le bouton est inséré juste après) |
 | TikTok | `/@<compte>/video/<id>` | colonne j'aime / commentaires / partage |
 | Instagram | `/reel/<id>`, `/p/<id>` (avec vidéo) | rangée d'actions de la publication |
 

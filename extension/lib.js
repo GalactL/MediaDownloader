@@ -97,6 +97,12 @@
       all.map((h) => ({ value: String(h), label: labels[h] || h + "p" })));
   }
 
+  // 75 -> "00:01:15" (placeholder example of a time field); invalid or <= 0 -> "00:00:00".
+  function timecode(seconds) {
+    const total = Math.max(0, Math.round(Number(seconds)) || 0);
+    return [Math.floor(total / 3600), Math.floor((total % 3600) / 60), total % 60].map((n) => String(n).padStart(2, "0")).join(":");
+  }
+
   // Engine/host error code -> catalogue key. Engine messages relay raw yt-dlp output, so only the code is ever shown.
   function errorKey(code) {
     const key = "error." + code;
@@ -158,7 +164,7 @@
     return { text: i18n.translate(language, "progress.withPercent", { phase, percent: Math.round(overall) }), percent: overall };
   }
 
-  const api = { parseTime, validateRange, parseMaxSize, buildDownloadRequest, qualityOptions, errorKey, DEFAULT_SETTINGS, normalizeSettings, isCalm, validateOutputDirectory, sameFolder, MAX_SIZE_MB, isVideoPage, canonicalUrl, phaseLabel, overallPercent, progressView };
+  const api = { timecode, parseTime, validateRange, parseMaxSize, buildDownloadRequest, qualityOptions, errorKey, DEFAULT_SETTINGS, normalizeSettings, isCalm, validateOutputDirectory, sameFolder, MAX_SIZE_MB, isVideoPage, canonicalUrl, phaseLabel, overallPercent, progressView };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.MDLib = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

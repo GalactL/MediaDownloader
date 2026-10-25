@@ -94,9 +94,9 @@
   const maxSize = el("input", { id: "size", type: "text", inputMode: "decimal" });
   text(maxSize, "field.optional", "placeholder");
   const clip = el("input", { id: "trim", type: "checkbox", role: "switch" });
-  // The timecode examples are not language-dependent.
+  // The timecode examples are not language-dependent; the end one follows the analysed video (reset with it).
   const startInput = el("input", { id: "start", type: "text", placeholder: "00:00:00", disabled: true });
-  const endInput = el("input", { id: "end", type: "text", placeholder: "00:12:48", disabled: true });
+  const endInput = el("input", { id: "end", type: "text", placeholder: "00:00:00", disabled: true });
   text(startInput, "field.startAria", "ariaLabel");
   text(endInput, "field.endAria", "ariaLabel");
   const group = (...children) => el("div", { className: "group" }, children);
@@ -382,6 +382,7 @@
     thumb.removeAttribute("src");
     video = { titleKey: "app.name", titleText: "", duration: "", shown: false };
     renderVideo();
+    endInput.placeholder = lib.timecode(0);
   }
 
   let probing = false; // a probe is in flight; the host runs one job at a time, so a new one waits for it to end
@@ -405,6 +406,7 @@
         renderVideo();
         if (/^https:\/\//.test(reply.data.thumbnail || "")) { thumb.src = reply.data.thumbnail; }
         setQualities(reply.data.heights);
+        endInput.placeholder = lib.timecode(reply.data.duration);
         if (!nameEdited) nameInput.value = String(reply.data.title || ""); // never overwrite what the user typed
       } else if (reply.type === "error") {
         resetVideo();
@@ -581,7 +583,7 @@
   // Opened without a usable button (toolbar icon, button off-screen or missing) it stays in the fixed corner and is never glued.
   function placePanel() {
     if (panel.hidden || !pageButton || !pageButton.isConnected) return;
-    const place = sites.placement(pageControl.getBoundingClientRect(), innerWidth, innerHeight, panel.offsetHeight);
+    const place = sites.placement(pageControl.getBoundingClientRect(), innerWidth, innerHeight, panel.offsetHeight, adapter.panel);
     const glued = panel.style.left !== "";
     if (!place || place.close) return glued ? closeBox() : undefined;
     panel.style.right = panel.style.bottom = "auto";

@@ -19,6 +19,7 @@ class Node {
   replaceChildren(...nodes) { this.children.forEach((child) => { child.parent = null; }); this.children = []; nodes.forEach((node) => this.append(node)); }
   setAttribute(name, value) { this.attrs[name] = value; }
   cloneNode() { const copy = new Node(this.name, this.attrs); this.children.forEach((child) => copy.append(child.cloneNode())); return copy; }
+  after(node) { node.remove(); node.parent = this.parent; this.parent.children.splice(this.parent.children.indexOf(this) + 1, 0, node); }
   remove() { if (this.parent) this.parent.children.splice(this.parent.children.indexOf(this), 1); this.parent = null; }
   before(node) { node.remove(); node.parent = this.parent; this.parent.children.splice(this.parent.children.indexOf(this), 0, node); }
   get previousElementSibling() { return this.parent ? this.parent.children[this.parent.children.indexOf(this) - 1] || null : null; }
@@ -138,6 +139,18 @@ test("placement: below, above, close when off-screen, null when unrendered", () 
   assert.equal(sites.placement({ ...rect(100), height: 0 }, 1280, 800, 420), null);
 });
 
+test("placement side right: beside the button, top aligned, clamped; falls back when there is no room", () => {
+  const rect = (top, right) => ({ width: 48, height: 48, top, bottom: top + 48, right });
+  assert.deepEqual(sites.placement(rect(200, 700), 1280, 800, 420, "right"), { top: 200, left: 708 });
+  assert.deepEqual(sites.placement(rect(600, 700), 1280, 800, 420, "right"), { top: 372, left: 708 }); // clamped to the bottom margin
+  assert.equal(sites.placement(rect(4, 700), 1280, 800, 420, "right").top, 8);
+  assert.deepEqual(sites.placement(rect(200, 1000), 1280, 800, 420, "right"), sites.placement(rect(200, 1000), 1280, 800, 420)); // no room right: default behaviour
+  assert.deepEqual(sites.placement(rect(200, 700), 1280, 800, 420), { top: 256, left: 300 }); // no option: unchanged
+  assert.deepEqual(sites.placement(rect(-100, 700), 1280, 800, 420, "right"), { close: true });
+  assert.equal(sites.adapterFor("www.tiktok.com", "/").panel, "right");
+  assert.equal(sites.adapterFor("x.com", "/").panel, undefined);
+});
+
 test("adapter css: zero-width host, 36px square button, explicit colours; isDark reads <html dark>", () => {
   assert.match(adapter.css, /width: 0 !important/);
   assert.match(adapter.css, /width: 36px; height: 36px/);
@@ -221,16 +234,18 @@ function xPage(pathname, { video = true, id = "123" } = {}) {
   const bar = add(post, "div", { role: "group" });
   const reply = add(bar, "div");
   add(add(reply, "div"), "button", { "data-testid": "reply" });
-  add(bar, "div");
-  return { root, reply, doc: fakeDocument(root, pathname) };
+  const share = add(bar, "div");
+  return { root, reply, share, doc: fakeDocument(root, pathname) };
 }
 
 test("X: the button leads the action bar of the page's own post, only with a video", () => {
   const x = sites.adapterFor("x.com", "/user/status/123");
   const page = xPage("/user/status/123");
-  assert.equal(x.findAnchor(page.doc), page.reply);
+  assert.equal(x.findAnchor(page.doc), page.share);
   const host = sites.mountButton(x, page.doc, make);
-  assert.equal(page.reply.previousElementSibling, host);
+  assert.equal(page.share.nextElementSibling, host);
+  assert.equal(page.reply.previousElementSibling, null);
+  assert.match(x.css, /align-self: center/);
   const none = xPage("/user/status/123", { video: false });
   assert.equal(x.findAnchor(none.doc), null); // the thread above has a video, but it is not this post
   assert.equal(sites.mountButton(x, none.doc, make), null);
@@ -305,9 +320,10 @@ test("mounting is stable on X and Instagram: the button is never taken as its ow
   const page = xPage("/user/status/123");
   const host = sites.mountButton(x, page.doc, make);
   for (let i = 0; i < 3; i++) assert.equal(sites.mountButton(x, page.doc, make), host);
-  assert.equal(x.findAnchor(page.doc), page.reply);
+  assert.equal(x.findAnchor(page.doc), page.share);
   assert.equal(page.doc.querySelectorAll("[data-md-button]").length, 1);
-  assert.equal(page.reply.previousElementSibling, host);
+  assert.equal(page.share.nextElementSibling, host);
+  assert.equal(page.share.parent.children[page.share.parent.children.length - 1], host);
 
   const instagram = sites.adapterFor("www.instagram.com", "/reel/abc");
   const root = new Node("body");

@@ -1,6 +1,6 @@
 "use strict";
 // Per-site adapters: the ONLY place with page selectors. Adding a site = adding one object to ADAPTERS (+ its host match in manifest.json).
-// An adapter is { id, matches(hostname, pathname), findAnchor(document), observeTarget(document), isDark(document), iconPath, css }: the button is inserted right before the anchor.
+// An adapter is { id, matches(hostname, pathname), findAnchor(document), observeTarget(document), isDark(document), iconPath, css, insert? }: the button is inserted right before the anchor (right after it when insert is "after").
 // Selectors of every site except YouTube classic are unverified on the live site (these sites rename and obfuscate their DOM): each list has fallbacks and `diagnose` reports what matched.
 (function (root) {
   // YouTube keeps hidden duplicate action bars, so only a rendered node counts (no getClientRects = fake DOM, treated as rendered).
@@ -22,19 +22,19 @@
     return r * 0.299 + g * 0.587 + b * 0.114 < 128;
   }
   // First rendered post (matching `box`) with a video, `accept` and an action bar (from `bars`); -> the bar's first child that is not our own button
-  // (our button leads the bar once mounted: taking it as the anchor would remove and re-add it on every sync, a flicker).
-  function barOf(doc, box, bars, accept = () => true) {
+  // (ours sits next to the anchor once mounted: taking it as the anchor would remove and re-add it on every sync, a flicker). `last`: the last one instead.
+  function barOf(doc, box, bars, accept = () => true, last = false) {
     for (const post of doc.querySelectorAll(box)) {
       if (!rendered(post) || !accept(post) || !first(post, ["video"])) continue;
       const bar = first(post, bars);
-      const child = bar && [...bar.children].find((node) => !node.hasAttribute("data-md-button"));
-      if (child) return child;
+      const natives = bar ? [...bar.children].filter((node) => !node.hasAttribute("data-md-button")) : [];
+      if (natives.length) return natives[last ? natives.length - 1 : 0];
     }
     return null;
   }
   // Square 36px button in a horizontal action bar (X, Instagram): a normal flex item.
   const ROW_CSS = `
-:host { display: flex !important; align-items: center; justify-content: center; flex: none !important; width: 36px !important; height: 36px !important;
+:host { display: flex !important; align-items: center; align-self: center; justify-content: center; flex: none !important; width: 36px !important; height: 36px !important;
   margin: 0 !important; padding: 0 !important; visibility: visible !important; opacity: 1 !important; --bg-hover: rgba(0, 0, 0, .1); --fg: #0f1419; }
 :host([data-dark]) { --bg-hover: rgba(255, 255, 255, .15); --fg: #e7e9ea; }
 button { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--fg); cursor: pointer; }
@@ -104,7 +104,7 @@ svg { width: 24px; height: 24px; flex: none; fill: currentColor; }`,
     css: COLUMN_CSS,
   };
 
-  // X / Twitter (/<account>/status/<id>): the post of the page, only when it holds a video; the button leads its action bar (reply, repost, like...).
+  // X / Twitter (/<account>/status/<id>): the post of the page, only when it holds a video; the button ends its action bar (after share).
   const X_BARS = ['[role="group"]:has([data-testid="reply"])', '[role="group"]'];
   const x = {
     id: "x",
@@ -113,8 +113,9 @@ svg { width: 24px; height: 24px; flex: none; fill: currentColor; }`,
       const id = (/\/status\/(\d+)/.exec(doc.location && doc.location.pathname) || [])[1];
       // The page may also show replies or the thread above: only the post whose own link carries the page's id.
       const isPageOf = (post) => !id || [...post.querySelectorAll("a")].some((link) => (link.getAttribute("href") || "").includes("/status/" + id));
-      return barOf(doc, "article", X_BARS, isPageOf);
+      return barOf(doc, "article", X_BARS, isPageOf, true);
     },
+    insert: "after",
     diagnose: (doc) => counts(doc, ["article", "article video", ...X_BARS]),
     observeTarget: (doc) => first(doc, ["main", '[data-testid="primaryColumn"]']) || doc.body,
     iconPath: DOWNLOAD_ICON,
@@ -144,6 +145,7 @@ svg { width: 24px; height: 24px; flex: none; fill: currentColor; }`,
     iconPath: DOWNLOAD_ICON,
     isDark: darkBackground,
     css: COLUMN_CSS,
+    panel: "right", // the column hugs the right side of the video: open the box beside the button
   };
 
   // Instagram (/reel/<id>, /p/<id>): the post (or the page's main area) holding a video; the button leads its action row (like, comment, share...).
@@ -170,19 +172,20 @@ svg { width: 24px; height: 24px; flex: none; fill: currentColor; }`,
   }
   const MARK = "[data-md-button]";
 
-  // Keeps exactly one button, directly before the anchor. `create()` returns the element (the same one every time is fine) or null (no template).
+  // Keeps exactly one button, directly before the anchor (after it for insert "after"). `create()` returns the element (the same one every time is fine) or null (no template).
   // -> the mounted element, or null when the anchor or the template is missing (any stale button is removed).
   function mountButton(adapter, doc, create) {
     const anchor = adapter.findAnchor(doc);
     const existing = [...doc.querySelectorAll(MARK)];
     if (!anchor) { report("ancre introuvable", adapter, doc); existing.forEach((node) => node.remove()); return null; }
-    const kept = existing.find((node) => anchor.previousElementSibling === node);
+    const after = adapter.insert === "after";
+    const kept = existing.find((node) => (after ? anchor.nextElementSibling : anchor.previousElementSibling) === node);
     existing.forEach((node) => { if (node !== kept) node.remove(); });
     if (kept) return kept;
     const host = create();
     if (!host) { report("création du bouton impossible", adapter, doc); return null; }
     host.setAttribute("data-md-button", "");
-    anchor.before(host);
+    if (after) anchor.after(host); else anchor.before(host);
     return host;
   }
 
@@ -190,12 +193,14 @@ svg { width: 24px; height: 24px; flex: none; fill: currentColor; }`,
 
   // Box position from the button rect: left right-aligned to the button (clamped), top below it when it fits, else above, else pushed up to stay inside the viewport.
   // null = button not rendered; { close: true } = button fully outside the visible area.
-  function placement(rect, vw, vh, panelHeight) {
+  // side "right" (adapter option `panel`): beside the button, top aligned with it, when there is room on the right; otherwise as above.
+  function placement(rect, vw, vh, panelHeight, side) {
     if (!(rect.width > 0) || !(rect.height > 0)) return null;
     if (rect.bottom <= 0 || rect.top >= vh) return { close: true };
     const height = panelHeight > 0 ? panelHeight : 420;
     const width = Math.min(400, vw - 32);
     const left = Math.max(16, Math.min(rect.right - width, vw - width - 16));
+    if (side === "right" && rect.right + 8 + width <= vw - 8) return { top: Math.max(8, Math.min(rect.top, vh - 8 - height)), left: rect.right + 8 };
     const below = rect.bottom + 8;
     if (below + height <= vh - 8) return { top: below, left };
     const above = rect.top - 8 - height;
