@@ -87,6 +87,7 @@ La réponse `probe` est compacte :
 | `cancelled` | travail annulé par `cancel` |
 | `no_folder` | `openFolder` sans téléchargement préalable |
 | `open_failed` | le gestionnaire de fichiers n'a pas pu s'ouvrir |
+| `invalid_output_directory` | `outputDirectory` n'est pas un dossier utilisable (fichier existant, création impossible) ; le message contient le chemin |
 
 Les autres codes d'`error` sont ceux du CLI (par exemple `processing_failed`,
 dépendance manquante) ; voir [CLI_PROTOCOL.md](CLI_PROTOCOL.md).

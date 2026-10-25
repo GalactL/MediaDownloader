@@ -376,4 +376,15 @@ namespace media_downloader
         return converter.from_bytes(value.data(), value.data() + value.size());
 #endif
     }
+
+    bool EnsureOutputDirectory(std::filesystem::path const& requested, std::filesystem::path& resolved)
+    {
+        std::error_code error;
+        resolved = std::filesystem::absolute(requested, error);
+        if (error) return false;
+        std::filesystem::create_directories(resolved, error);
+        if (error) return false;
+        // create_directories renvoie false sans erreur si le chemin existe déjà, y compris comme fichier.
+        return std::filesystem::is_directory(resolved, error) && !error;
+    }
 }

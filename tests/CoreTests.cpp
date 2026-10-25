@@ -38,6 +38,16 @@ int main()
     Check(BuildFormatSelector(L"1440") == L"bestvideo[height<=1440]+bestaudio/best[height<=1440]/best", "sélecteur 2K");
     Check(BuildFormatSelector(L"1080") == L"bestvideo[height<=1080]+bestaudio/best[height<=1080]/best", "sélecteur 1080p avec repli direct");
     Check(SanitizeFileName(L" Mon titre: test? ") == L"Mon titre_ test_", "nettoyage du titre Windows");
+    {
+        auto base = std::filesystem::temp_directory_path() / (L"md-out-" + std::to_wstring(std::chrono::steady_clock::now().time_since_epoch().count()));
+        std::filesystem::path resolved;
+        Check(EnsureOutputDirectory(base / L"a" / L"b", resolved) && std::filesystem::is_directory(base / L"a" / L"b"), "dossier de sortie imbriqué créé");
+        { std::ofstream(base / L"f.txt") << "x"; }
+        Check(!EnsureOutputDirectory(base / L"f.txt", resolved), "fichier refusé comme dossier de sortie");
+        Check(!EnsureOutputDirectory(base / L"f.txt" / L"sub", resolved), "dossier sous un fichier refusé");
+        std::error_code ignored;
+        std::filesystem::remove_all(base, ignored);
+    }
     Check(SanitizeFileName(L"CON") == L"_CON", "nom Windows réservé");
     Check(SanitizeFileName(L"... ") == L"video", "titre vide après nettoyage");
 

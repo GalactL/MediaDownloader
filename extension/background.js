@@ -55,3 +55,8 @@ browser.runtime.onMessage.addListener((request, sender) => {
     sendToTab(sender.tab.id, { type: "error", id: String(request.id), code: "host_disconnected", message: "Impossible de joindre l'hôte MediaDownloader." });
   }
 });
+
+// Toolbar icon: toggles the box of the current tab (ignored where no content script runs).
+browser.browserAction.onClicked.addListener((tab) => {
+  browser.tabs.sendMessage(tab.id, { kind: "toggle" }).catch(() => {});
+});

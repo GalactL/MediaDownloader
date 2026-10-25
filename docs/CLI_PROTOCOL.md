@@ -54,6 +54,9 @@ pas déclencher de rafraîchissement.
 le message de réussite est écrit sur la sortie d'erreur. En cas d'échec, un
 événement `error` est émis et le code de sortie est `4`.
 
+Si `--output` désigne un fichier existant ou un dossier impossible à créer, l'événement `error` a le code
+`invalid_output_directory` (message en français contenant le chemin) et le code de sortie est `4`.
+
 ## Codes de sortie
 
 - `0` : réussite ;

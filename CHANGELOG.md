@@ -2,6 +2,11 @@
 
 ## Non publié
 
+## v0.4.0 (2026-10-25)
+
+- Extension : réglages dans le menu (engrenage) : dossier de téléchargement, thème clair ou sombre, affichage du bouton (sur la page ou icône de la barre d'outils uniquement). Les changements s'appliquent immédiatement.
+- Extension : icône MediaDownloader dans la barre d'outils, qui ouvre et ferme le menu ; nouvelle permission `storage`.
+
 ## v0.3.1 (2026-10-24)
 
 - Correction de la vérification de somme de contrôle de Deno sur Windows (la release v0.3.0 n'a pas été publiée avec ses archives).

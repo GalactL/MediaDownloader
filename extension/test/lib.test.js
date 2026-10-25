@@ -71,3 +71,24 @@ test("progressText", () => {
   assert.equal(lib.progressText("download", 41.6), "Téléchargement : 42 %");
   assert.equal(lib.progressText("encode", 10, 2), "Encodage (passe 2) : 10 %");
 });
+
+test("normalizeSettings", () => {
+  assert.deepEqual(lib.normalizeSettings(undefined), lib.DEFAULT_SETTINGS);
+  assert.deepEqual(lib.normalizeSettings({ outputDirectory: "  /v  ", theme: "light", buttonMode: "icon" }),
+    { outputDirectory: "/v", theme: "light", buttonMode: "icon" });
+  assert.deepEqual(lib.normalizeSettings({ outputDirectory: 5, theme: "x", buttonMode: "y" }), lib.DEFAULT_SETTINGS);
+});
+
+test("validateOutputDirectory", () => {
+  for (const ok of ["", "  ", "C:\\Users\\Moi\\Videos", "d:/Videos", "\\\\srv\\share\\v", "/home/u/Videos"])
+    assert.equal(lib.validateOutputDirectory(ok), "", ok);
+  for (const bad of ["Videos", "C:", "C:Videos", "\\\\srv", "C:\\a|b", "C:\\a?", "/a\u0000b", "./x"])
+    assert.notEqual(lib.validateOutputDirectory(bad), "", bad);
+  assert.equal(lib.validateOutputDirectory("x"), "Saisissez un chemin absolu, par exemple C:\\Users\\Moi\\Videos.");
+});
+
+test("outputDirectory in request and error text", () => {
+  assert.equal(lib.buildDownloadRequest({ url: "u", outputDirectory: " /v " }).outputDirectory, "/v");
+  assert.ok(!("outputDirectory" in lib.buildDownloadRequest({ url: "u", outputDirectory: "  " })));
+  assert.match(lib.errorText("invalid_output_directory"), /réglages/);
+});

@@ -29,8 +29,9 @@
     return number > 0 && number <= MAX_SIZE_MB ? number : NaN;
   }
 
-  function buildDownloadRequest({ url, quality, maxSizeMb, start, end, name }) {
+  function buildDownloadRequest({ url, quality, maxSizeMb, start, end, name, outputDirectory }) {
     const request = { type: "download", url };
+    if (typeof outputDirectory === "string" && outputDirectory.trim()) request.outputDirectory = outputDirectory.trim();
     if (name && name.trim()) request.title = name.trim(); // empty -> the engine keeps the video title
     if (quality && quality !== "best") request.quality = String(quality);
     if (maxSizeMb !== null && maxSizeMb !== undefined) request.maxSizeMb = maxSizeMb;
@@ -39,6 +40,30 @@
       request.endTime = end;
     }
     return request;
+  }
+
+  const DEFAULT_SETTINGS = { outputDirectory: "", theme: "dark", buttonMode: "page" };
+
+  function normalizeSettings(raw) {
+    const r = raw && typeof raw === "object" ? raw : {};
+    return {
+      outputDirectory: typeof r.outputDirectory === "string" ? r.outputDirectory.trim() : DEFAULT_SETTINGS.outputDirectory,
+      theme: r.theme === "light" ? "light" : DEFAULT_SETTINGS.theme,
+      buttonMode: r.buttonMode === "icon" ? "icon" : DEFAULT_SETTINGS.buttonMode,
+    };
+  }
+
+  // "" = engine default folder. Otherwise an absolute path (drive, UNC or POSIX). Returns French error text or "".
+  function validateOutputDirectory(text) {
+    const value = String(text ?? "").trim();
+    if (value === "") return "";
+    const bad = "Saisissez un chemin absolu, par exemple C:\\Users\\Moi\\Videos.";
+    if (/[\u0000-\u001f\u007f]/.test(value)) return bad;
+    if (value.startsWith("/") && !value.startsWith("//")) return "";
+    const drive = /^[A-Za-z]:[\\/]/.test(value);
+    const unc = /^\\\\[^\\/]+[\\/][^\\/]+/.test(value);
+    if (!drive && !unc) return bad;
+    return /[<>"|?*]/.test(drive ? value.slice(2) : value) ? bad : "";
   }
 
   function qualityOptions(heights) {
@@ -63,6 +88,7 @@
     processing_failed: "Le téléchargement a échoué.",
     download_failed: "Le téléchargement a échoué.",
     probe_failed: "Impossible d'analyser cette vidéo.",
+    invalid_output_directory: "Le dossier de téléchargement est inutilisable. Vérifiez-le dans les réglages.",
     tool_missing: "Un outil requis (yt-dlp ou FFmpeg) est introuvable.",
   };
   function errorText(code, fallback) {
@@ -95,7 +121,7 @@
     return label + passText + " : " + Math.round(Number(percent) || 0) + " %";
   }
 
-  const api = { parseTime, validateRange, parseMaxSize, buildDownloadRequest, qualityOptions, errorText, MAX_SIZE_MB, isVideoPage, canonicalUrl, progressText };
+  const api = { parseTime, validateRange, parseMaxSize, buildDownloadRequest, qualityOptions, errorText, DEFAULT_SETTINGS, normalizeSettings, validateOutputDirectory, MAX_SIZE_MB, isVideoPage, canonicalUrl, progressText };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.MDLib = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

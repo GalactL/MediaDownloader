@@ -16,6 +16,7 @@
   }
 
   browser.runtime.onMessage.addListener((message) => {
+    if (message && message.kind === "toggle") return void toggle();
     if (!message || message.kind !== "host" || !message.message) return;
     const reply = message.message;
     const handler = handlers.get(reply.id);
@@ -36,7 +37,7 @@
   }
 
   const style = el("link", { rel: "stylesheet", href: browser.runtime.getURL("content.css") });
-  const fab = el("button", { className: "fab", type: "button", title: "MediaDownloader", textContent: "⬇" });
+  const fab = el("button", { className: "fab", hidden: true, type: "button", title: "MediaDownloader", textContent: "⬇" });
 
   // Header and video summary
   const closeX = el("button", { className: "close", type: "button", textContent: "×", title: "Fermer", ariaLabel: "Fermer" });
@@ -61,6 +62,18 @@
   ]);
 
   // Side button (square, next to Télécharger): close -> cancel while running -> open folder once done. Outline icons (currentColor).
+  function icon(...paths) {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    for (const [name, value] of [["fill", "none"], ["stroke", "currentColor"], ["stroke-width", "1.8"], ["stroke-linecap", "round"], ["stroke-linejoin", "round"], ["aria-hidden", "true"]])
+      svg.setAttribute(name, value);
+    for (const d of paths) {
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", d);
+      svg.append(path);
+    }
+    return svg;
+  }
   const SIDE = {
     close: { label: "Fermer", path: "M6 6l12 12M18 6L6 18" },
     cancel: { label: "Annuler", path: "M6 6l12 12M18 6L6 18" },
@@ -70,14 +83,7 @@
   let sideMode = "close";
   function setSide(mode) {
     sideMode = mode;
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    svg.setAttribute("viewBox", "0 0 24 24");
-    for (const [name, value] of [["fill", "none"], ["stroke", "currentColor"], ["stroke-width", "1.8"], ["stroke-linecap", "round"], ["stroke-linejoin", "round"], ["aria-hidden", "true"]])
-      svg.setAttribute(name, value);
-    path.setAttribute("d", SIDE[mode].path);
-    svg.append(path);
-    side.replaceChildren(svg);
+    side.replaceChildren(icon(SIDE[mode].path));
     side.title = SIDE[mode].label;
     side.setAttribute("aria-label", SIDE[mode].label);
   }
@@ -89,16 +95,51 @@
   const download = el("button", { className: "primary", type: "button" }, [fill, label]);
   const status = el("span", { textContent: "Prêt à télécharger" });
   const notice = el("p", { className: "notice", role: "status", hidden: true });
-  const panel = el("article", { className: "dialog", hidden: true }, [
-    el("header", {}, [
-      el("div", {}, [el("h3", { textContent: "Télécharger la vidéo" }), el("span", { className: "brand", textContent: "MediaDownloader" })]),
-      closeX,
-    ]),
+  const mainView = el("div", {}, [
     el("div", { className: "video" }, [thumb, el("div", {}, [title, meta])]),
     form,
     el("div", { className: "status", role: "status" }, [status]),
     notice,
     el("div", { className: "actions" }, [download, side]),
+  ]);
+
+  // Settings view (same box, opened by the gear). Radio groups are native fieldset + radios.
+  function radioGroup(name, legend, options, stack) {
+    const inputs = options.map(([value]) => el("input", { type: "radio", name, value }));
+    const node = el("fieldset", { className: "field" }, [
+      el("legend", { textContent: legend }),
+      el("div", { className: "choices" + (stack ? " stack" : "") }, options.map(([, text], i) => el("label", { className: "choice" }, [inputs[i], text]))),
+    ]);
+    return { node, get: () => inputs.find((i) => i.checked).value, set: (v) => inputs.forEach((i) => { i.checked = i.value === v; }) };
+  }
+  const dirInput = el("input", { id: "dir", type: "text", placeholder: "Dossier Vidéos par défaut", spellcheck: false });
+  const themeChoice = radioGroup("theme", "Thème", [["light", "Clair"], ["dark", "Sombre"]]);
+  const modeChoice = radioGroup("mode", "Affichage du bouton", [["page", "Sur la page"], ["icon", "Icône de la barre uniquement"]], true);
+  const settingsNotice = el("p", { className: "notice", role: "status", hidden: true });
+  const save = el("button", { className: "primary", type: "button", textContent: "Enregistrer" });
+  const settingsView = el("div", { hidden: true }, [
+    el("div", { className: "field" }, [
+      el("label", { htmlFor: "dir", textContent: "Dossier de téléchargement" }), dirInput,
+      el("span", { className: "muted hint", textContent: "Laissez vide pour utiliser le dossier Vidéos." }),
+    ]),
+    themeChoice.node,
+    modeChoice.node,
+    settingsNotice,
+    el("div", { className: "actions" }, [save]),
+  ]);
+
+  const gear = el("button", { className: "close", type: "button", title: "Réglages", ariaLabel: "Réglages" }, [
+    icon("M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z", "M15 12a3 3 0 1 1-6 0a3 3 0 0 1 6 0z"),
+  ]);
+  const back = el("button", { className: "close", type: "button", title: "Retour", ariaLabel: "Retour", hidden: true }, [icon("M19 12H5M12 19l-7-7 7-7")]);
+  const heading = el("h3", { textContent: "Télécharger la vidéo" });
+  const panel = el("article", { className: "dialog", hidden: true }, [
+    el("header", {}, [
+      el("div", { className: "head-left" }, [back, el("div", {}, [heading, el("span", { className: "brand", textContent: "MediaDownloader" })])]),
+      el("div", { className: "head-right" }, [gear, closeX]),
+    ]),
+    mainView,
+    settingsView,
   ]);
   shadow.append(style, fab, panel);
   // Typing in the box must not trigger the page's shortcuts (space, k, f, arrows...): events leave the shadow root retargeted to the host.
@@ -117,11 +158,32 @@
     return svg;
   }
 
-  function say(text, kind) { // kind: "ok" | "error"; empty text hides the notice
-    notice.textContent = text ? (kind === "ok" ? "✓ " : "") + text : "";
-    notice.className = "notice" + (kind === "ok" ? " success" : kind === "error" ? " error" : "");
-    notice.hidden = !text;
-    notice.setAttribute("role", kind === "error" ? "alert" : "status");
+  function say(text, kind, box = notice) { // kind: "ok" | "error"; empty text hides the notice
+    box.textContent = text ? (kind === "ok" ? "✓ " : "") + text : "";
+    box.className = "notice" + (kind === "ok" ? " success" : kind === "error" ? " error" : "");
+    box.hidden = !text;
+    box.setAttribute("role", kind === "error" ? "alert" : "status");
+  }
+
+  // Settings: persisted in storage.local, applied live (also when changed from another tab).
+  let settings = lib.normalizeSettings();
+  function fillSettings() {
+    dirInput.value = settings.outputDirectory;
+    themeChoice.set(settings.theme);
+    modeChoice.set(settings.buttonMode);
+  }
+  function applySettings(next) {
+    settings = next;
+    host.dataset.theme = next.theme;
+    fab.hidden = next.buttonMode === "icon";
+    if (settingsView.hidden) fillSettings(); // never clobber an edit in progress
+  }
+  function setView(name) {
+    const inSettings = name === "settings";
+    settingsView.hidden = back.hidden = !inSettings;
+    mainView.hidden = gear.hidden = inSettings;
+    heading.textContent = inSettings ? "Réglages" : "Télécharger la vidéo";
+    if (inSettings) { fillSettings(); say("", "", settingsNotice); }
   }
 
   function setQualities(heights) {
@@ -208,7 +270,7 @@
     const startedAt = Date.now();
     say("");
     request(lib.buildDownloadRequest({
-      url: lib.canonicalUrl(location.href), quality: quality.value, maxSizeMb: size, start: startTime, end: endTime, name: nameInput.value,
+      url: lib.canonicalUrl(location.href), quality: quality.value, maxSizeMb: size, start: startTime, end: endTime, name: nameInput.value, outputDirectory: settings.outputDirectory,
     }), (reply) => {
       if (reply.type === "progress") {
         fill.style.width = Math.min(100, Math.max(0, Number(reply.percent) || 0)) + "%";
@@ -238,18 +300,36 @@
     });
   }
 
-  fab.addEventListener("click", () => {
+  function toggle() {
+    if (!host.isConnected) return; // not on a video page: no box to show
     panel.hidden = !panel.hidden;
+    if (panel.hidden) setView("main");
     if (!panel.hidden && !running && probedUrl !== location.href) probe();
+  }
+  fab.addEventListener("click", toggle);
+  gear.addEventListener("click", () => setView("settings"));
+  back.addEventListener("click", () => setView("main"));
+  save.addEventListener("click", () => {
+    const error = lib.validateOutputDirectory(dirInput.value);
+    if (error) return say(error, "error", settingsNotice);
+    const next = lib.normalizeSettings({ outputDirectory: dirInput.value, theme: themeChoice.get(), buttonMode: modeChoice.get() });
+    browser.storage.local.set({ settings: next }).then(() => {
+      applySettings(next);
+      say("Réglages enregistrés.", "ok", settingsNotice);
+    }).catch(() => say("Impossible d'enregistrer les réglages.", "error", settingsNotice));
   });
-  closeX.addEventListener("click", () => { panel.hidden = true; });
+  browser.storage.local.get("settings").then((stored) => applySettings(lib.normalizeSettings(stored.settings))).catch(() => applySettings(settings));
+  browser.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && changes.settings) applySettings(lib.normalizeSettings(changes.settings.newValue));
+  });
+  closeX.addEventListener("click", () => { panel.hidden = true; setView("main"); });
   nameInput.addEventListener("input", () => { nameEdited = true; });
   clip.addEventListener("change", () => { startInput.disabled = endInput.disabled = !clip.checked; });
   form.addEventListener("input", resetResult);
   form.addEventListener("change", resetResult);
   side.addEventListener("click", () => {
     if (sideMode === "cancel") request({ type: "cancel" }, () => {});
-    else if (sideMode === "close") panel.hidden = true;
+    else if (sideMode === "close") { panel.hidden = true; setView("main"); }
     else request({ type: "openFolder" }, (reply) => {
       if (reply.type === "error") say(lib.errorText(reply.code, reply.message), "error");
     });

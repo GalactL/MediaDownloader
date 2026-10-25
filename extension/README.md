@@ -1,12 +1,24 @@
 # Extension Firefox MediaDownloader
 
-Menu dans la page (bouton flottant en bas à droite) pour télécharger la vidéo de l'onglet
+Menu dans la page (bouton flottant en bas à droite ou icône de la barre d'outils) pour télécharger la vidéo de l'onglet
 via l'hôte de messagerie native `media_downloader` (voir `docs/NATIVE_HOST_PROTOCOL.md`).
 JavaScript pur, sans étape de build. Pour l'instant uniquement YouTube ; d'autres sites
 s'ajoutent en modifiant `content_scripts[0].matches` dans `manifest.json`.
 
 Manifest V2 avec page d'événements (`persistent: false`) : Firefox la garde active tant que
 le port `connectNative` est ouvert, et c'est le plus simple pour `runtime.connectNative`.
+
+## Réglages
+
+L'engrenage de l'en-tête du menu ouvre les réglages dans la même boîte (stockés avec
+`storage.local`, appliqués immédiatement sans recharger) :
+
+- **Dossier de téléchargement** : chemin absolu ; vide = dossier Vidéos par défaut.
+- **Thème** : clair ou sombre (sombre par défaut).
+- **Affichage du bouton** : « Sur la page » (bouton flottant) ou « Icône de la barre uniquement ».
+  Dans ce second mode, le bouton ⬇ disparaît et l'icône MediaDownloader de la barre d'outils
+  ouvre et ferme le menu. Elle n'agit que sur une page vidéo YouTube : pour revenir au bouton
+  flottant, ouvrir une vidéo, cliquer sur l'icône puis sur l'engrenage.
 
 ## Installation
 
