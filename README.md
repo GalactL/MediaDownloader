@@ -179,7 +179,7 @@ enregistre aussi la clé de registre `HKCU`). Il se relance après un déplaceme
 MediaDownloader.Cli install-host
 ```
 
-L'extension affiche un bouton flottant sur les pages YouTube ; le menu permet de choisir
+L'extension ajoute un bouton à icône « Télécharger » avant le groupe « J'aime / Je n'aime pas » sur les pages vidéo YouTube ; le menu permet de choisir
 la qualité, la taille maximale et un extrait.
 
 ## Tests
