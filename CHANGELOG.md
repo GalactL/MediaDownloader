@@ -1,5 +1,9 @@
 # Changelog
 
+## Non publié
+
+- Distribution : le job `extension` récupère le `.xpi` déjà signé par AMO si la version existe (AMO refuse de signer deux fois), ce qui rend les relances de release sûres ; les artefacts intermédiaires sont conservés 1 jour (`retention-days: 1`).
+
 ## v0.5.1 (2026-10-30)
 
 - Distribution : le workflow de release exécute d'abord les tests (moteur et extension) ; la signature Mozilla de l'extension n'a lieu qu'une fois ces tests passés.

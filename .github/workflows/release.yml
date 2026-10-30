@@ -29,7 +29,7 @@ jobs:
       - name: Tester
         run: ctest --test-dir build -C Release --output-on-failure
       - name: Tests de l'extension
-        run: node --test extension/test/*.test.js
+        run: node --test extension/test/*.test.js tools/fetch-signed-xpi.test.mjs
 
   extension:
     # AMO refuse de signer deux fois la même version : ne jamais signer avant que les tests passent.
@@ -48,14 +48,25 @@ jobs:
           cp -r extension/. ext-src/
           rm -rf ext-src/test ext-src/README.md
           if [ -n "$WEB_EXT_API_KEY" ] && [ -n "$WEB_EXT_API_SECRET" ]; then
-            npx --yes web-ext@8.3.0 sign --channel=unlisted --source-dir ext-src --artifacts-dir signed
-            cp signed/*.xpi out/mediadownloader.xpi
+            # AMO refuse de signer deux fois la même version : on réutilise le .xpi déjà signé, ce qui rend les relances sûres.
+            ext_id=$(node -p "require('./extension/manifest.json').browser_specific_settings.gecko.id")
+            ext_version=$(node -p "require('./extension/manifest.json').version")
+            code=0
+            node tools/fetch-signed-xpi.mjs "$ext_id" "$ext_version" out/mediadownloader.xpi || code=$?
+            if [ "$code" -eq 3 ]; then
+              npx --yes web-ext@8.3.0 sign --channel=unlisted --source-dir ext-src --artifacts-dir signed
+              cp signed/*.xpi out/mediadownloader.xpi
+            elif [ "$code" -ne 0 ]; then
+              exit "$code"
+            fi
           else
             echo "::warning::AMO_JWT_ISSUER/AMO_JWT_SECRET absents : mediadownloader.xpi n'est PAS signé (Firefox stable le refusera)."
             (cd ext-src && zip -r -X ../out/mediadownloader.xpi .)
           fi
+      # Ces artefacts ne servent qu'à passer des fichiers entre jobs jusqu'à la publication : 1 jour limite le quota de stockage.
       - uses: actions/upload-artifact@v4
         with:
+          retention-days: 1
           name: mediadownloader-xpi
           path: out/mediadownloader.xpi
           if-no-files-found: error
@@ -154,8 +165,10 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         run: tar -C package -czf "package/${{ matrix.artifact }}.tar.gz" "${{ matrix.artifact }}"
+      # Ces artefacts ne servent qu'à passer des fichiers entre jobs jusqu'à la publication : 1 jour limite le quota de stockage.
       - uses: actions/upload-artifact@v4
         with:
+          retention-days: 1
           name: ${{ matrix.artifact }}
           path: package/${{ matrix.artifact }}.*
           if-no-files-found: error
