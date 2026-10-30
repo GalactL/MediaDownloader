@@ -35,6 +35,10 @@ int main()
     Check(IsYouTubeUrl(L"https://www.youtube.com/watch?v=test"), "youtube.com détecté");
     Check(IsYouTubeUrl(L"https://youtu.be/test"), "youtu.be détecté");
     Check(!IsYouTubeUrl(L"https://youtube.com.example.test/video"), "faux domaine YouTube refusé");
+    Check(IsTwitterUrl(L"https://x.com/u/status/1"), "x.com détecté");
+    Check(IsTwitterUrl(L"https://twitter.com/u/status/1"), "twitter.com détecté");
+    Check(IsTwitterUrl(L"https://www.x.com/u/status/1") && IsTwitterUrl(L"https://mobile.twitter.com/u/status/1"), "sous-domaines X détectés");
+    Check(!IsTwitterUrl(L"https://x.com.evil.test/u/status/1") && !IsTwitterUrl(L"https://evilx.com/u/status/1"), "faux domaines X refusés");
 
     Check(BuildFormatSelector(L"best") == L"bestvideo+bestaudio/best", "sélecteur best");
     Check(BuildFormatSelector(L"2160") == L"bestvideo[height<=2160]+bestaudio/best[height<=2160]/best", "sélecteur 4K");

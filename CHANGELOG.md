@@ -2,6 +2,8 @@
 
 ## Non publié
 
+- Moteur : sur X (Twitter), le téléchargement d'un tweet qui en cite un autre récupère maintenant la vidéo du tweet lui-même et non celle du tweet cité (`--playlist-items 1` pour x.com et twitter.com). Un tweet sans vidéo propre qui cite une vidéo télécharge toujours la vidéo citée.
+
 ## v0.4.0 (2026-10-25)
 
 - Extension : le bouton de la page affiche le logo de l'extension (tracé SVG intégré, clair sur thème sombre et sombre sur thème clair) sur tous les sites, YouTube compris, à la place du pictogramme « télécharger ». Bouton TikTok : l'ancre reste le bouton « J'aime » (ou son conteneur) même si les autres actions de la colonne ne sont pas des `<button>`.

@@ -64,6 +64,7 @@ namespace media_downloader
     bool EnsureOutputDirectory(std::filesystem::path const& requested, std::filesystem::path& resolved);
     bool IsSupportedUrl(std::wstring_view value);
     bool IsYouTubeUrl(std::wstring_view value);
+    bool IsTwitterUrl(std::wstring_view value);
     std::wstring BuildFormatSelector(std::wstring const& quality);
     std::wstring BuildDownloadSection(double startTimeSeconds, double endTimeSeconds);
     std::wstring SanitizeFileName(std::wstring_view value);

@@ -402,6 +402,8 @@ namespace
         if (!AppendJavaScriptRuntimeArguments(arguments))
             c.Log("warning", "Aucun runtime JavaScript compatible n'a été trouvé ; certains liens YouTube peuvent échouer.");
         AppendAuthenticationArguments(arguments, options);
+        // yt-dlp renvoie [vidéos du tweet..., vidéos du tweet cité] même avec --no-playlist : on ne garde que la première.
+        if (IsTwitterUrl(options.url)) arguments.insert(arguments.end(), { L"--playlist-items", L"1" });
         if (options.startTimeSeconds && options.endTimeSeconds)
         {
             arguments.insert(arguments.end(), {
