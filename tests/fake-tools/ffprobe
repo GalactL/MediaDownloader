@@ -1,8 +1,0 @@
-#!/bin/sh
-# Fake ffprobe: prints the duration only (FAKE_DURATION seconds, default 10).
-# Record argv (one line per call) when FAKE_ARGV_LOG is set.
-if [ -n "$FAKE_ARGV_LOG" ]; then
-  { printf '%s' "$0"; for a in "$@"; do printf ' %s' "$a"; done; echo; } >> "$FAKE_ARGV_LOG"
-fi
-[ -n "$FAKE_PROBE_OUTPUT" ] && { echo "$FAKE_PROBE_OUTPUT"; exit 0; }
-echo "${FAKE_DURATION:-10}.000000"

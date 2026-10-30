@@ -70,7 +70,9 @@ namespace
             "  MediaDownloader probe --url URL\n"
             "  MediaDownloader download --url URL [options]\n"
             "  MediaDownloader host   Messagerie native Firefox (stdin/stdout)\n"
-            "  MediaDownloader install-host   Enregistre l'hote natif pour Firefox\n\n"
+            "  MediaDownloader install-host   Enregistre l'hote natif pour Firefox\n"
+            "  MediaDownloader uninstall-host   Retire l'hote natif de Firefox\n"
+            "  MediaDownloader update   Met a jour yt-dlp (yt-dlp -U)\n\n"
             "Options:\n"
             "  --quality best|720|1080    Qualite ou hauteur maximale\n"
             "  --format mp4|mkv|webm      Conteneur final (mp4 par defaut)\n"
@@ -84,7 +86,7 @@ namespace
             "  --low-resources            FFmpeg en priorite basse, 2 threads\n"
             "  --yt-dlp CHEMIN            Chemin de yt-dlp.exe\n"
             "  --ffmpeg CHEMIN            Chemin de ffmpeg.exe\n"
-            "  --ffprobe CHEMIN           Chemin de ffprobe.exe\n";
+            "  --ffprobe CHEMIN           Ignore (compatibilite)\n";
     }
 }
 
@@ -116,6 +118,8 @@ int wmain(int argc, wchar_t* argv[])
         case Command::Probe: exitCode = g_engine.Probe(*parsed.options); break;
         case Command::Download: exitCode = g_engine.Download(*parsed.options); break;
         case Command::InstallHost: exitCode = g_engine.InstallHost(); break;
+        case Command::UninstallHost: exitCode = g_engine.UninstallHost(); break;
+        case Command::Update: exitCode = g_engine.Update(*parsed.options); break;
         case Command::Host: exitCode = RunHost(g_cancelRequested); break;
         }
     }
@@ -155,6 +159,8 @@ int main(int argc, char* argv[])
         case Command::Probe: return g_engine.Probe(*parsed.options);
         case Command::Download: return g_engine.Download(*parsed.options);
         case Command::InstallHost: return g_engine.InstallHost();
+        case Command::UninstallHost: return g_engine.UninstallHost();
+        case Command::Update: return g_engine.Update(*parsed.options);
         case Command::Host: return RunHost(g_cancelRequested);
         }
     }

@@ -6,6 +6,7 @@
 #include <fstream>
 #include <cctype>
 #include <cmath>
+#include <cstdio>
 #include <cwctype>
 #include <limits>
 #include <iomanip>
@@ -119,6 +120,16 @@ namespace media_downloader
             if (arguments.size() > 1) return { std::nullopt, L"install-host n'accepte aucun argument : " + arguments[1] };
             return { Options{ .command = Command::InstallHost }, {} };
         }
+        else if (command == L"uninstall-host")
+        {
+            if (arguments.size() > 1) return { std::nullopt, L"uninstall-host n'accepte aucun argument : " + arguments[1] };
+            return { Options{ .command = Command::UninstallHost }, {} };
+        }
+        else if (command == L"update")
+        {
+            if (arguments.size() > 1) return { std::nullopt, L"update n'accepte aucun argument : " + arguments[1] };
+            return { Options{ .command = Command::Update }, {} };
+        }
         else if (command == L"host") return { Options{ .command = Command::Host }, {} }; // Firefox appends extra argv: ignored
         else return { std::nullopt, L"Commande inconnue : " + arguments[0] };
 
@@ -192,6 +203,21 @@ namespace media_downloader
     {
         auto lower = Lower(std::wstring(value));
         return lower.starts_with(L"https://") || lower.starts_with(L"http://");
+    }
+
+    std::optional<double> ParseFfmpegDuration(std::string_view output)
+    {
+        constexpr std::string_view key = "Duration:";
+        auto at = output.find(key);
+        if (at == std::string_view::npos) return std::nullopt;
+        std::string text(output.substr(at + key.size(), 16));
+        unsigned hours{}, minutes{};
+        double seconds{};
+        int consumed{};
+        if (std::sscanf(text.c_str(), " %u:%u:%lf%n", &hours, &minutes, &seconds, &consumed) != 3) return std::nullopt;
+        auto total = hours * 3600.0 + minutes * 60.0 + seconds;
+        if (!std::isfinite(total) || total <= 0.0) return std::nullopt;
+        return total;
     }
 
     static bool IsHostOrSubdomainOf(std::wstring_view value, std::initializer_list<std::wstring_view> domains)

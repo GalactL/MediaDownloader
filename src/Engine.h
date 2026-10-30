@@ -21,7 +21,7 @@ namespace media_downloader
     struct CompletedEvent { std::string path; std::uint64_t bytes{}; };
     struct ErrorEvent { std::string code; std::string message; };
     struct DoctorTool { bool found{}; std::string path; };
-    struct DoctorEvent { DoctorTool ytDlp, ffmpeg, ffprobe, javascriptRuntime; };
+    struct DoctorEvent { DoctorTool ytDlp, ffmpeg, javascriptRuntime; };
     struct ProbeEvent { std::string json; }; // raw yt-dlp --dump-single-json object
 
     using Event = std::variant<StartedEvent, LogEvent, ProgressEvent, PhaseEvent, EncodingPlanEvent,
@@ -44,8 +44,12 @@ namespace media_downloader
         int Doctor(Options const& options);
         int Probe(Options const& options);
         int Download(Options const& options);
+        // Runs `yt-dlp -U`; its output is relayed as log events.
+        int Update(Options const& options);
         // Writes the Firefox native-messaging manifest (and the registry key on Windows). Throws on failure.
         int InstallHost();
+        // Removes the manifest (and the registry key on Windows) written by InstallHost; nothing to remove is success.
+        int UninstallHost();
 
     private:
         EventSink& sink_;

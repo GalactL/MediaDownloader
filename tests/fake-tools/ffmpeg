@@ -4,6 +4,14 @@
 if [ -n "$FAKE_ARGV_LOG" ]; then
   { printf '%s' "$0"; for a in "$@"; do printf ' %s' "$a"; done; echo; } >> "$FAKE_ARGV_LOG"
 fi
+# Duration probe (`ffmpeg -i FILE`): FAKE_PROBE_OUTPUT replaces the line, else FAKE_DURATION seconds (default 10). Exits 1 like the real one.
+if [ "$1" = "-hide_banner" ] && [ "$2" = "-i" ]; then
+  d=${FAKE_DURATION:-10}
+  echo "Input #0, mov,mp4, from '$3':"
+  if [ -n "$FAKE_PROBE_OUTPUT" ]; then echo "$FAKE_PROBE_OUTPUT"; else printf '  Duration: %02d:%02d:%02d.00, start: 0.000000, bitrate: 800 kb/s\n' $((d/3600)) $((d%3600/60)) $((d%60)); fi
+  echo "At least one output file must be specified"
+  exit 1
+fi
 for a in "$@"; do
   [ "$prev" = "-pass" ] && pass=$a
   prev=$a

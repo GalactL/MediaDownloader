@@ -2,6 +2,11 @@
 
 ## Non publié
 
+- Extension : la taille maximale n'est plus plafonnée à 20 Mo (tout nombre supérieur à 0 est accepté) ; un bouton aux couleurs de Discord, « 20 Mo », remplit le champ avec la limite Discord.
+- Distribution : scripts d'installation et de désinstallation dans chaque archive (`Installer.bat` et `Desinstaller.bat` sous Windows, `install.sh` et `uninstall.sh` sous Linux et macOS) : ils lancent `install-host` / `uninstall-host` puis ouvrent `mediadownloader.xpi` dans Firefox. FFprobe n'est plus embarqué dans l'archive Linux.
+- Moteur : ffprobe n'est plus nécessaire. La durée de la vidéo est lue avec `ffmpeg -i` (ligne `Duration:`). Le champ `ffprobe` disparaît de l'événement `doctor` (CLI et hôte natif) ; l'option `--ffprobe` reste acceptée mais est ignorée. Retiré aussi de CMake, du script `install-dependencies.ps1` et de la documentation.
+- Moteur : `doctor` n'exige un runtime JavaScript (Deno ou Node) que pour une URL YouTube (`doctor --url`), et l'avertissement « Aucun runtime JavaScript » du téléchargement n'apparaît plus que pour YouTube.
+- CLI : nouvelle commande `update` (`yt-dlp -U`, sortie relayée en événements `log`, codes 0, 3 ou 4) et nouvelle commande `uninstall-host` (supprime le manifeste et, sous Windows, la clé de registre ; sans effet si rien n'est installé).
 - Moteur : sur X (Twitter), le téléchargement d'un tweet qui en cite un autre récupère maintenant la vidéo du tweet lui-même et non celle du tweet cité (`--playlist-items 1` pour x.com et twitter.com). Un tweet sans vidéo propre qui cite une vidéo télécharge toujours la vidéo citée.
 
 ## v0.4.0 (2026-10-25)

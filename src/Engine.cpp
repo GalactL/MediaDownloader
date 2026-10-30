@@ -42,13 +42,11 @@ namespace
 #ifdef _WIN32
     constexpr wchar_t YtDlpName[] = L"yt-dlp.exe";
     constexpr wchar_t FfmpegName[] = L"ffmpeg.exe";
-    constexpr wchar_t FfprobeName[] = L"ffprobe.exe";
     constexpr wchar_t DenoName[] = L"deno.exe";
     constexpr wchar_t NodeName[] = L"node.exe";
 #else
     constexpr wchar_t YtDlpName[] = L"yt-dlp";
     constexpr wchar_t FfmpegName[] = L"ffmpeg";
-    constexpr wchar_t FfprobeName[] = L"ffprobe";
     constexpr wchar_t DenoName[] = L"deno";
     constexpr wchar_t NodeName[] = L"node";
 #endif
@@ -257,20 +255,14 @@ namespace
         return { path, &c };
     }
 
-    double ProbeDuration(Ctx const& c, std::filesystem::path const& ffprobe, std::filesystem::path const& source)
+    // `ffmpeg -i` without output exits non-zero but prints the Duration line, so the exit code is ignored.
+    double ProbeDuration(Ctx const& c, std::filesystem::path const& ffmpeg, std::filesystem::path const& source)
     {
-        auto result = RunProcess(ffprobe,
-            { L"-v", L"error", L"-show_entries", L"format=duration", L"-of", L"default=noprint_wrappers=1:nokey=1", source.wstring() },
-            source.parent_path(), {}, c.cancel);
+        auto result = RunProcess(ffmpeg, { L"-hide_banner", L"-i", source.wstring() }, source.parent_path(), {}, c.cancel);
         if (result.cancelled) throw std::runtime_error("Traitement annulé");
-        if (result.exitCode != 0) throw std::runtime_error("ffprobe n'a pas pu déterminer la durée de la vidéo");
-        try
-        {
-            double duration = std::stod(Trim(result.output));
-            if (!std::isfinite(duration) || duration <= 0.0) throw std::runtime_error("durée invalide");
-            return duration;
-        }
-        catch (...) { throw std::runtime_error("La durée retournée par ffprobe est invalide"); }
+        auto duration = ParseFfmpegDuration(result.output);
+        if (!duration) throw std::runtime_error("FFmpeg n'a pas pu déterminer la durée de la vidéo");
+        return *duration;
     }
 
     void EncodeToSize(
@@ -309,15 +301,15 @@ namespace
     {
         auto ytDlp = FindTool(options.ytDlp, L"MEDIADOWNLOADER_YTDLP", YtDlpName);
         auto ffmpeg = FindTool(options.ffmpeg, L"MEDIADOWNLOADER_FFMPEG", FfmpegName);
-        auto ffprobe = FindTool(options.ffprobe, L"MEDIADOWNLOADER_FFPROBE", FfprobeName);
         std::vector<std::wstring> runtimeArguments;
         auto jsRuntime = AppendJavaScriptRuntimeArguments(runtimeArguments);
         auto tool = [](auto const& path)
         {
             return DoctorTool{ path.has_value(), path ? WideToUtf8(path->wstring()) : std::string{} };
         };
-        c.sink.On(DoctorEvent{ tool(ytDlp), tool(ffmpeg), tool(ffprobe), tool(jsRuntime) });
-        return ytDlp && ffmpeg && ffprobe && jsRuntime ? 0 : 3;
+        c.sink.On(DoctorEvent{ tool(ytDlp), tool(ffmpeg), tool(jsRuntime) });
+        // The JS runtime only matters for YouTube; without a YouTube URL it is reported but not required.
+        return ytDlp && ffmpeg && (jsRuntime || !IsYouTubeUrl(options.url)) ? 0 : 3;
     }
 
     int RunProbe(Ctx const& c, Options const& options)
@@ -347,15 +339,9 @@ namespace
         if (!ytDlp) { c.Error("tool_missing", "yt-dlp est introuvable"); return 3; }
 
         auto ffmpeg = FindTool(options.ffmpeg, L"MEDIADOWNLOADER_FFMPEG", FfmpegName);
-        auto ffprobe = FindTool(options.ffprobe, L"MEDIADOWNLOADER_FFPROBE", FfprobeName);
         if (!ffmpeg)
         {
             c.Error("tool_missing", "ffmpeg.exe est requis pour assembler les flux vidéo et audio");
-            return 3;
-        }
-        if (options.maxSizeMb && !ffprobe)
-        {
-            c.Error("tool_missing", "ffmpeg.exe et ffprobe.exe sont requis pour limiter la taille");
             return 3;
         }
 
@@ -399,7 +385,7 @@ namespace
             L"--print", L"before_dl:__MD_DL__:%(id)s",
             L"--print", L"after_move:__MD_FILE__:%(filepath)s"
         };
-        if (!AppendJavaScriptRuntimeArguments(arguments))
+        if (!AppendJavaScriptRuntimeArguments(arguments) && IsYouTubeUrl(options.url))
             c.Log("warning", "Aucun runtime JavaScript compatible n'a été trouvé ; certains liens YouTube peuvent échouer.");
         AppendAuthenticationArguments(arguments, options);
         // yt-dlp renvoie [vidéos du tweet..., vidéos du tweet cité] même avec --no-playlist : on ne garde que la première.
@@ -450,7 +436,7 @@ namespace
         std::filesystem::path completedSource = *source;
         if (options.maxSizeMb)
         {
-            auto duration = ProbeDuration(c, *ffprobe, *source);
+            auto duration = ProbeDuration(c, *ffmpeg, *source);
             auto plan = CalculateEncodePlan(duration, *options.maxSizeMb);
             if (!plan)
             {
@@ -487,9 +473,22 @@ int Engine::Doctor(Options const& options) { return RunDoctor(Ctx{ sink_, cancel
 int Engine::Probe(Options const& options) { return RunProbe(Ctx{ sink_, cancel_ }, options); }
 int Engine::Download(Options const& options) { return RunDownload(Ctx{ sink_, cancel_ }, options); }
 
+int Engine::Update(Options const& options)
+{
+    Ctx c{ sink_, cancel_ };
+    auto ytDlp = FindTool(options.ytDlp, L"MEDIADOWNLOADER_YTDLP", YtDlpName);
+    if (!ytDlp) { c.Error("tool_missing", "yt-dlp est introuvable"); return 3; }
+    auto result = RunProcess(*ytDlp, { L"-U" }, std::filesystem::current_path(), [&c](std::string const& line)
+    {
+        if (!Trim(line).empty()) c.Log("info", line);
+    }, cancel_);
+    if (result.cancelled) { c.Error("cancelled", "Mise à jour annulée"); return 4; }
+    if (result.exitCode != 0) { c.Error("update_failed", "La mise à jour de yt-dlp a échoué"); return 4; }
+    return 0;
+}
+
 int Engine::InstallHost()
 {
-    // Chemin provisoire : remplacé par l'identifiant de l'extension à l'étape 2.
     constexpr char ExtensionId[] = "mediadownloader@localhost";
     auto exe = ExecutablePath();
     std::filesystem::path home;
@@ -527,6 +526,34 @@ int Engine::InstallHost()
     if (status != ERROR_SUCCESS) throw std::runtime_error("Impossible d'écrire la clé de registre de l'hôte natif");
 #endif
     std::cerr << "Hôte natif installé : " << WideToUtf8(manifest.wstring()) << std::endl;
+    return 0;
+}
+
+int Engine::UninstallHost()
+{
+    std::filesystem::path home;
+#ifdef _WIN32
+    constexpr auto platform = HostPlatform::Windows;
+#else
+    if (auto value = std::getenv("HOME")) home = value;
+    if (home.empty()) throw std::runtime_error("Le dossier personnel est indisponible");
+#ifdef __APPLE__
+    constexpr auto platform = HostPlatform::MacOS;
+#else
+    constexpr auto platform = HostPlatform::Linux;
+#endif
+#endif
+    auto manifest = NativeManifestPath(platform, home, ExecutablePath().parent_path());
+    std::error_code error;
+    auto removed = std::filesystem::remove(manifest, error);
+    if (error) throw std::runtime_error("Impossible de supprimer le manifeste : " + error.message());
+#ifdef _WIN32
+    auto status = RegDeleteKeyW(HKEY_CURRENT_USER, L"Software\\Mozilla\\NativeMessagingHosts\\media_downloader");
+    if (status != ERROR_SUCCESS && status != ERROR_FILE_NOT_FOUND)
+        throw std::runtime_error("Impossible de supprimer la clé de registre de l'hôte natif");
+    removed = removed || status == ERROR_SUCCESS;
+#endif
+    std::cerr << (removed ? "Hôte natif retiré : " : "Hôte natif déjà absent : ") << WideToUtf8(manifest.wstring()) << std::endl;
     return 0;
 }
 }

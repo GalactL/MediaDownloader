@@ -31,7 +31,8 @@ test("parseMaxSize", () => {
   assert.equal(lib.parseMaxSize("10"), 10);
   assert.equal(lib.parseMaxSize("2,5"), 2.5);
   assert.equal(lib.parseMaxSize("20"), 20);
-  for (const bad of ["0", "-3", "x", "20.5", "100"]) assert.ok(Number.isNaN(lib.parseMaxSize(bad)), bad);
+  assert.equal(lib.parseMaxSize("100"), 100);
+  for (const bad of ["0", "-3", "x", "1e400", "9".repeat(400)]) assert.ok(Number.isNaN(lib.parseMaxSize(bad)), bad);
 });
 
 test("buildDownloadRequest", () => {
@@ -58,6 +59,17 @@ test("custom name and errorText", () => {
   // Unknown codes never leak the engine's raw text: they get the generic message.
   assert.equal(errorText("fr", "dependency_missing"), "Une erreur est survenue.");
   assert.equal(lib.errorKey("size_exceeded"), "error.size_exceeded");
+});
+
+test("host_disconnected: dedicated install notice with steps and release link", () => {
+  assert.equal(lib.errorKey("host_disconnected"), "error.host_disconnected");
+  const text = errorText("fr", "host_disconnected");
+  assert.match(text, /^Programme MediaDownloader non installé\./);
+  assert.match(text, /Installer\.bat/);
+  assert.match(text, /install\.sh/);
+  assert.match(text, /Relancez Firefox/);
+  assert.equal(lib.INSTALL_URL, "https://github.com/GalactL/MediaDownloader/releases/latest");
+  assert.match(errorText("en", "host_disconnected"), /^MediaDownloader program not installed\./);
 });
 
 test("qualityOptions", () => {
@@ -127,7 +139,7 @@ test("i18n: missing key falls back to French, then to the key", () => {
   }
   assert.equal(i18n.translate("en", "no.such.key"), "no.such.key");
   assert.equal(i18n.translate("zz", "action.close"), "Fermer");
-  assert.equal(i18n.translate("en", "field.maxSize", { max: 20 }), "Maximum size (MB, 20 max, optional)");
+  assert.equal(i18n.translate("en", "field.maxSize"), "Maximum size (MB, optional)");
 });
 
 test("i18n: catalogue completeness", () => {

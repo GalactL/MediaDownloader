@@ -16,7 +16,9 @@ namespace media_downloader
         Probe,
         Download,
         Host,
-        InstallHost
+        InstallHost,
+        Update,
+        UninstallHost
     };
 
     enum class HostPlatform { Windows, MacOS, Linux };
@@ -69,6 +71,8 @@ namespace media_downloader
     std::wstring BuildDownloadSection(double startTimeSeconds, double endTimeSeconds);
     std::wstring SanitizeFileName(std::wstring_view value);
     std::string SummarizeDownloadFailure(std::string_view output);
+    // Durée en secondes lue sur la ligne "Duration: HH:MM:SS.xx" de `ffmpeg -i` ; nullopt si absente, "N/A" ou nulle.
+    std::optional<double> ParseFfmpegDuration(std::string_view output);
     std::optional<EncodePlan> CalculateEncodePlan(double durationSeconds, double maxSizeMb);
     // FFmpeg arguments of one x264 pass (1 or 2). `lowResources` only adds "-threads 2"; priority is the caller's concern.
     std::vector<std::wstring> BuildEncodeArguments(
