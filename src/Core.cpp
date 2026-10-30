@@ -220,7 +220,7 @@ namespace media_downloader
         return total;
     }
 
-    bool IsYouTubeUrl(std::wstring_view value)
+    static bool IsHostOrSubdomainOf(std::wstring_view value, std::initializer_list<std::wstring_view> domains)
     {
         auto lower = Lower(std::wstring(value));
         auto scheme = lower.find(L"://");
@@ -237,7 +237,17 @@ namespace media_downloader
             return authority == domain || (authority.size() > domain.size() &&
                 authority.ends_with(domain) && authority[authority.size() - domain.size() - 1] == L'.');
         };
-        return isDomain(L"youtube.com") || isDomain(L"youtu.be") || isDomain(L"youtube-nocookie.com");
+        return std::ranges::any_of(domains, isDomain);
+    }
+
+    bool IsYouTubeUrl(std::wstring_view value)
+    {
+        return IsHostOrSubdomainOf(value, { L"youtube.com", L"youtu.be", L"youtube-nocookie.com" });
+    }
+
+    bool IsTwitterUrl(std::wstring_view value)
+    {
+        return IsHostOrSubdomainOf(value, { L"x.com", L"twitter.com" });
     }
 
     std::wstring BuildFormatSelector(std::wstring const& quality)
