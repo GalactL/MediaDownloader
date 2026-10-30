@@ -31,13 +31,11 @@ try {
 
     Expand-Archive -LiteralPath $ffmpegArchive -DestinationPath $ffmpegExtracted -Force
     $ffmpeg = Get-ChildItem -LiteralPath $ffmpegExtracted -Filter 'ffmpeg.exe' -File -Recurse | Select-Object -First 1
-    $ffprobe = Get-ChildItem -LiteralPath $ffmpegExtracted -Filter 'ffprobe.exe' -File -Recurse | Select-Object -First 1
-    if (-not $ffmpeg -or -not $ffprobe) {
+    if (-not $ffmpeg) {
         throw "L'archive FFmpeg ne contient pas les exécutables attendus."
     }
 
     Copy-Item -LiteralPath $ffmpeg.FullName -Destination (Join-Path $binDirectory 'ffmpeg.exe') -Force
-    Copy-Item -LiteralPath $ffprobe.FullName -Destination (Join-Path $binDirectory 'ffprobe.exe') -Force
 
     # Garder la version synchronisée avec .github/workflows/release.yml
     $denoVersion = '2.5.6'

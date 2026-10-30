@@ -57,7 +57,6 @@ namespace
             " PATH=/usr/bin:/bin FAKE_ARGV_LOG=" + Q(g_argvLog.string()) +
             " MEDIADOWNLOADER_YTDLP=" + Q((tools / "yt-dlp").string()) +
             " MEDIADOWNLOADER_FFMPEG=" + Q((tools / "ffmpeg").string()) +
-            " MEDIADOWNLOADER_FFPROBE=" + Q((tools / "ffprobe").string()) +
             " MEDIADOWNLOADER_DENO=" + Q((tools / "deno").string());
         for (auto const& e : env) cmd += " " + Q(e);
         cmd += " " + Q(MD_CLI_PATH);
@@ -127,7 +126,7 @@ namespace
         {
             auto r = Run(args);
             Check(r.code == 0, "help exits 0");
-            for (auto const* s : { "doctor", "probe", "download", "host", "install-host", "--url", "--quality", "--format", "--title",
+            for (auto const* s : { "doctor", "probe", "download", "host", "install-host", "uninstall-host", "update", "--url", "--quality", "--format", "--title",
                 "--start-time", "--end-time", "--max-size-mb", "--cookies-from-browser", "--output",
                 "--overwrite", "--yt-dlp", "--ffmpeg", "--ffprobe" })
                 Check(Has(r, s), std::string("help mentions ") + s);
@@ -180,10 +179,8 @@ namespace
             { "PATH=" + empty.string(), "MEDIADOWNLOADER_YTDLP=/nonexistent/yt-dlp" });
         Check(r.code == 3 && Has(r, "\"code\":\"tool_missing\""), "probe without yt-dlp: tool_missing exit 3");
 
-        // Only ffprobe is missing: yt-dlp/ffmpeg resolve from the fake tools.
-        r = Run({ "download", "--url", url, "--output", out.string(), "--max-size-mb", "10" },
-            { "PATH=" + empty.string(), "MEDIADOWNLOADER_FFPROBE=/nonexistent/ffprobe" });
-        Check(r.code == 3 && Has(r, "\"code\":\"tool_missing\""), "missing ffprobe with size limit: tool_missing exit 3");
+        r = Run({ "update" }, { "PATH=" + empty.string(), "MEDIADOWNLOADER_YTDLP=/nonexistent/yt-dlp" });
+        Check(r.code == 3 && Has(r, "\"code\":\"tool_missing\""), "update without yt-dlp: tool_missing exit 3");
     }
 
     void TestDoctor()
@@ -193,7 +190,7 @@ namespace
         CheckAllJson(r, "doctor");
         Check(r.lines.size() == 1 && r.lines[0].starts_with("{\"type\":\"doctor\",\"tools\":{\"yt-dlp\":{\"found\":true,\"path\":\""),
             "doctor shape: " + r.out);
-        for (auto const* tool : { "\"ffmpeg\":{\"found\":true", "\"ffprobe\":{\"found\":true", "\"javascript-runtime\":{\"found\":true" })
+        for (auto const* tool : { "\"ffmpeg\":{\"found\":true", "\"javascript-runtime\":{\"found\":true" })
             Check(Has(r, tool), std::string("doctor reports ") + tool);
 
         auto empty = NewDir("emptypath");
@@ -201,6 +198,16 @@ namespace
         Check(r.code == 3, "doctor exits 3 when a tool is missing");
         Check(Has(r, "\"yt-dlp\":{\"found\":false}"), "doctor reports missing tool as found:false without path");
         Check(Has(r, "\"javascript-runtime\":{\"found\":false}"), "doctor reports missing JS runtime");
+        Check(!Has(r, "ffprobe"), "doctor has no ffprobe field");
+
+        // JS runtime is optional without a YouTube URL, required with one.
+        auto noJs = std::vector<std::string>{ "PATH=" + empty.string(), "MEDIADOWNLOADER_DENO=/nonexistent", "MEDIADOWNLOADER_NODE=/nonexistent" };
+        r = Run({ "doctor" }, noJs);
+        Check(r.code == 0 && Has(r, "\"javascript-runtime\":{\"found\":false}"), "doctor without URL: missing JS runtime is not fatal");
+        r = Run({ "doctor", "--url", "https://example.com/v" }, noJs);
+        Check(r.code == 0, "doctor non-YouTube URL: JS runtime optional");
+        r = Run({ "doctor", "--url", "https://www.youtube.com/watch?v=abc" }, noJs);
+        Check(r.code == 3, "doctor YouTube URL: JS runtime required");
     }
 
     void TestProbe()
@@ -279,6 +286,36 @@ namespace
         Check(low.argv.find("-passlogfile") != std::string::npos && low.argv.find(" -threads 2 ") != std::string::npos, "--low-resources adds -threads 2: " + low.argv);
         Check(normal.out.find("\"stage\":\"encode\",\"percent\":0.0,\"pass\":1") != std::string::npos, "pass 1 is announced at 0 %");
         Check(normal.out.find("\"stage\":\"encode\",\"percent\":50.0,\"pass\":2") != std::string::npos, "pass 2 is announced at 50 %");
+    }
+
+    void TestUpdate()
+    {
+        auto r = Run({ "update" });
+        Check(r.code == 0, "update exits 0");
+        CheckAllJson(r, "update");
+        Check(Has(r, "{\"type\":\"log\",\"level\":\"info\",\"message\":\"yt-dlp is up to date\"}"), "update relays yt-dlp output as log: " + r.out);
+        Check(r.argv.find("yt-dlp -U") != std::string::npos, "update runs yt-dlp -U: " + r.argv);
+        r = Run({ "update" }, { "FAKE_YTDLP_MODE=fail" });
+        Check(r.code == 4 && Has(r, "\"type\":\"error\""), "update failure exits 4");
+        Check(Run({ "update", "--x" }).code == 2, "update rejects arguments");
+    }
+
+    void TestUninstallHost()
+    {
+        auto manifest = g_home / (
+#ifdef __APPLE__
+            "Library/Application Support/Mozilla/NativeMessagingHosts/media_downloader.json"
+#else
+            ".mozilla/native-messaging-hosts/media_downloader.json"
+#endif
+        );
+        Run({ "install-host" });
+        Check(fs::exists(manifest), "manifest exists before uninstall-host");
+        auto r = Run({ "uninstall-host" });
+        Check(r.code == 0 && r.out.empty() && !fs::exists(manifest), "uninstall-host removes the manifest, empty stdout");
+        r = Run({ "uninstall-host" });
+        Check(r.code == 0 && r.out.empty(), "uninstall-host is idempotent");
+        Check(Run({ "uninstall-host", "--x" }).code == 2, "uninstall-host rejects arguments");
     }
 
     void TestInstallHost()
@@ -438,7 +475,7 @@ namespace
         r = Run({ "download", "--url", url, "--output", out.string(), "--max-size-mb", "10" });
         Check(!Contains(r.argv, "scale="), "no scale filter for best");
 
-        // Clip + size limit: the plan uses the duration ffprobe reports for the downloaded file.
+        // Clip + size limit: the plan uses the duration ffmpeg reports for the downloaded file.
         r = Run({ "download", "--url", url, "--output", out.string(), "--max-size-mb", "10", "--start-time", "10", "--end-time", "15" },
             { "FAKE_DURATION=5", "FAKE_ENCODED_BYTES=4096" });
         Check(r.code == 0, "clip + max-size exits 0: " + r.out);
@@ -450,12 +487,12 @@ namespace
     {
         fs::path tools = MD_FAKE_TOOLS_DIR;
         auto alt = NewDir("alt");
-        for (auto const* n : { "yt-dlp", "ffmpeg", "ffprobe" }) fs::copy_file(tools / n, alt / n);
+        for (auto const* n : { "yt-dlp", "ffmpeg" }) fs::copy_file(tools / n, alt / n);
         auto out = NewDir("out");
         auto r = Run({ "download", "--url", "https://example.com/v", "--output", out.string(), "--max-size-mb", "10",
-            "--yt-dlp", (alt / "yt-dlp").string(), "--ffmpeg", (alt / "ffmpeg").string(), "--ffprobe", (alt / "ffprobe").string() });
+            "--yt-dlp", (alt / "yt-dlp").string(), "--ffmpeg", (alt / "ffmpeg").string() });
         Check(r.code == 0, "download with explicit tool flags exits 0: " + r.out);
-        for (auto const* n : { "yt-dlp", "ffmpeg", "ffprobe" })
+        for (auto const* n : { "yt-dlp", "ffmpeg" })
         {
             Check(!ToolLine(r, (alt / n).string()).empty(), std::string("--") + n + " flag selects the tool");
             Check(ToolLine(r, (tools / n).string()).empty(), std::string("env ") + n + " is not used when the flag is given");
@@ -498,16 +535,19 @@ namespace
         };
         expectError({ "FAKE_FFMPEG_MODE=fail" }, "FFmpeg a échoué pendant l'encodage passe 1", "ffmpeg failure");
         expectError({ "FAKE_FFMPEG_MODE=nofile" }, "FFmpeg n'a pas produit le fichier attendu", "ffmpeg without output");
-        expectError({ "FAKE_PROBE_OUTPUT=abc" }, "La durée retournée par ffprobe est invalide", "invalid ffprobe duration");
-        expectError({ "FAKE_PROBE_OUTPUT=0" }, "La durée retournée par ffprobe est invalide", "zero ffprobe duration");
+        expectError({ "FAKE_PROBE_OUTPUT=abc" }, "FFmpeg n'a pas pu déterminer la durée de la vidéo", "invalid duration");
+        expectError({ "FAKE_PROBE_OUTPUT=  Duration: 00:00:00.00, start: 0" }, "FFmpeg n'a pas pu déterminer la durée de la vidéo", "zero duration");
 
         // Warning log when no JavaScript runtime exists (PATH holds only head, needed by the fakes).
         auto bin = NewDir("bin");
         for (auto const* head : { "/usr/bin/head", "/bin/head" })
             if (fs::exists(head)) { fs::create_symlink(head, bin / "head"); break; }
         auto out = NewDir("out");
-        auto r = Run({ "download", "--url", url, "--output", out.string() },
-            { "PATH=" + bin.string(), "MEDIADOWNLOADER_DENO=/nonexistent", "MEDIADOWNLOADER_NODE=/nonexistent" });
+        std::vector<std::string> noJs{ "PATH=" + bin.string(), "MEDIADOWNLOADER_DENO=/nonexistent", "MEDIADOWNLOADER_NODE=/nonexistent" };
+        auto r = Run({ "download", "--url", url, "--output", out.string() }, noJs);
+        Check(r.code == 0 && !Has(r, "Aucun runtime JavaScript"), "no JS runtime warning for a non-YouTube URL: " + r.out);
+        out = NewDir("out");
+        r = Run({ "download", "--url", "https://www.youtube.com/watch?v=abc", "--output", out.string() }, noJs);
         Check(r.code == 0, "download without JS runtime still succeeds: " + r.out);
         Check(Has(r, "{\"type\":\"log\",\"level\":\"warning\",\"message\":\"Aucun runtime JavaScript compatible n'a été trouvé ; certains liens YouTube peuvent échouer.\"}"),
             "warning log without JS runtime");
@@ -535,7 +575,9 @@ int main()
     TestDownloadPlain();
     TestProgressArguments();
     TestLowResources();
+    TestUpdate();
     TestInstallHost();
+    TestUninstallHost();
     TestDefaultOutput();
     TestOutputFallback();
     TestDownloadEncode();

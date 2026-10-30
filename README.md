@@ -9,9 +9,10 @@ FFmpeg afin de respecter une taille maximale (par exemple 10 Mo pour Discord).
 
 ## État du projet
 
-La version 0.2 fournit un CLI pour Windows, macOS et Linux, avec des événements JSON ligne par
+La version 0.4 fournit un CLI pour Windows, macOS et Linux, avec des événements JSON ligne par
 ligne exploitables par toute application appelante (l'utilisation depuis HUB est inchangée),
-ainsi que l'extension Firefox et son hôte natif. YouTube, TikTok et X sont pris en
+ainsi que l'extension Firefox et son hôte natif. L'extension ajoute un bouton de téléchargement sur
+YouTube (vidéos et Shorts), X (Twitter), TikTok et Instagram ; le CLI accepte toute URL HTTP(S). Ces sites sont pris en
 charge dans la mesure où la version installée de `yt-dlp` les prend en charge et
 où le contenu est accessible sans contourner de DRM.
 
@@ -24,33 +25,35 @@ La release GitHub contient une archive et une notice distinctes pour chaque cibl
 ## Installation (release)
 
 1. Décompresser l'archive.
-2. Exécuter `MediaDownloader.Cli install-host` (`MediaDownloader.Cli.exe install-host` sous Windows).
-3. Glisser `mediadownloader.xpi` dans une fenêtre Firefox.
+2. Windows : double-cliquer sur `Installer.bat`. Linux et macOS : exécuter `./install.sh`.
+3. Firefox s'ouvre sur `mediadownloader.xpi` : accepter l'installation de l'extension.
+
+Désinstallation : `Desinstaller.bat` (Windows) ou `./uninstall.sh`, puis supprimer l'extension dans `about:addons` et le dossier.
 
 Contenu de l'archive :
 
 ```text
 MediaDownloader.Cli(.exe)
+Installer.bat, Desinstaller.bat (Windows) ; install.sh, uninstall.sh (Linux, macOS)
 mediadownloader.xpi
-tools/bin/   yt-dlp, ffmpeg, ffprobe, deno (Windows, Linux) ; deno seul (macOS)
+tools/bin/   yt-dlp, ffmpeg, deno (Windows, Linux) ; deno seul (macOS)
 README.txt
 ```
 
-Sous Linux, l'archive est autonome : `yt-dlp`, `ffmpeg` (build statique GPL de BtbN/FFmpeg-Builds, redistribué sous licence GPL ; sources et licence : https://github.com/BtbN/FFmpeg-Builds et https://ffmpeg.org/legal.html), `ffprobe` et `deno` sont dans `tools/bin`. Sous macOS, `yt-dlp` et FFmpeg doivent être installés séparément, par exemple avec Homebrew (voir `README.txt`).
-Sous Windows, ne pas déplacer l'exécutable après `install-host` : le manifeste
+Sous Linux, l'archive est autonome : `yt-dlp`, `ffmpeg` (build statique GPL de BtbN/FFmpeg-Builds, redistribué sous licence GPL ; sources et licence : https://github.com/BtbN/FFmpeg-Builds et https://ffmpeg.org/legal.html) et `deno` sont dans `tools/bin`. Sous macOS, `yt-dlp` et FFmpeg doivent être installés séparément, par exemple avec Homebrew (voir `README.txt`).
+Sous Windows, ne pas déplacer le dossier après l'installation : le manifeste
 contient son chemin. Signature de l'extension : [docs/EXTENSION_SIGNATURE.md](docs/EXTENSION_SIGNATURE.md).
 
 ## Prérequis
 
 - compilateur C++20 et CMake 3.24+ pour compiler depuis les sources
-- `yt-dlp`, `ffmpeg` et `ffprobe` (extensions `.exe` sous Windows)
+- `yt-dlp` et `ffmpeg` (extensions `.exe` sous Windows)
 - Node.js 22 ou plus récent, ou Deno 2.3+, pour résoudre les challenges JavaScript YouTube
 
-Les trois outils sont recherchés, dans cet ordre :
+Les outils sont recherchés, dans cet ordre :
 
-1. chemins fournis avec `--yt-dlp`, `--ffmpeg` et `--ffprobe` ;
-2. variables `MEDIADOWNLOADER_YTDLP`, `MEDIADOWNLOADER_FFMPEG` et
-   `MEDIADOWNLOADER_FFPROBE` ;
+1. chemins fournis avec `--yt-dlp` et `--ffmpeg` (`--ffprobe` est accepté et ignoré) ;
+2. variables `MEDIADOWNLOADER_YTDLP` et `MEDIADOWNLOADER_FFMPEG` ;
 3. dossier `tools/bin` voisin du projet ou de l'exécutable ;
 4. `PATH`.
 
@@ -90,6 +93,14 @@ Diagnostic des dépendances :
 
 ```powershell
 MediaDownloader.Cli.exe doctor
+```
+
+`doctor` n'exige un runtime JavaScript que pour une URL YouTube (`doctor --url URL`).
+
+Mise à jour de yt-dlp (`yt-dlp -U`, sortie relayée en événements `log`) :
+
+```powershell
+MediaDownloader.Cli.exe update
 ```
 
 Inspection d'un lien :
@@ -137,6 +148,8 @@ MediaDownloader reconnaît les domaines YouTube et ajoute silencieusement
 `--cookies-from-browser firefox`. Aucun choix de navigateur n'est présenté dans
 l'interface. Le programme ne lance pas Firefox et ne tente aucune reconnexion :
 une session Firefox valide doit déjà exister sur le compte Windows.
+Pour les autres sites (X, TikTok, Instagram…), aucun cookie n'est lu : une vidéo qui exige une connexion
+ne peut pas être téléchargée et l'extension affiche un message d'erreur clair.
 
 Sans `--output`, les fichiers finaux sont placés dans le dossier **Vidéos** de
 Windows ou dans `~/Videos` sur macOS et Linux. Le dossier Windows est celui
@@ -179,11 +192,17 @@ enregistre aussi la clé de registre `HKCU`). Il se relance après un déplaceme
 MediaDownloader.Cli install-host
 ```
 
-L'extension ajoute un bouton à icône « Télécharger » avant le groupe « J'aime / Je n'aime pas » sur les pages vidéo YouTube ; le menu permet de choisir
-la qualité, la taille maximale et un extrait.
+`MediaDownloader.Cli uninstall-host` fait l'inverse : il supprime le manifeste (et la clé de registre sous Windows).
+Sans rien à retirer, il réussit quand même.
+
+L'extension ajoute un bouton (le logo de MediaDownloader) dans la page : avant le groupe « J'aime / Je n'aime pas » sur YouTube, dans la
+colonne d'actions des Shorts et de TikTok, dans la barre d'actions d'une publication X ou Instagram contenant une vidéo.
+Le même menu permet de choisir la qualité, la taille maximale et un extrait. Détails par site (pages concernées,
+permissions, sélecteurs de repli) : [extension/README.md](extension/README.md).
 
 ## Tests
 
 ```powershell
 ctest --test-dir build -C Release --output-on-failure
+node --test extension/test/*.test.js
 ```

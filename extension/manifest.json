@@ -22,7 +22,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["*://*.youtube.com/*", "*://youtu.be/*"],
+      "matches": ["*://*.youtube.com/*", "*://youtu.be/*", "*://x.com/*", "*://www.x.com/*", "*://twitter.com/*", "*://www.twitter.com/*", "*://www.tiktok.com/*", "*://www.instagram.com/*"],
       "js": ["i18n.js", "lib.js", "sites.js", "content.js"],
       "run_at": "document_idle"
     }
