@@ -16,7 +16,7 @@ YouTube (vidéos et Shorts), X (Twitter), TikTok et Instagram ; le CLI accepte t
 charge dans la mesure où la version installée de `yt-dlp` les prend en charge et
 où le contenu est accessible sans contourner de DRM.
 
-## Plateformes de la v0.4.1
+## Plateformes de la v0.4.2
 
 - Windows x64 et Linux x64 : CLI, hôte de messagerie native et extension Firefox.
 
