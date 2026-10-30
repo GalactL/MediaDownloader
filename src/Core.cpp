@@ -97,7 +97,6 @@ namespace media_downloader
         switch (platform)
         {
         case HostPlatform::Windows: return exeDirectory / "native-host" / "media_downloader.json";
-        case HostPlatform::MacOS: return home / "Library" / "Application Support" / "Mozilla" / "NativeMessagingHosts" / "media_downloader.json";
         default: return home / ".mozilla" / "native-messaging-hosts" / "media_downloader.json";
         }
     }

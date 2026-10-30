@@ -9,23 +9,23 @@ FFmpeg afin de respecter une taille maximale (par exemple 10 Mo pour Discord).
 
 ## État du projet
 
-La version 0.4 fournit un CLI pour Windows, macOS et Linux, avec des événements JSON ligne par
+La version 0.4 fournit un CLI pour Windows et Linux, avec des événements JSON ligne par
 ligne exploitables par toute application appelante (l'utilisation depuis HUB est inchangée),
 ainsi que l'extension Firefox et son hôte natif. L'extension ajoute un bouton de téléchargement sur
 YouTube (vidéos et Shorts), X (Twitter), TikTok et Instagram ; le CLI accepte toute URL HTTP(S). Ces sites sont pris en
 charge dans la mesure où la version installée de `yt-dlp` les prend en charge et
 où le contenu est accessible sans contourner de DRM.
 
-## Plateformes de la v0.4.0
+## Plateformes de la v0.4.1
 
-- Windows x64, macOS Apple Silicon et Intel, Linux x64 : CLI, hôte de messagerie native et extension Firefox.
+- Windows x64 et Linux x64 : CLI, hôte de messagerie native et extension Firefox.
 
 La release GitHub contient une archive et une notice distinctes pour chaque cible.
 
 ## Installation (release)
 
 1. Décompresser l'archive.
-2. Windows : double-cliquer sur `Installer.bat`. Linux et macOS : exécuter `./install.sh`.
+2. Windows : double-cliquer sur `Installer.bat`. Linux : exécuter `./install.sh`.
 3. Firefox s'ouvre sur `mediadownloader.xpi` : accepter l'installation de l'extension.
 
 Désinstallation : `Desinstaller.bat` (Windows) ou `./uninstall.sh`, puis supprimer l'extension dans `about:addons` et le dossier.
@@ -34,13 +34,13 @@ Contenu de l'archive :
 
 ```text
 MediaDownloader.Cli(.exe)
-Installer.bat, Desinstaller.bat (Windows) ; install.sh, uninstall.sh (Linux, macOS)
+Installer.bat, Desinstaller.bat (Windows) ; install.sh, uninstall.sh (Linux)
 mediadownloader.xpi
-tools/bin/   yt-dlp, ffmpeg, deno (Windows, Linux) ; deno seul (macOS)
+tools/bin/   yt-dlp, ffmpeg, deno (Windows, Linux)
 README.txt
 ```
 
-Sous Linux, l'archive est autonome : `yt-dlp`, `ffmpeg` (build statique GPL de BtbN/FFmpeg-Builds, redistribué sous licence GPL ; sources et licence : https://github.com/BtbN/FFmpeg-Builds et https://ffmpeg.org/legal.html) et `deno` sont dans `tools/bin`. Sous macOS, `yt-dlp` et FFmpeg doivent être installés séparément, par exemple avec Homebrew (voir `README.txt`).
+Sous Linux, l'archive est autonome : `yt-dlp`, `ffmpeg` (build statique GPL de BtbN/FFmpeg-Builds, redistribué sous licence GPL ; sources et licence : https://github.com/BtbN/FFmpeg-Builds et https://ffmpeg.org/legal.html) et `deno` sont dans `tools/bin`.
 Sous Windows, ne pas déplacer le dossier après l'installation : le manifeste
 contient son chemin. Signature de l'extension : [docs/EXTENSION_SIGNATURE.md](docs/EXTENSION_SIGNATURE.md).
 
@@ -79,7 +79,7 @@ La compilation génère :
 
 L'extension (`extension/`, JavaScript pur) ne se compile pas : voir [extension/README.md](extension/README.md).
 
-Sur macOS et Linux :
+Sous Linux :
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -152,7 +152,7 @@ Pour les autres sites (X, TikTok, Instagram…), aucun cookie n'est lu : une vid
 ne peut pas être téléchargée et l'extension affiche un message d'erreur clair.
 
 Sans `--output`, les fichiers finaux sont placés dans le dossier **Vidéos** de
-Windows ou dans `~/Videos` sur macOS et Linux. Le dossier Windows est celui
+Windows ou dans `~/Videos` sous Linux. Le dossier Windows est celui
 indexé par la médiathèque Windows.
 
 ## Protocole

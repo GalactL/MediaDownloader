@@ -12,7 +12,6 @@ dialogue par messages JSON encadrés sur stdin/stdout.
 - Windows : `<dossier de l'exe>\native-host\media_downloader.json`, et la valeur par
   défaut de `HKCU\Software\Mozilla\NativeMessagingHosts\media_downloader` pointe
   vers ce fichier ;
-- macOS : `~/Library/Application Support/Mozilla/NativeMessagingHosts/media_downloader.json` ;
 - Linux : `~/.mozilla/native-messaging-hosts/media_downloader.json`.
 
 Firefox ajoute à la ligne de commande le chemin du manifeste et l'identifiant de
@@ -68,7 +67,7 @@ d'une phase sans pourcentage et peut être ignoré (détails dans [CLI_PROTOCOL.
 `pickFolder` répond `{"type":"folderPicked","id":"…","path":"<chemin absolu>"}` lorsque l'utilisateur choisit un
 dossier, ou `{"type":"folderPicked","id":"…"}` sans champ `path` s'il annule (annuler = pas de chemin). Si aucun
 sélecteur n'est disponible ou s'il échoue, l'hôte répond l'erreur `pick_failed`. Le sélecteur est
-`IFileOpenDialog` (Windows), `osascript` (macOS), `zenity` puis `kdialog` (Linux).
+`IFileOpenDialog` (Windows), `zenity` puis `kdialog` (Linux).
 
 La réponse `probe` est compacte :
 

@@ -375,8 +375,6 @@ namespace media_downloader
             _wdupenv_s(&root, nullptr, L"SystemRoot");
             opener = std::filesystem::path(root ? root : L"C:\\Windows") / L"explorer.exe";
             std::free(root);
-#elif defined(__APPLE__)
-            opener = "/usr/bin/open";
 #else
             opener = "/usr/bin/xdg-open";
 #endif
@@ -457,8 +455,6 @@ namespace media_downloader
             }
             CoUninitialize();
             return outcome;
-#elif defined(__APPLE__)
-            return RunChooser("/usr/bin/osascript", { L"-e", L"POSIX path of (choose folder)" }, cancel, path);
 #else
             struct Chooser { char const* name; std::vector<std::wstring> arguments; };
             for (auto const& chooser : { Chooser{ "zenity", { L"--file-selection", L"--directory" } },

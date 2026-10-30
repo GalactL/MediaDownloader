@@ -302,13 +302,7 @@ namespace
 
     void TestUninstallHost()
     {
-        auto manifest = g_home / (
-#ifdef __APPLE__
-            "Library/Application Support/Mozilla/NativeMessagingHosts/media_downloader.json"
-#else
-            ".mozilla/native-messaging-hosts/media_downloader.json"
-#endif
-        );
+        auto manifest = g_home / ".mozilla/native-messaging-hosts/media_downloader.json";
         Run({ "install-host" });
         Check(fs::exists(manifest), "manifest exists before uninstall-host");
         auto r = Run({ "uninstall-host" });
@@ -321,13 +315,7 @@ namespace
     void TestInstallHost()
     {
         auto r = Run({ "install-host" });
-        auto manifest = g_home / (
-#ifdef __APPLE__
-            "Library/Application Support/Mozilla/NativeMessagingHosts/media_downloader.json"
-#else
-            ".mozilla/native-messaging-hosts/media_downloader.json"
-#endif
-        );
+        auto manifest = g_home / ".mozilla/native-messaging-hosts/media_downloader.json";
         Check(r.code == 0 && r.out.empty(), "install-host exits 0 with empty stdout");
         std::ifstream file(manifest);
         std::ostringstream all; all << file.rdbuf();
