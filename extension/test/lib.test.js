@@ -31,7 +31,8 @@ test("parseMaxSize", () => {
   assert.equal(lib.parseMaxSize("10"), 10);
   assert.equal(lib.parseMaxSize("2,5"), 2.5);
   assert.equal(lib.parseMaxSize("20"), 20);
-  for (const bad of ["0", "-3", "x", "20.5", "100"]) assert.ok(Number.isNaN(lib.parseMaxSize(bad)), bad);
+  assert.equal(lib.parseMaxSize("100"), 100);
+  for (const bad of ["0", "-3", "x", "1e400", "9".repeat(400)]) assert.ok(Number.isNaN(lib.parseMaxSize(bad)), bad);
 });
 
 test("buildDownloadRequest", () => {
@@ -138,7 +139,7 @@ test("i18n: missing key falls back to French, then to the key", () => {
   }
   assert.equal(i18n.translate("en", "no.such.key"), "no.such.key");
   assert.equal(i18n.translate("zz", "action.close"), "Fermer");
-  assert.equal(i18n.translate("en", "field.maxSize", { max: 20 }), "Maximum size (MB, 20 max, optional)");
+  assert.equal(i18n.translate("en", "field.maxSize"), "Maximum size (MB, optional)");
 });
 
 test("i18n: catalogue completeness", () => {
