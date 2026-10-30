@@ -258,7 +258,6 @@ int main()
         Check(BuildNativeManifest("/a\"b", "x@y").find("/a\\\"b") != std::string::npos, "manifeste : guillemet échappé");
         std::filesystem::path home{ "/home/u" }, exeDir{ "/opt/md" };
         Check(NativeManifestPath(HostPlatform::Linux, home, exeDir) == home / ".mozilla/native-messaging-hosts/media_downloader.json", "chemin manifeste Linux");
-        Check(NativeManifestPath(HostPlatform::MacOS, home, exeDir) == home / "Library/Application Support/Mozilla/NativeMessagingHosts/media_downloader.json", "chemin manifeste macOS");
         Check(NativeManifestPath(HostPlatform::Windows, home, exeDir) == exeDir / "native-host/media_downloader.json", "chemin manifeste Windows");
         auto installHost = ParseArguments({ L"install-host" });
         Check(installHost.options && installHost.options->command == Command::InstallHost, "install-host reconnu");

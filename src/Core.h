@@ -21,7 +21,7 @@ namespace media_downloader
         UninstallHost
     };
 
-    enum class HostPlatform { Windows, MacOS, Linux };
+    enum class HostPlatform { Windows, Linux };
 
     struct Options
     {

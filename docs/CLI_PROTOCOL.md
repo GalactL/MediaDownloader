@@ -31,7 +31,7 @@ auxquels le compte local a légitimement accès. L'appelant ne doit jamais deman
 de passe du compte ni recopier les cookies dans ses propres fichiers de réglages.
 
 `--low-resources` (option facultative, sans valeur) économise les ressources de la machine : FFmpeg est lancé en priorité
-la plus basse (`nice 19` sous Linux et macOS, `IDLE_PRIORITY_CLASS` sous Windows) avec `-threads 2`. Sans cette option, les
+la plus basse (`nice 19` sous Linux, `IDLE_PRIORITY_CLASS` sous Windows) avec `-threads 2`. Sans cette option, les
 arguments de FFmpeg et les événements sont exactement ceux d'avant. Le moteur traite de toute façon un seul job à la fois.
 
 L'absence de `--output` sélectionne le dossier connu Windows `FOLDERID_Videos`,

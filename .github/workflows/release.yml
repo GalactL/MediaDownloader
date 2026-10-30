@@ -49,20 +49,12 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            artifact: MediaDownloader-v0.4.0-Windows-x64
+            artifact: MediaDownloader-v0.4.1-Windows-x64
             readme: docs/RELEASE_WINDOWS.md
           - os: ubuntu-latest
-            artifact: MediaDownloader-v0.4.0-Linux-x64
+            artifact: MediaDownloader-v0.4.1-Linux-x64
             deno: x86_64-unknown-linux-gnu
             readme: docs/RELEASE_LINUX.md
-          - os: macos-15-intel
-            artifact: MediaDownloader-v0.4.0-macOS-x64
-            deno: x86_64-apple-darwin
-            readme: docs/RELEASE_MACOS.md
-          - os: macos-15
-            artifact: MediaDownloader-v0.4.0-macOS-arm64
-            deno: aarch64-apple-darwin
-            readme: docs/RELEASE_MACOS.md
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6

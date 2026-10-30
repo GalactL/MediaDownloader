@@ -7,9 +7,6 @@
 #include <shlobj.h>
 #else
 #include <unistd.h>
-#ifdef __APPLE__
-#include <mach-o/dyld.h>
-#endif
 #endif
 
 #include <algorithm>
@@ -57,12 +54,6 @@ namespace
         auto length = GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
         buffer.resize(length);
         return std::filesystem::path(buffer);
-#elif defined(__APPLE__)
-        uint32_t size{};
-        _NSGetExecutablePath(nullptr, &size);
-        std::string buffer(size, '\0');
-        if (_NSGetExecutablePath(buffer.data(), &size) != 0) return std::filesystem::current_path() / "MediaDownloader.Cli";
-        return std::filesystem::weakly_canonical(buffer);
 #else
         std::array<char, 4096> buffer{};
         auto length = readlink("/proc/self/exe", buffer.data(), buffer.size() - 1);
@@ -497,11 +488,7 @@ int Engine::InstallHost()
 #else
     if (auto value = std::getenv("HOME")) home = value;
     if (home.empty()) throw std::runtime_error("Le dossier personnel est indisponible");
-#ifdef __APPLE__
-    constexpr auto platform = HostPlatform::MacOS;
-#else
     constexpr auto platform = HostPlatform::Linux;
-#endif
 #endif
     auto manifest = NativeManifestPath(platform, home, exe.parent_path());
     std::error_code error;
@@ -537,11 +524,7 @@ int Engine::UninstallHost()
 #else
     if (auto value = std::getenv("HOME")) home = value;
     if (home.empty()) throw std::runtime_error("Le dossier personnel est indisponible");
-#ifdef __APPLE__
-    constexpr auto platform = HostPlatform::MacOS;
-#else
     constexpr auto platform = HostPlatform::Linux;
-#endif
 #endif
     auto manifest = NativeManifestPath(platform, home, ExecutablePath().parent_path());
     std::error_code error;
