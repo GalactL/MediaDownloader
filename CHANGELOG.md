@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.5.0 (2026-10-30)
+## v0.5.1 (2026-10-30)
 
 - Distribution : le workflow de release exécute d'abord les tests (moteur et extension) ; la signature Mozilla de l'extension n'a lieu qu'une fois ces tests passés.
 - Distribution : macOS n'est plus pris en charge, ni compilé ni empaqueté (archives macOS x64 et arm64, notice `RELEASE_MACOS.md`, CI macOS et code spécifique macOS supprimés). Windows x64 et Linux x64 restent livrés. `install.sh` ne gère plus macOS.

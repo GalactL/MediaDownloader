@@ -1,4 +1,4 @@
-MediaDownloader v0.5.0 — Linux x64
+MediaDownloader v0.5.1 — Linux x64
 
 Cette archive est autonome : elle fournit le CLI, yt-dlp, FFmpeg et Deno
 (dans tools/bin). Aucune installation supplémentaire n'est nécessaire. Firefox connecté à
