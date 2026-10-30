@@ -2,6 +2,7 @@
 
 ## v0.4.2 (2026-10-30)
 
+- Distribution : le workflow de release exécute d'abord les tests (moteur et extension) ; la signature Mozilla de l'extension n'a lieu qu'une fois ces tests passés.
 - Distribution : macOS n'est plus pris en charge, ni compilé ni empaqueté (archives macOS x64 et arm64, notice `RELEASE_MACOS.md`, CI macOS et code spécifique macOS supprimés). Windows x64 et Linux x64 restent livrés. `install.sh` ne gère plus macOS.
 - Extension : la taille maximale n'est plus plafonnée à 20 Mo (tout nombre supérieur à 0 est accepté) ; un bouton aux couleurs de Discord, « 20 Mo », remplit le champ avec la limite Discord.
 - Distribution : scripts d'installation et de désinstallation dans chaque archive (`Installer.bat` et `Desinstaller.bat` sous Windows, `install.sh` et `uninstall.sh` sous Linux) : ils lancent `install-host` / `uninstall-host` puis ouvrent `mediadownloader.xpi` dans Firefox. FFprobe n'est plus embarqué dans l'archive Linux.

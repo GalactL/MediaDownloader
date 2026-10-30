@@ -15,7 +15,25 @@ env:
   FFMPEG_ASSET: ffmpeg-n8.1-latest-linux64-gpl-8.1.tar.xz
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Configurer
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Compiler
+        run: cmake --build build --config Release --parallel
+      - name: Tester
+        run: ctest --test-dir build -C Release --output-on-failure
+      - name: Tests de l'extension
+        run: node --test extension/test/*.test.js
+
   extension:
+    # AMO refuse de signer deux fois la même version : ne jamais signer avant que les tests passent.
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
