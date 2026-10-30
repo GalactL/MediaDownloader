@@ -20,6 +20,14 @@ Sans secrets, le workflow n'échoue pas : il émet un avertissement et joint un
 `.xpi` **non signé**, utilisable seulement avec Firefox Developer/Nightly
 (`xpinstall.signatures.required` à `false`) ou en chargement temporaire.
 
+Relances : Mozilla refusant de signer deux fois la même version, le job
+interroge d'abord AMO (`tools/fetch-signed-xpi.mjs`, authentifié par JWT avec les
+mêmes secrets). Si la version de `extension/manifest.json` est déjà signée, son
+`.xpi` est téléchargé et réutilisé ; sinon (réponse 404) `web-ext sign` est
+lancé. Une release dont le job a échoué après la signature peut donc être
+relancée sans incrémenter la version. Les points d'accès AMO utilisés n'ont pas
+été éprouvés en conditions réelles.
+
 ## Points d'attention
 
 - Mozilla refuse de signer deux fois la même version : incrémenter `version`
