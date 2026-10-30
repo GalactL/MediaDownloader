@@ -49,10 +49,10 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            artifact: MediaDownloader-v0.4.1-Windows-x64
+            artifact: MediaDownloader-v0.4.2-Windows-x64
             readme: docs/RELEASE_WINDOWS.md
           - os: ubuntu-latest
-            artifact: MediaDownloader-v0.4.1-Linux-x64
+            artifact: MediaDownloader-v0.4.2-Linux-x64
             deno: x86_64-unknown-linux-gnu
             readme: docs/RELEASE_LINUX.md
     runs-on: ${{ matrix.os }}

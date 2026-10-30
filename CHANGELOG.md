@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.4.1 (2026-10-30)
+## v0.4.2 (2026-10-30)
 
 - Distribution : macOS n'est plus pris en charge, ni compilé ni empaqueté (archives macOS x64 et arm64, notice `RELEASE_MACOS.md`, CI macOS et code spécifique macOS supprimés). Windows x64 et Linux x64 restent livrés. `install.sh` ne gère plus macOS.
 - Extension : la taille maximale n'est plus plafonnée à 20 Mo (tout nombre supérieur à 0 est accepté) ; un bouton aux couleurs de Discord, « 20 Mo », remplit le champ avec la limite Discord.
