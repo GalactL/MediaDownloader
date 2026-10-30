@@ -6,6 +6,12 @@ if [ -n "$FAKE_ARGV_LOG" ]; then
   { printf '%s' "$0"; for a in "$@"; do printf ' %s' "$a"; done; echo; } >> "$FAKE_ARGV_LOG"
 fi
 mode=${FAKE_YTDLP_MODE:-ok}
+if [ "$1" = "-U" ]; then
+  [ "$mode" = fail ] && { echo "ERROR: [fake] unable to update"; exit 1; }
+  echo "Latest version: 2099.01.01"
+  echo "yt-dlp is up to date"
+  exit 0
+fi
 out=
 for a in "$@"; do
   [ "$prev" = "--output" ] && out=$a

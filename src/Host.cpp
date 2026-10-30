@@ -559,7 +559,7 @@ namespace media_downloader
                 return "{\"type\":\"error\",\"code\":\"" + JsonEscape(e.code) + "\",\"message\":\"" + JsonEscape(e.message) + "\"}";
             else if constexpr (std::is_same_v<T, DoctorEvent>)
                 return "{\"type\":\"doctor\",\"tools\":{" + ToolJson("yt-dlp", e.ytDlp) + ',' + ToolJson("ffmpeg", e.ffmpeg) + ',' +
-                    ToolJson("ffprobe", e.ffprobe) + ',' + ToolJson("javascript-runtime", e.javascriptRuntime) + "}}";
+                    ToolJson("javascript-runtime", e.javascriptRuntime) + "}}";
             else
                 return "{\"type\":\"probe\",\"data\":" + e.json + "}";
         }, event);

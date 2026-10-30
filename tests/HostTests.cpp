@@ -139,7 +139,7 @@ namespace
             fs::path tools = MD_FAKE_TOOLS_DIR;
             std::vector<std::string> env{ "HOME=" + (g_tmp / "home").string(), "PATH=/usr/bin:/bin",
                 "MEDIADOWNLOADER_YTDLP=" + (tools / "yt-dlp").string(), "MEDIADOWNLOADER_FFMPEG=" + (tools / "ffmpeg").string(),
-                "MEDIADOWNLOADER_FFPROBE=" + (tools / "ffprobe").string(), "MEDIADOWNLOADER_DENO=" + (tools / "deno").string() };
+                "MEDIADOWNLOADER_DENO=" + (tools / "deno").string() };
             env.insert(env.end(), extraEnv.begin(), extraEnv.end());
             std::vector<char*> envp;
             for (auto& e : env) envp.push_back(e.data());

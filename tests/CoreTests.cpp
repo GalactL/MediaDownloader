@@ -82,6 +82,11 @@ int main()
     Check(!CalculateEncodePlan(7200.0, 1.0).has_value(), "une cible irréaliste doit être refusée");
     Check(!CalculateEncodePlan(0.0, 10.0).has_value(), "une durée nulle doit être refusée");
 
+    Check(ParseFfmpegDuration("  Duration: 01:02:03.50, start: 0.000000, bitrate: 800 kb/s") == 3723.5, "durée ffmpeg HH:MM:SS.xx");
+    Check(!ParseFfmpegDuration("  Duration: N/A, bitrate: N/A").has_value(), "durée ffmpeg N/A refusée");
+    Check(!ParseFfmpegDuration("  Duration: 00:00:00.00, start: 0").has_value(), "durée ffmpeg nulle refusée");
+    Check(!ParseFfmpegDuration("pas de durée").has_value(), "durée ffmpeg absente");
+
     auto parsed = ParseArguments({ L"download", L"--url", L"https://example.test/v", L"--quality", L"720", L"--max-size-mb", L"10" });
     Check(parsed.options.has_value(), "arguments de téléchargement valides");
     if (parsed.options)
@@ -254,6 +259,12 @@ int main()
         auto installHost = ParseArguments({ L"install-host" });
         Check(installHost.options && installHost.options->command == Command::InstallHost, "install-host reconnu");
         Check(!ParseArguments({ L"install-host", L"--x" }).options, "install-host refuse les arguments");
+        auto uninstallHost = ParseArguments({ L"uninstall-host" });
+        Check(uninstallHost.options && uninstallHost.options->command == Command::UninstallHost, "uninstall-host reconnu");
+        Check(!ParseArguments({ L"uninstall-host", L"--x" }).options, "uninstall-host refuse les arguments");
+        auto update = ParseArguments({ L"update" });
+        Check(update.options && update.options->command == Command::Update, "update reconnu");
+        Check(!ParseArguments({ L"update", L"--x" }).options, "update refuse les arguments");
     }
 
     if (failures == 0) std::cout << "Tous les tests sont passes.\n";

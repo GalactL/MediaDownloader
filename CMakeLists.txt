@@ -41,7 +41,7 @@ if(MSVC)
     target_compile_options(MediaDownloaderCli PRIVATE /W4 /permissive- /utf-8)
 endif()
 
-foreach(tool yt-dlp.exe ffmpeg.exe ffprobe.exe deno.exe)
+foreach(tool yt-dlp.exe ffmpeg.exe deno.exe)
     if(EXISTS "${CMAKE_SOURCE_DIR}/tools/bin/${tool}")
         add_custom_command(TARGET MediaDownloaderCli POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:MediaDownloaderCli>/tools/bin"

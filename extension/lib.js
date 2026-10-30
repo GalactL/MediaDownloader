@@ -109,6 +109,9 @@
     return i18n.hasKey(key) ? key : "error.generic";
   }
 
+  // Page of the latest release, linked from the "host not installed" notice.
+  const INSTALL_URL = "https://github.com/GalactL/MediaDownloader/releases/latest";
+
   // Non-YouTube sites: host, and the path of a post page (its match is also the canonical page URL). Unknown hosts: every page counts.
   const SITES = [
     { host: /^(?:[a-z0-9-]+\.)*(?:x|twitter)\.com$/i, post: /^\/[^/]+\/status\/\d+/ },
@@ -164,7 +167,7 @@
     return { text: i18n.translate(language, "progress.withPercent", { phase, percent: Math.round(overall) }), percent: overall };
   }
 
-  const api = { timecode, parseTime, validateRange, parseMaxSize, buildDownloadRequest, qualityOptions, errorKey, DEFAULT_SETTINGS, normalizeSettings, isCalm, validateOutputDirectory, sameFolder, MAX_SIZE_MB, isVideoPage, canonicalUrl, phaseLabel, overallPercent, progressView };
+  const api = { timecode, parseTime, validateRange, parseMaxSize, buildDownloadRequest, qualityOptions, errorKey, INSTALL_URL, DEFAULT_SETTINGS, normalizeSettings, isCalm, validateOutputDirectory, sameFolder, MAX_SIZE_MB, isVideoPage, canonicalUrl, phaseLabel, overallPercent, progressView };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.MDLib = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

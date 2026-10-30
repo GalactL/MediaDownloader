@@ -60,6 +60,17 @@ test("custom name and errorText", () => {
   assert.equal(lib.errorKey("size_exceeded"), "error.size_exceeded");
 });
 
+test("host_disconnected: dedicated install notice with steps and release link", () => {
+  assert.equal(lib.errorKey("host_disconnected"), "error.host_disconnected");
+  const text = errorText("fr", "host_disconnected");
+  assert.match(text, /^Programme MediaDownloader non installé\./);
+  assert.match(text, /Installer\.bat/);
+  assert.match(text, /install\.sh/);
+  assert.match(text, /Relancez Firefox/);
+  assert.equal(lib.INSTALL_URL, "https://github.com/GalactL/MediaDownloader/releases/latest");
+  assert.match(errorText("en", "host_disconnected"), /^MediaDownloader program not installed\./);
+});
+
 test("qualityOptions", () => {
   assert.deepEqual(lib.qualityOptions([360, 1080, 720, 720], "fr").map((o) => o.value), ["best", "2160", "1440", "1080", "720", "360"]);
   assert.deepEqual(lib.qualityOptions(undefined, "fr").map((o) => o.value), ["best", "2160", "1440"]);
