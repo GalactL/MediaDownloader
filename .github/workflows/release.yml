@@ -37,39 +37,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Empaqueter et signer l'extension
+      # Signe (ou vérifie) une seule fois ; chaque job build refait le .xpi lui-même (aucun artefact GitHub).
+      - name: Signer l'extension
         shell: bash
         env:
           WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
           WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
-        run: |
-          set -euo pipefail
-          mkdir -p ext-src out
-          cp -r extension/. ext-src/
-          rm -rf ext-src/test ext-src/README.md
-          if [ -n "$WEB_EXT_API_KEY" ] && [ -n "$WEB_EXT_API_SECRET" ]; then
-            # AMO refuse de signer deux fois la même version : on réutilise le .xpi déjà signé, ce qui rend les relances sûres.
-            ext_id=$(node -p "require('./extension/manifest.json').browser_specific_settings.gecko.id")
-            ext_version=$(node -p "require('./extension/manifest.json').version")
-            code=0
-            node tools/fetch-signed-xpi.mjs "$ext_id" "$ext_version" out/mediadownloader.xpi || code=$?
-            if [ "$code" -eq 3 ]; then
-              npx --yes web-ext@8.3.0 sign --channel=unlisted --source-dir ext-src --artifacts-dir signed
-              cp signed/*.xpi out/mediadownloader.xpi
-            elif [ "$code" -ne 0 ]; then
-              exit "$code"
-            fi
-          else
-            echo "::warning::AMO_JWT_ISSUER/AMO_JWT_SECRET absents : mediadownloader.xpi n'est PAS signé (Firefox stable le refusera)."
-            (cd ext-src && zip -r -X ../out/mediadownloader.xpi .)
-          fi
-      # Ces artefacts ne servent qu'à passer des fichiers entre jobs jusqu'à la publication : 1 jour limite le quota de stockage.
-      - uses: actions/upload-artifact@v4
-        with:
-          retention-days: 1
-          name: mediadownloader-xpi
-          path: out/mediadownloader.xpi
-          if-no-files-found: error
+        run: tools/make-xpi.sh
 
   build:
     needs: extension
@@ -99,13 +73,18 @@ jobs:
         run: ctest --test-dir build -C Release --output-on-failure
       - name: Installer
         run: cmake --install build --config Release --prefix package/${{ matrix.artifact }}
-      - uses: actions/download-artifact@v4
+      - uses: actions/setup-node@v4
         with:
-          name: mediadownloader-xpi
-          path: xpi
-      - name: Ajouter l'extension Firefox
+          node-version: 22
+      - name: Reconstruire l'extension Firefox
+        # Déjà signée par le job extension : fetch-signed-xpi la retrouve, aucune seconde signature.
         shell: bash
-        run: cp xpi/mediadownloader.xpi "package/${{ matrix.artifact }}/mediadownloader.xpi"
+        env:
+          WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
+          WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+        run: |
+          tools/make-xpi.sh
+          cp out/mediadownloader.xpi "package/${{ matrix.artifact }}/mediadownloader.xpi"
       - name: Ajouter les scripts d'installation
         shell: bash
         run: |
@@ -165,24 +144,10 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         run: tar -C package -czf "package/${{ matrix.artifact }}.tar.gz" "${{ matrix.artifact }}"
-      # Ces artefacts ne servent qu'à passer des fichiers entre jobs jusqu'à la publication : 1 jour limite le quota de stockage.
-      - uses: actions/upload-artifact@v4
-        with:
-          retention-days: 1
-          name: ${{ matrix.artifact }}
-          path: package/${{ matrix.artifact }}.*
-          if-no-files-found: error
-
-  publish:
-    if: startsWith(github.ref, 'refs/tags/')
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-          merge-multiple: true
+      # Pas d'artefacts GitHub (quota de stockage) : chaque job ajoute son archive à la release.
+      # Les deux jobs créent/complètent la même release en parallèle ; si la création concurrente échoue, relancer le job.
       - uses: softprops/action-gh-release@v3
+        if: startsWith(github.ref, 'refs/tags/')
         with:
           generate_release_notes: true
-          files: artifacts/*
+          files: package/${{ matrix.artifact }}.*
