@@ -2,6 +2,7 @@
 
 ## Non publié
 
+- Distribution : le workflow de release n'utilise plus les artefacts GitHub (quota de stockage atteint) : chaque job de build reconstruit le `.xpi` (`tools/make-xpi.sh`, qui réutilise la version signée) et publie lui-même son archive sur la release ; le job `publish` disparaît.
 - Distribution : le job `extension` récupère le `.xpi` déjà signé par AMO si la version existe (AMO refuse de signer deux fois), ce qui rend les relances de release sûres ; les artefacts intermédiaires sont conservés 1 jour (`retention-days: 1`).
 
 ## v0.5.1 (2026-10-30)

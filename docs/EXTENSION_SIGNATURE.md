@@ -25,7 +25,9 @@ interroge d'abord AMO (`tools/fetch-signed-xpi.mjs`, authentifié par JWT avec l
 mêmes secrets). Si la version de `extension/manifest.json` est déjà signée, son
 `.xpi` est téléchargé et réutilisé ; sinon (réponse 404) `web-ext sign` est
 lancé. Une release dont le job a échoué après la signature peut donc être
-relancée sans incrémenter la version. Les points d'accès AMO utilisés n'ont pas
+relancée sans incrémenter la version. Aucun artefact GitHub n'est utilisé (quota de
+stockage) : le job `extension` signe une fois, puis chaque job `build` relance
+`tools/make-xpi.sh`, qui retrouve le `.xpi` déjà signé. Les points d'accès AMO utilisés n'ont pas
 été éprouvés en conditions réelles.
 
 ## Points d'attention
