@@ -151,3 +151,8 @@ jobs:
         with:
           generate_release_notes: true
           files: package/${{ matrix.artifact }}.*
+      # Le .xpi seul n'est joint que par une entrée de la matrice, pour éviter un conflit d'asset en double.
+      - uses: softprops/action-gh-release@v3
+        if: startsWith(github.ref, 'refs/tags/') && runner.os == 'Linux'
+        with:
+          files: out/mediadownloader.xpi
