@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.6.0 (non publiée)
+## v0.6.0 (2026-11-02)
 
 - Extension : version Chromium (Opera, Chrome, Brave), manifeste MV3 `extension/manifest.chromium.json` (service worker, clé publique `key` qui fixe l'identifiant ; la clé privée n'est pas conservée) sur le même code que Firefox, avec une cale `extension/shim.js` (`browser` = `chrome`). Le manifeste Firefox ne change que de version. Livrée en `mediadownloader-chromium.zip` (`tools/make-chromium-zip.sh`) dans les archives Windows et Linux et jointe à la release ; à charger à la main en mode développeur (voir README). Non vérifiée sur Opera sous Windows réel.
 - CLI : `install-host` enregistre aussi l'hôte natif pour Opera, Chrome et Brave (manifeste avec `allowed_origins`, sous Linux dans `~/.config/<navigateur>/NativeMessagingHosts`, sous Windows clés `HKCU` pointant vers `native-host\media_downloader.chromium.json`) ; `uninstall-host` les retire. Le lancement par Chromium (origine `chrome-extension://…` en premier argument) est reconnu comme `host`.
