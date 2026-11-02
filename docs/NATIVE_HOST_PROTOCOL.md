@@ -1,6 +1,6 @@
 # Protocole de l'hôte de messagerie native
 
-`MediaDownloader.Cli host` est un hôte de messagerie native pour Firefox. Il
+`MediaDownloader.Cli host` est un hôte de messagerie native pour Firefox et pour les navigateurs Chromium (Opera, Chrome, Brave). Il
 réutilise le même moteur que le CLI (voir [CLI_PROTOCOL.md](CLI_PROTOCOL.md)) mais
 dialogue par messages JSON encadrés sur stdin/stdout.
 
@@ -24,6 +24,25 @@ Le manifeste pointe directement vers l'exécutable. Toute autre commande inconnu
 
 L'identifiant d'extension autorisé (`allowed_extensions`) est `mediadownloader@localhost`,
 celui de `extension/manifest.json`.
+
+## Lancement par Opera, Chrome et Brave
+
+`install-host` écrit aussi un manifeste Chromium de même nom (`media_downloader`) : `allowed_origins`
+vaut `["chrome-extension://jjclljkpbmlceplpicnjkmkjifhhghne/"]` (pas d'`allowed_extensions`). Cet identifiant est
+fixé par la clé publique `key` de `extension/manifest.chromium.json` (la clé privée n'est pas conservée) ; il est
+la constante `ChromiumExtensionId` de `src/Core.h`, et un test (`extension/test/chromium.test.js`) vérifie qu'ils concordent.
+
+- Windows : `<dossier de l'exe>\native-host\media_downloader.chromium.json`, et la valeur par défaut de
+  `HKCU\Software\Google\Chrome\NativeMessagingHosts\media_downloader`,
+  `HKCU\Software\BraveSoftware\Brave-Browser\NativeMessagingHosts\media_downloader` et
+  `HKCU\Software\Opera Software\Opera Stable\NativeMessagingHosts\media_downloader` pointe vers ce fichier ;
+- Linux : `~/.config/google-chrome/NativeMessagingHosts/media_downloader.json`, `~/.config/chromium/...`,
+  `~/.config/BraveSoftware/Brave-Browser/...` et `~/.config/opera/...` (mêmes noms de fichier).
+
+Les emplacements Opera (registre Windows) et Brave n'ont pas été vérifiés sur machine réelle ; c'est pourquoi tous les
+emplacements plausibles sont écrits. Chromium lance l'exécutable avec l'origine de l'extension
+(`chrome-extension://<id>/`) en premier argument (et `--parent-window=<n>` sous Windows) : `MediaDownloader.Cli` reconnaît cette
+origine comme un lancement d'hôte, comme pour Firefox. `uninstall-host` supprime tous ces manifestes et clés.
 
 ## Encadrement
 

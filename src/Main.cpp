@@ -64,7 +64,7 @@ namespace
     void PrintHelp()
     {
         std::cout <<
-            "MediaDownloader 0.5.1\n\n"
+            "MediaDownloader 0.6.0\n\n"
             "Usage:\n"
             "  MediaDownloader doctor [chemins des outils]\n"
             "  MediaDownloader probe --url URL\n"

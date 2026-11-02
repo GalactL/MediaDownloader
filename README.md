@@ -1,7 +1,7 @@
 # MediaDownloader
 
 Outil natif et indépendant de téléchargement et de conversion vidéo : un CLI, un
-hôte de messagerie native et une extension Firefox (menu dans la page).
+hôte de messagerie native et une extension (menu dans la page) pour Firefox, Opera, Chrome et Brave.
 
 Le programme accepte une URL HTTP(S), télécharge la meilleure source compatible
 avec la qualité demandée à l'aide de `yt-dlp`, puis peut réencoder la vidéo avec
@@ -16,9 +16,9 @@ YouTube (vidéos et Shorts), X (Twitter), TikTok et Instagram ; le CLI accepte t
 charge dans la mesure où la version installée de `yt-dlp` les prend en charge et
 où le contenu est accessible sans contourner de DRM.
 
-## Plateformes de la v0.5.1
+## Plateformes de la v0.6.0
 
-- Windows x64 et Linux x64 : CLI, hôte de messagerie native et extension Firefox.
+- Windows x64 et Linux x64 : CLI, hôte de messagerie native, extension Firefox et extension Chromium (Opera, Chrome, Brave).
 
 La release GitHub contient une archive et une notice distinctes pour chaque cible.
 
@@ -36,9 +36,23 @@ Contenu de l'archive :
 MediaDownloader.Cli(.exe)
 Installer.bat, Desinstaller.bat (Windows) ; install.sh, uninstall.sh (Linux)
 mediadownloader.xpi
+mediadownloader-chromium.zip
 tools/bin/   yt-dlp, ffmpeg, deno (Windows, Linux)
 README.txt
 ```
+
+### Opera, Chrome et Brave
+
+`Installer.bat` / `./install.sh` enregistrent aussi l'hôte natif pour Opera, Chrome et Brave (`install-host`) ; en
+revanche l'extension se charge à la main, car elle n'est pas publiée sur un store :
+
+1. Décompresser `mediadownloader-chromium.zip` dans un dossier à garder (ne pas le supprimer ensuite).
+2. Ouvrir la page des extensions : `opera://extensions` (Opera), `chrome://extensions` (Chrome) ou `brave://extensions` (Brave).
+3. Activer le **mode développeur**, puis cliquer sur **Charger l'extension non empaquetée** et choisir le dossier décompressé.
+
+L'identifiant de l'extension est fixe (clé publique dans le manifeste), ce qui permet à l'hôte natif de l'autoriser.
+**Non vérifié** : le chargement et l'hôte natif n'ont pas encore été testés sur Opera sous Windows réel ; les emplacements
+du manifeste et de la clé de registre pour Opera et Brave restent à confirmer (tous les emplacements plausibles sont écrits).
 
 Sous Linux, l'archive est autonome : `yt-dlp`, `ffmpeg` (build statique GPL de BtbN/FFmpeg-Builds, redistribué sous licence GPL ; sources et licence : https://github.com/BtbN/FFmpeg-Builds et https://ffmpeg.org/legal.html) et `deno` sont dans `tools/bin`.
 Sous Windows, ne pas déplacer le dossier après l'installation : le manifeste
@@ -77,7 +91,7 @@ La compilation génère :
 
 - `build/Release/MediaDownloader.Cli.exe` : moteur en ligne de commande et hôte de messagerie native.
 
-L'extension (`extension/`, JavaScript pur) ne se compile pas : voir [extension/README.md](extension/README.md).
+L'extension (`extension/`, JavaScript pur) ne se compile pas : voir [extension/README.md](extension/README.md). `tools/make-chromium-zip.sh` produit `out/mediadownloader-chromium.zip`.
 
 Sous Linux :
 
@@ -176,7 +190,7 @@ Les codes de sortie sont `0` en cas de réussite, `2` pour une erreur de saisie,
 `3` lorsqu'un outil manque et `4` lorsqu'un traitement échoue.
 Contrat complet : [docs/CLI_PROTOCOL.md](docs/CLI_PROTOCOL.md).
 
-## Hôte Firefox (messagerie native)
+## Hôte natif (Firefox, Opera, Chrome, Brave)
 
 `MediaDownloader.Cli host` dialogue avec une extension Firefox sur stdin/stdout
 (messages JSON préfixés par leur longueur). Protocole :
@@ -185,14 +199,14 @@ Contrat complet : [docs/CLI_PROTOCOL.md](docs/CLI_PROTOCOL.md).
 Firefox lance directement l'exécutable : `MediaDownloader.Cli` reconnaît ce lancement
 (chemin du manifeste ou identifiant d'extension en premier argument) et passe en mode `host`.
 
-`MediaDownloader.Cli install-host` écrit le manifeste pour Firefox (sous Windows, il
-enregistre aussi la clé de registre `HKCU`). Il se relance après un déplacement de l'exécutable.
+`MediaDownloader.Cli install-host` écrit le manifeste pour Firefox et, avec `allowed_origins`, pour Opera, Chrome et Brave (sous Windows, il
+enregistre aussi les clés de registre `HKCU`). Il se relance après un déplacement de l'exécutable.
 
 ```text
 MediaDownloader.Cli install-host
 ```
 
-`MediaDownloader.Cli uninstall-host` fait l'inverse : il supprime le manifeste (et la clé de registre sous Windows).
+`MediaDownloader.Cli uninstall-host` fait l'inverse : il supprime tous les manifestes (et les clés de registre sous Windows).
 Sans rien à retirer, il réussit quand même.
 
 L'extension ajoute un bouton (le logo de MediaDownloader) dans la page : avant le groupe « J'aime / Je n'aime pas » sur YouTube, dans la

@@ -1,4 +1,4 @@
-MediaDownloader v0.5.1 — Linux x64
+MediaDownloader v0.6.0 — Linux x64
 
 Cette archive est autonome : elle fournit le CLI, yt-dlp, FFmpeg et Deno
 (dans tools/bin). Aucune installation supplémentaire n'est nécessaire. Firefox connecté à
@@ -7,6 +7,7 @@ YouTube est utilisé automatiquement lorsque la vidéo exige une session valide.
 Contenu de l'archive :
 - MediaDownloader.Cli : CLI et hôte de messagerie native.
 - mediadownloader.xpi : extension Firefox.
+- mediadownloader-chromium.zip : extension pour Opera, Chrome et Brave (chargement manuel).
 - install.sh, uninstall.sh : installation et désinstallation.
 - tools/bin : yt-dlp, ffmpeg et deno (moteur JavaScript pour YouTube).
 - README.txt : cette notice.
@@ -28,6 +29,10 @@ Licences : ffmpeg est un build statique GPL (BtbN/FFmpeg-Builds),
 redistribué sous licence GPL. Sources et licence : https://github.com/BtbN/FFmpeg-Builds
 et https://ffmpeg.org/legal.html. yt-dlp est publié sous licence Unlicense
 (https://github.com/yt-dlp/yt-dlp).
+
+Opera, Chrome, Brave : l'installation enregistre aussi l'hôte natif. Décompressez mediadownloader-chromium.zip
+dans un dossier à conserver, ouvrez opera://extensions, chrome://extensions ou brave://extensions, activez le mode
+développeur, puis « Charger l'extension non empaquetée » et choisissez ce dossier. Non vérifié sur Opera sous Windows réel.
 
 Désinstallation : lancer ./uninstall.sh, puis supprimer l'extension dans about:addons et le dossier.
 

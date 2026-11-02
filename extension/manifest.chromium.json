@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "MediaDownloader",
+  "version": "0.6.0",
+  "description": "Télécharge la vidéo de la page avec MediaDownloader (yt-dlp et FFmpeg).",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsZZYzaxtIiJ9FEqhhVfV0VBK38wgO8glhMW24v6wpaSxyfgk//28oQR11r+XOKItnqHThPaXr1IoBrdF2klzSZaNCJ3A+P/UlY5uEuOmGRct+zy5G/4iY/Mpn4LQDiYTodXls0Tep1WRiy+9iZZUZjqtdjXkXVPO2MoBcnoExKI4j21yCgYdZj+if05szhSBe4J5bzkLogzh3rT2rtnoSKZEOeZFlGy3Wz9KaKvw+0W3+xdIIzkn6RPyc0VIneb32umrRbZi/ZDlz46epObfWpeSYm9lav298Itgg/NjL+4mSjB+Nsh/yUl/HCgIXrMN8AOBUDw2IpxHs6eciPBeKQIDAQAB",
+  "permissions": ["nativeMessaging", "storage"],
+  "action": {
+    "default_title": "MediaDownloader",
+    "default_icon": { "16": "icons/icon-16.png", "48": "icons/icon-48.png" }
+  },
+  "icons": { "16": "icons/icon-16.png", "48": "icons/icon-48.png", "128": "icons/icon-128.png" },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.youtube.com/*", "*://youtu.be/*", "*://x.com/*", "*://www.x.com/*", "*://twitter.com/*", "*://www.twitter.com/*", "*://www.tiktok.com/*", "*://www.instagram.com/*"],
+      "js": ["shim.js", "i18n.js", "lib.js", "sites.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["content.css"],
+      "matches": ["*://*.youtube.com/*", "*://youtu.be/*", "*://x.com/*", "*://www.x.com/*", "*://twitter.com/*", "*://www.twitter.com/*", "*://www.tiktok.com/*", "*://www.instagram.com/*"]
+    }
+  ]
+}

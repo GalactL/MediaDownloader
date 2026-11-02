@@ -59,6 +59,15 @@ namespace media_downloader
     bool IsNativeHostLaunch(std::vector<std::wstring> const& arguments);
     // Manifeste Firefox de messagerie native (UTF-8) ; `exePath` est l'exécutable lui-même.
     std::string BuildNativeManifest(std::string_view exePath, std::string_view extensionId);
+    // Identifiant fixe de l'extension Chromium : dérivé de la clé publique (`key`) de extension/manifest.chromium.json (testé en JS).
+    inline constexpr std::string_view ChromiumExtensionId = "jjclljkpbmlceplpicnjkmkjifhhghne";
+    // Manifeste de messagerie native pour Chrome, Brave et Opera (allowed_origins au lieu de allowed_extensions).
+    std::string BuildChromiumNativeManifest(std::string_view exePath);
+    // Manifestes Chromium : sous Windows un seul fichier à côté de l'exécutable (les clés de registre y pointent),
+    // sous Linux un fichier par navigateur sous ~/.config. Chemins Opera et Brave non vérifiés sur machine réelle.
+    std::vector<std::filesystem::path> ChromiumManifestPaths(HostPlatform platform, std::filesystem::path const& home, std::filesystem::path const& exeDirectory);
+    // Clés HKCU (Windows) dont la valeur par défaut est le chemin du manifeste Chromium.
+    std::vector<std::wstring> ChromiumRegistryKeys();
     // Emplacement du manifeste : Windows à côté de l'exécutable, sinon sous le dossier personnel.
     std::filesystem::path NativeManifestPath(HostPlatform platform, std::filesystem::path const& home, std::filesystem::path const& exeDirectory);
     // Résout `requested` en chemin absolu et crée le dossier et vérifie l'écriture (fichier témoin créé puis supprimé) ;

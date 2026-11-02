@@ -478,63 +478,99 @@ int Engine::Update(Options const& options)
     return 0;
 }
 
-int Engine::InstallHost()
+namespace
 {
-    constexpr char ExtensionId[] = "mediadownloader@localhost";
-    auto exe = ExecutablePath();
-    std::filesystem::path home;
-#ifdef _WIN32
-    constexpr auto platform = HostPlatform::Windows;
-#else
-    if (auto value = std::getenv("HOME")) home = value;
-    if (home.empty()) throw std::runtime_error("Le dossier personnel est indisponible");
-    constexpr auto platform = HostPlatform::Linux;
-#endif
-    auto manifest = NativeManifestPath(platform, home, exe.parent_path());
+void WriteManifest(std::filesystem::path const& manifest, std::string const& content)
+{
     std::error_code error;
     std::filesystem::create_directories(manifest.parent_path(), error);
     if (error) throw std::runtime_error("Impossible de créer le dossier du manifeste : " + error.message());
-    {
-        std::ofstream file(manifest, std::ios::binary | std::ios::trunc);
-        auto utf8 = exe.u8string();
-        file << BuildNativeManifest(std::string(utf8.begin(), utf8.end()), ExtensionId);
-        file.flush();
-        if (!file) throw std::runtime_error("Impossible d'écrire le manifeste : " + WideToUtf8(manifest.wstring()));
-    }
+    std::ofstream file(manifest, std::ios::binary | std::ios::trunc);
+    file << content;
+    file.flush();
+    if (!file) throw std::runtime_error("Impossible d'écrire le manifeste : " + WideToUtf8(manifest.wstring()));
+}
+
 #ifdef _WIN32
+void SetHostRegistryKey(std::wstring const& keyPath, std::wstring const& value)
+{
     HKEY key{};
-    auto value = manifest.wstring();
-    if (RegCreateKeyExW(HKEY_CURRENT_USER, L"Software\\Mozilla\\NativeMessagingHosts\\media_downloader", 0, nullptr, 0,
-            KEY_SET_VALUE, nullptr, &key, nullptr) != ERROR_SUCCESS)
+    if (RegCreateKeyExW(HKEY_CURRENT_USER, keyPath.c_str(), 0, nullptr, 0, KEY_SET_VALUE, nullptr, &key, nullptr) != ERROR_SUCCESS)
         throw std::runtime_error("Impossible de créer la clé de registre de l'hôte natif");
     auto status = RegSetValueExW(key, nullptr, 0, REG_SZ, reinterpret_cast<BYTE const*>(value.c_str()),
         static_cast<DWORD>((value.size() + 1) * sizeof(wchar_t)));
     RegCloseKey(key);
     if (status != ERROR_SUCCESS) throw std::runtime_error("Impossible d'écrire la clé de registre de l'hôte natif");
+}
+
+// true si la clé existait et a été supprimée.
+bool DeleteHostRegistryKey(std::wstring const& keyPath)
+{
+    auto status = RegDeleteKeyW(HKEY_CURRENT_USER, keyPath.c_str());
+    if (status != ERROR_SUCCESS && status != ERROR_FILE_NOT_FOUND)
+        throw std::runtime_error("Impossible de supprimer la clé de registre de l'hôte natif");
+    return status == ERROR_SUCCESS;
+}
+#endif
+
+std::filesystem::path HomeDirectory()
+{
+#ifdef _WIN32
+    return {};
+#else
+    std::filesystem::path home;
+    if (auto value = std::getenv("HOME")) home = value;
+    if (home.empty()) throw std::runtime_error("Le dossier personnel est indisponible");
+    return home;
+#endif
+}
+
+#ifdef _WIN32
+constexpr auto CurrentPlatform = HostPlatform::Windows;
+#else
+constexpr auto CurrentPlatform = HostPlatform::Linux;
+#endif
+}
+
+int Engine::InstallHost()
+{
+    constexpr char ExtensionId[] = "mediadownloader@localhost";
+    auto exe = ExecutablePath();
+    auto exeUtf8 = exe.u8string();
+    auto exeText = std::string(exeUtf8.begin(), exeUtf8.end());
+    auto home = HomeDirectory();
+    auto manifest = NativeManifestPath(CurrentPlatform, home, exe.parent_path());
+    WriteManifest(manifest, BuildNativeManifest(exeText, ExtensionId));
+    auto chromiumManifests = ChromiumManifestPaths(CurrentPlatform, home, exe.parent_path());
+    for (auto const& path : chromiumManifests) WriteManifest(path, BuildChromiumNativeManifest(exeText));
+#ifdef _WIN32
+    SetHostRegistryKey(L"Software\\Mozilla\\NativeMessagingHosts\\media_downloader", manifest.wstring());
+    for (auto const& key : ChromiumRegistryKeys()) SetHostRegistryKey(key, chromiumManifests.front().wstring());
 #endif
     std::cerr << "Hôte natif installé : " << WideToUtf8(manifest.wstring()) << std::endl;
+    for (auto const& path : chromiumManifests) std::cerr << "Hôte natif Chromium installé : " << WideToUtf8(path.wstring()) << std::endl;
     return 0;
 }
 
 int Engine::UninstallHost()
 {
-    std::filesystem::path home;
+    auto exeDirectory = ExecutablePath().parent_path();
+    auto home = HomeDirectory();
+    auto manifest = NativeManifestPath(CurrentPlatform, home, exeDirectory);
+    auto paths = ChromiumManifestPaths(CurrentPlatform, home, exeDirectory);
+    paths.insert(paths.begin(), manifest);
+    bool removed = false;
+    for (auto const& path : paths)
+    {
+        std::error_code error;
+        auto gone = std::filesystem::remove(path, error);
+        if (error) throw std::runtime_error("Impossible de supprimer le manifeste : " + error.message());
+        removed = removed || gone;
+    }
 #ifdef _WIN32
-    constexpr auto platform = HostPlatform::Windows;
-#else
-    if (auto value = std::getenv("HOME")) home = value;
-    if (home.empty()) throw std::runtime_error("Le dossier personnel est indisponible");
-    constexpr auto platform = HostPlatform::Linux;
-#endif
-    auto manifest = NativeManifestPath(platform, home, ExecutablePath().parent_path());
-    std::error_code error;
-    auto removed = std::filesystem::remove(manifest, error);
-    if (error) throw std::runtime_error("Impossible de supprimer le manifeste : " + error.message());
-#ifdef _WIN32
-    auto status = RegDeleteKeyW(HKEY_CURRENT_USER, L"Software\\Mozilla\\NativeMessagingHosts\\media_downloader");
-    if (status != ERROR_SUCCESS && status != ERROR_FILE_NOT_FOUND)
-        throw std::runtime_error("Impossible de supprimer la clé de registre de l'hôte natif");
-    removed = removed || status == ERROR_SUCCESS;
+    auto keys = ChromiumRegistryKeys();
+    keys.push_back(L"Software\\Mozilla\\NativeMessagingHosts\\media_downloader");
+    for (auto const& key : keys) removed = DeleteHostRegistryKey(key) || removed;
 #endif
     std::cerr << (removed ? "Hôte natif retiré : " : "Hôte natif déjà absent : ") << WideToUtf8(manifest.wstring()) << std::endl;
     return 0;

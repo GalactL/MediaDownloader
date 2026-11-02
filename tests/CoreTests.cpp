@@ -1,6 +1,7 @@
 #include "Core.h"
 #include "TemporaryFiles.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <filesystem>
@@ -259,6 +260,25 @@ int main()
         std::filesystem::path home{ "/home/u" }, exeDir{ "/opt/md" };
         Check(NativeManifestPath(HostPlatform::Linux, home, exeDir) == home / ".mozilla/native-messaging-hosts/media_downloader.json", "chemin manifeste Linux");
         Check(NativeManifestPath(HostPlatform::Windows, home, exeDir) == exeDir / "native-host/media_downloader.json", "chemin manifeste Windows");
+        Check(IsNativeHostLaunch({ L"chrome-extension://jjclljkpbmlceplpicnjkmkjifhhghne/", L"--parent-window=123" }), "lancement Chromium : origine de l'extension");
+        auto chromium = BuildChromiumNativeManifest("C:\\MD\\MediaDownloader.Cli.exe");
+        Check(chromium.find("\"allowed_origins\": [\"chrome-extension://" + std::string(ChromiumExtensionId) + "/\"]") != std::string::npos, "manifeste Chromium : allowed_origins");
+        Check(chromium.find("allowed_extensions") == std::string::npos, "manifeste Chromium : pas d'allowed_extensions");
+        Check(chromium.find("\"name\": \"media_downloader\"") != std::string::npos && chromium.find("\"type\": \"stdio\"") != std::string::npos, "manifeste Chromium : nom et stdio");
+        Check(chromium.find("\"path\": \"C:\\\\MD\\\\MediaDownloader.Cli.exe\"") != std::string::npos, "manifeste Chromium : antislashs échappés");
+        Check(ChromiumExtensionId.size() == 32 && ChromiumExtensionId.find_first_not_of("abcdefghijklmnop") == std::string_view::npos, "identifiant Chromium : 32 lettres a-p");
+        auto linuxChromium = ChromiumManifestPaths(HostPlatform::Linux, home, exeDir);
+        Check(linuxChromium.size() == 4, "chemins Chromium Linux : quatre navigateurs");
+        Check(std::find(linuxChromium.begin(), linuxChromium.end(), home / ".config/google-chrome/NativeMessagingHosts/media_downloader.json") != linuxChromium.end(), "chemin Chrome Linux");
+        Check(std::find(linuxChromium.begin(), linuxChromium.end(), home / ".config/chromium/NativeMessagingHosts/media_downloader.json") != linuxChromium.end(), "chemin Chromium Linux");
+        Check(std::find(linuxChromium.begin(), linuxChromium.end(), home / ".config/BraveSoftware/Brave-Browser/NativeMessagingHosts/media_downloader.json") != linuxChromium.end(), "chemin Brave Linux");
+        Check(std::find(linuxChromium.begin(), linuxChromium.end(), home / ".config/opera/NativeMessagingHosts/media_downloader.json") != linuxChromium.end(), "chemin Opera Linux");
+        auto windowsChromium = ChromiumManifestPaths(HostPlatform::Windows, home, exeDir);
+        Check(windowsChromium.size() == 1 && windowsChromium[0] == exeDir / "native-host/media_downloader.chromium.json", "chemin manifeste Chromium Windows (distinct de Firefox)");
+        auto keys = ChromiumRegistryKeys();
+        Check(std::find(keys.begin(), keys.end(), L"Software\\Google\\Chrome\\NativeMessagingHosts\\media_downloader") != keys.end(), "clé de registre Chrome");
+        Check(std::find(keys.begin(), keys.end(), L"Software\\BraveSoftware\\Brave-Browser\\NativeMessagingHosts\\media_downloader") != keys.end(), "clé de registre Brave");
+        Check(std::find(keys.begin(), keys.end(), L"Software\\Opera Software\\Opera Stable\\NativeMessagingHosts\\media_downloader") != keys.end(), "clé de registre Opera");
         auto installHost = ParseArguments({ L"install-host" });
         Check(installHost.options && installHost.options->command == Command::InstallHost, "install-host reconnu");
         Check(!ParseArguments({ L"install-host", L"--x" }).options, "install-host refuse les arguments");

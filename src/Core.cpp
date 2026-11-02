@@ -76,6 +76,7 @@ namespace media_downloader
         auto first = Lower(arguments[0]);
         if (first.empty() || first[0] == L'-' || first.find_first_of(L" \t") != std::wstring::npos) return false;
         if (first.size() > 5 && first.ends_with(L".json")) return true;
+        if (first.starts_with(L"chrome-extension://")) return true; // Chrome, Brave, Opera : origine de l'extension
         auto at = first.find(L'@');
         if (at != std::wstring::npos && at > 0 && at + 1 < first.size()) return true;
         return first.size() > 2 && first.front() == L'{' && first.back() == L'}';
@@ -90,6 +91,35 @@ namespace media_downloader
             "  \"type\": \"stdio\",\n"
             "  \"allowed_extensions\": [\"" + JsonEscape(extensionId) + "\"]\n"
             "}\n";
+    }
+
+    std::string BuildChromiumNativeManifest(std::string_view exePath)
+    {
+        return "{\n"
+            "  \"name\": \"media_downloader\",\n"
+            "  \"description\": \"MediaDownloader : télécharge et convertit des vidéos avec yt-dlp et FFmpeg.\",\n"
+            "  \"path\": \"" + JsonEscape(exePath) + "\",\n"
+            "  \"type\": \"stdio\",\n"
+            "  \"allowed_origins\": [\"chrome-extension://" + std::string(ChromiumExtensionId) + "/\"]\n"
+            "}\n";
+    }
+
+    std::vector<std::filesystem::path> ChromiumManifestPaths(HostPlatform platform, std::filesystem::path const& home, std::filesystem::path const& exeDirectory)
+    {
+        if (platform == HostPlatform::Windows) return { exeDirectory / "native-host" / "media_downloader.chromium.json" };
+        std::vector<std::filesystem::path> paths;
+        for (auto const* browser : { "google-chrome", "chromium", "BraveSoftware/Brave-Browser", "opera" })
+            paths.push_back(home / ".config" / browser / "NativeMessagingHosts" / "media_downloader.json");
+        return paths;
+    }
+
+    std::vector<std::wstring> ChromiumRegistryKeys()
+    {
+        return {
+            L"Software\\Google\\Chrome\\NativeMessagingHosts\\media_downloader",
+            L"Software\\BraveSoftware\\Brave-Browser\\NativeMessagingHosts\\media_downloader",
+            L"Software\\Opera Software\\Opera Stable\\NativeMessagingHosts\\media_downloader",
+        };
     }
 
     std::filesystem::path NativeManifestPath(HostPlatform platform, std::filesystem::path const& home, std::filesystem::path const& exeDirectory)
