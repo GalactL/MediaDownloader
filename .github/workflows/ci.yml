@@ -42,3 +42,5 @@ jobs:
           set -euo pipefail
           for f in extension/*.js; do node --check "$f"; done
           node -e "JSON.parse(require('fs').readFileSync('extension/manifest.json','utf8'))"
+      - name: Construire et valider le zip Chromium
+        run: tools/make-chromium-zip.sh

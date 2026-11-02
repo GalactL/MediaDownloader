@@ -52,10 +52,10 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            artifact: MediaDownloader-v0.5.1-Windows-x64
+            artifact: MediaDownloader-v0.6.0-Windows-x64
             readme: docs/RELEASE_WINDOWS.md
           - os: ubuntu-latest
-            artifact: MediaDownloader-v0.5.1-Linux-x64
+            artifact: MediaDownloader-v0.6.0-Linux-x64
             deno: x86_64-unknown-linux-gnu
             readme: docs/RELEASE_LINUX.md
     runs-on: ${{ matrix.os }}
@@ -85,6 +85,12 @@ jobs:
         run: |
           tools/make-xpi.sh
           cp out/mediadownloader.xpi "package/${{ matrix.artifact }}/mediadownloader.xpi"
+      - name: Construire l'extension Chromium
+        # Opera, Chrome et Brave : zip non signé à charger en mode développeur (README.txt), sans secret.
+        shell: bash
+        run: |
+          tools/make-chromium-zip.sh
+          cp out/mediadownloader-chromium.zip "package/${{ matrix.artifact }}/mediadownloader-chromium.zip"
       - name: Ajouter les scripts d'installation
         shell: bash
         run: |
@@ -151,8 +157,10 @@ jobs:
         with:
           generate_release_notes: true
           files: package/${{ matrix.artifact }}.*
-      # Le .xpi seul n'est joint que par une entrée de la matrice, pour éviter un conflit d'asset en double.
+      # Le .xpi et le zip Chromium seuls ne sont joints que par une entrée de la matrice, pour éviter un conflit d'asset en double.
       - uses: softprops/action-gh-release@v3
         if: startsWith(github.ref, 'refs/tags/') && runner.os == 'Linux'
         with:
-          files: out/mediadownloader.xpi
+          files: |
+            out/mediadownloader.xpi
+            out/mediadownloader-chromium.zip

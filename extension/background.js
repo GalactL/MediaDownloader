@@ -1,5 +1,8 @@
 "use strict";
 
+// Chromium service worker: load the `browser` shim (Firefox defines `browser` natively).
+if (typeof browser === "undefined") importScripts("shim.js");
+
 const HOST_NAME = "media_downloader";
 const FORWARDED_TYPES = new Set(["probe", "download", "cancel", "doctor", "openFolder", "pickFolder"]);
 const TERMINAL_TYPES = new Set(["completed", "error", "probe", "doctor", "opened", "folderPicked"]);
@@ -52,6 +55,6 @@ browser.runtime.onMessage.addListener((request, sender) => {
 });
 
 // Toolbar icon: toggles the box of the current tab (ignored where no content script runs).
-browser.browserAction.onClicked.addListener((tab) => {
+(browser.action || browser.browserAction).onClicked.addListener((tab) => {
   browser.tabs.sendMessage(tab.id, { kind: "toggle" }).catch(() => {});
 });

@@ -1,7 +1,9 @@
 # Changelog
 
-## Non publié
+## v0.6.0 (non publiée)
 
+- Extension : version Chromium (Opera, Chrome, Brave), manifeste MV3 `extension/manifest.chromium.json` (service worker, clé publique `key` qui fixe l'identifiant ; la clé privée n'est pas conservée) sur le même code que Firefox, avec une cale `extension/shim.js` (`browser` = `chrome`). Le manifeste Firefox ne change que de version. Livrée en `mediadownloader-chromium.zip` (`tools/make-chromium-zip.sh`) dans les archives Windows et Linux et jointe à la release ; à charger à la main en mode développeur (voir README). Non vérifiée sur Opera sous Windows réel.
+- CLI : `install-host` enregistre aussi l'hôte natif pour Opera, Chrome et Brave (manifeste avec `allowed_origins`, sous Linux dans `~/.config/<navigateur>/NativeMessagingHosts`, sous Windows clés `HKCU` pointant vers `native-host\media_downloader.chromium.json`) ; `uninstall-host` les retire. Le lancement par Chromium (origine `chrome-extension://…` en premier argument) est reconnu comme `host`.
 - Distribution : le workflow de release n'utilise plus les artefacts GitHub (quota de stockage atteint) : chaque job de build reconstruit le `.xpi` (`tools/make-xpi.sh`, qui réutilise la version signée) et publie lui-même son archive sur la release ; le job `publish` disparaît.
 - Distribution : l'extension signée `mediadownloader.xpi` est de nouveau jointe seule à la release (depuis le job Linux).
 - Distribution : le job `extension` récupère le `.xpi` déjà signé par AMO si la version existe (AMO refuse de signer deux fois), ce qui rend les relances de release sûres ; les artefacts intermédiaires sont conservés 1 jour (`retention-days: 1`).

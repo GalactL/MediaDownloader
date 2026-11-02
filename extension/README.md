@@ -29,7 +29,11 @@ moteur. Une vidéo qui exige une connexion échoue donc dans yt-dlp, et l'extens
 (`error.probe_failed` / `error.download_failed`). Pendant une navigation sans rechargement (SPA), le bouton est
 réinséré ou retiré sans doublon, et une analyse en cours est annulée puis relancée pour la nouvelle page.
 
-Manifest V2 avec page d'événements (`persistent: false`) : Firefox la garde active tant que
+Version Chromium (Opera, Chrome, Brave) : `manifest.chromium.json` (MV3, service worker `background.js`, clé publique `key`
+qui fixe l'identifiant, à garder égal à `ChromiumExtensionId` de `src/Core.h`) sur le même code ; `shim.js` définit `browser` comme
+`chrome` et `tools/make-chromium-zip.sh` produit le zip à charger en mode développeur. Les icônes PNG sont requises par Chromium.
+
+Firefox : manifest V2 avec page d'événements (`persistent: false`) : Firefox la garde active tant que
 le port `connectNative` est ouvert, et c'est le plus simple pour `runtime.connectNative`.
 
 ## Réglages

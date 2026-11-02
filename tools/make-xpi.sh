@@ -4,7 +4,7 @@
 set -euo pipefail
 mkdir -p ext-src out
 cp -r extension/. ext-src/
-rm -rf ext-src/test ext-src/README.md
+rm -rf ext-src/test ext-src/README.md ext-src/manifest.chromium.json
 if [ -n "${WEB_EXT_API_KEY:-}" ] && [ -n "${WEB_EXT_API_SECRET:-}" ]; then
   # AMO refuse de signer deux fois la même version : on réutilise le .xpi déjà signé, ce qui rend les relances sûres.
   ext_id=$(node -p "require('./extension/manifest.json').browser_specific_settings.gecko.id")
