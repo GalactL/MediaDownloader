@@ -113,9 +113,10 @@
   const INSTALL_URL = "https://github.com/GalactL/MediaDownloader/releases/latest";
 
   // Non-YouTube sites: host, and the path of a post page (its match is also the canonical page URL). Unknown hosts: every page counts.
+  // lite: also offered in lite mode (lite/engine.js covers YouTube, TikTok and X only).
   const SITES = [
-    { host: /^(?:[a-z0-9-]+\.)*(?:x|twitter)\.com$/i, post: /^\/[^/]+\/status\/\d+/ },
-    { host: /^(?:[a-z0-9-]+\.)*tiktok\.com$/i, post: /^\/@[^/]+\/video\/\d+/ },
+    { host: /^(?:[a-z0-9-]+\.)*(?:x|twitter)\.com$/i, post: /^\/[^/]+\/status\/\d+/, lite: true },
+    { host: /^(?:[a-z0-9-]+\.)*tiktok\.com$/i, post: /^\/@[^/]+\/video\/\d+/, lite: true },
     { host: /^(?:[a-z0-9-]+\.)*instagram\.com$/i, post: /^\/(?:[^/]+\/)?(?:reel|p)\/[^/]+/ },
   ];
   const siteOf = (url) => SITES.find((site) => site.host.test(url.hostname));
@@ -167,7 +168,46 @@
     return { text: i18n.translate(language, "progress.withPercent", { phase, percent: Math.round(overall) }), percent: overall };
   }
 
-  const api = { timecode, parseTime, validateRange, parseMaxSize, buildDownloadRequest, qualityOptions, errorKey, INSTALL_URL, DEFAULT_SETTINGS, normalizeSettings, isCalm, validateOutputDirectory, sameFolder, DISCORD_SIZE_MB, isVideoPage, canonicalUrl, phaseLabel, overallPercent, progressView };
+  // Lite mode exists only in the Firefox build, whose manifest declares the optional webRequestBlocking permission
+  // (the Chromium manifest has none); sites: YouTube, TikTok and X, never Instagram.
+  function liteAvailable(href, manifest) {
+    if (!((manifest && manifest.optional_permissions) || []).includes("webRequestBlocking")) return false;
+    let url;
+    try { url = new URL(href); } catch { return false; }
+    if (!/^https?:$/.test(url.protocol)) return false;
+    const host = url.hostname.toLowerCase();
+    return host === "youtu.be" || YOUTUBE_HOST.test(host) || !!(siteOf(url) || {}).lite;
+  }
+
+  // What lite mode asks for: every optional permission of the manifest, split as permissions.request expects.
+  function litePermissions(manifest) {
+    const list = (manifest && manifest.optional_permissions) || [];
+    const isOrigin = (p) => p.startsWith("<") || p.includes(":");
+    return { permissions: list.filter((p) => !isOrigin(p)), origins: list.filter(isOrigin) };
+  }
+
+  // Lite job error code -> catalogue key: lite.error.* when lite mode has its own text, else the shared error.* one.
+  function liteErrorKey(code) {
+    const key = "lite.error." + code;
+    return i18n.hasKey(key) ? key : errorKey(code);
+  }
+
+  // Lite progress { phase, pass, percent } -> the { stage, pass, percent } of progressView. The worker counts each
+  // encode pass 0-100; the native engine (and the bar) counts both passes as one 0-100.
+  function liteProgress({ phase, pass, percent }) {
+    const known = percent !== undefined && percent !== null && Number.isFinite(Number(percent));
+    const encode = phase === "encode" && known && pass;
+    return { stage: phase, pass, percent: encode ? (Math.min(pass, 2) - 1) * 50 + Math.min(100, Math.max(0, Number(percent))) / 2 : known ? Number(percent) : null };
+  }
+
+  // File name for downloads.download (Firefox rejects path separators and characters Windows forbids).
+  function liteFileName(name) {
+    const base = String(name ?? "").replace(/[\u0000-\u001f\u007f-\u009f\\/:*?"<>|]/g, " ").replace(/\s+/g, " ")
+      .replace(/^[\s.]+|[\s.]+$/g, "").slice(0, 120).trim();
+    return (base || "video") + ".mp4";
+  }
+
+  const api = { timecode, parseTime, validateRange, parseMaxSize, buildDownloadRequest, qualityOptions, errorKey, INSTALL_URL, DEFAULT_SETTINGS, normalizeSettings, isCalm, validateOutputDirectory, sameFolder, DISCORD_SIZE_MB, isVideoPage, canonicalUrl, phaseLabel, overallPercent, progressView, liteAvailable, litePermissions, liteErrorKey, liteProgress, liteFileName };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.MDLib = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

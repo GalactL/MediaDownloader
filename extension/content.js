@@ -167,6 +167,10 @@
   }
   function setLabel(state) { labelState = state; renderLabel(); }
   bind(renderLabel);
+  // Lite mode entry (Firefox, YouTube/TikTok/X only: see sync()), with what it changes.
+  const liteButton = el("button", { className: "lite", type: "button" }, [tr("action.liteDownload")]);
+  const liteHint = Object.assign(tr("lite.hint", () => ({ size: lib.DISCORD_SIZE_MB }), "p"), { className: "muted hint" });
+  const liteBox = el("div", { className: "lite-box", hidden: true }, [liteButton, liteHint]);
   const status = el("span");
   const statusBox = el("div", { className: "status", role: "status" }, [status]);
   let statusState = { key: "status.ready", kind: "ready" };
@@ -236,6 +240,7 @@
     statusBox,
     notice,
     el("div", { className: "actions" }, [download, side]),
+    liteBox,
   ]);
   const settingsCard = cardOf("h-settings", "settings.title", "settings", [back], [headButton("action.close", ICON.close, { className: "close closer" })], [
     el("div", { className: "body" }, [
@@ -364,7 +369,7 @@
 
   function setRunning(value) {
     running = value;
-    form.disabled = download.disabled = value;
+    form.disabled = download.disabled = liteButton.disabled = value;
     download.classList.remove("complete");
     download.classList.toggle("loading", value);
     download.toggleAttribute("aria-busy", value);
@@ -423,27 +428,65 @@
     });
   }
 
-  function start() {
+  // Form values of a job, or null once the error is shown.
+  function readForm() {
     // Timecodes are ignored while the box is unchecked; once checked, start and end are both required.
     const startTime = clip.checked ? lib.parseTime(startInput.value) : null;
     const endTime = clip.checked ? lib.parseTime(endInput.value) : null;
     const size = lib.parseMaxSize(maxSize.value);
     const rangeError = clip.checked && (startTime === null || endTime === null) && !Number.isNaN(startTime) && !Number.isNaN(endTime)
       ? "error.rangeRequired" : lib.validateRange(startTime, endTime);
-    if (rangeError) return say(rangeError, "error");
-    if (Number.isNaN(size)) return say("error.sizeRange", "error", notice);
+    if (rangeError) return void say(rangeError, "error");
+    if (Number.isNaN(size)) return void say("error.sizeRange", "error", notice);
+    return { startTime, endTime, size };
+  }
+
+  let startedAt = 0;
+  function beginJob(hasEncode, stage) {
     setRunning(true);
     fill.style.transition = "";
     fill.style.width = "0";
     barPercent = 0;
-    jobHasEncode = size !== null;
-    setLabel({ kind: "progress", reply: { stage: "inspection" } }); // phase name right away, never a frozen "starting"
-    const startedAt = Date.now();
+    jobHasEncode = hasEncode;
+    setLabel({ kind: "progress", reply: { stage } }); // phase name right away, never a frozen "starting"
+    startedAt = Date.now();
+    say("");
+  }
+
+  function finish(sideMode, after) {
+    // Very short jobs still show a full left-to-right run: the bar fills to 100 % over whatever is left of one second.
+    const left = Math.max(0, 1000 - (Date.now() - startedAt));
+    const calm = isCalm();
+    fill.style.transition = calm ? "none" : "width " + Math.max(left, 200) + "ms linear";
+    jobHasEncode = false;
+    setLabel({ kind: "progress", reply: { stage: "download", percent: 100 } }); // fills the bar to 100 % and drops the stripes
+    setTimeout(() => {
+      fill.style.transition = "";
+      setRunning(false);
+      download.classList.add("complete");
+      download.disabled = true;
+      setLabel({ kind: "done" });
+      setStatus("");
+      setSide(sideMode);
+      if (after) after();
+    }, calm ? 0 : Math.max(left, 200));
+  }
+
+  function fail(key) {
+    setRunning(false);
+    fill.style.transition = "";
+    setStatus("status.interrupted", "error");
+    say(key, "error");
+  }
+
+  function start() {
+    const job = readForm();
+    if (!job) return;
+    beginJob(job.size !== null, "inspection");
     const requestedDir = settings.outputDirectory;
     let usedDir = "";
-    say("");
     request(lib.buildDownloadRequest({
-      url: lib.canonicalUrl(location.href), quality: quality.value, maxSizeMb: size, start: startTime, end: endTime, name: nameInput.value, outputDirectory: settings.outputDirectory, lowResources: settings.lowResources,
+      url: lib.canonicalUrl(location.href), quality: quality.value, maxSizeMb: job.size, start: job.startTime, end: job.endTime, name: nameInput.value, outputDirectory: settings.outputDirectory, lowResources: settings.lowResources,
     }), (reply) => {
       if (reply.type === "started") {
         usedDir = String(reply.outputDirectory || "");
@@ -452,31 +495,43 @@
       } else if (reply.type === "phase") {
         setLabel({ kind: "progress", reply: { stage: reply.stage } }); // no percent: indeterminate bar
       } else if (reply.type === "completed") {
-        // Very short jobs still show a full left-to-right run: the bar fills to 100 % over whatever is left of one second.
-        const left = Math.max(0, 1000 - (Date.now() - startedAt));
-        const calm = isCalm();
-        fill.style.transition = calm ? "none" : "width " + Math.max(left, 200) + "ms linear";
-        jobHasEncode = false;
-        setLabel({ kind: "progress", reply: { stage: "download", percent: 100 } }); // fills the bar to 100 % and drops the stripes
-        setTimeout(() => {
-          fill.style.transition = "";
-          setRunning(false);
-          download.classList.add("complete");
-          download.disabled = true;
-          setLabel({ kind: "done" });
-          setStatus("");
-          setSide("folder");
+        finish("folder", () => {
           // The engine fell back to the Videos folder: say where the file really went.
           if (requestedDir && usedDir && !lib.sameFolder(requestedDir, usedDir))
             say("notice.dirFallback", "", notice, { dir: usedDir });
-        }, calm ? 0 : Math.max(left, 200));
+        });
       } else if (reply.type === "error") {
-        setRunning(false);
-        fill.style.transition = "";
-        setStatus("status.interrupted", "error");
-        say(lib.errorKey(reply.code), "error");
+        fail(lib.errorKey(reply.code));
       }
     });
+  }
+
+  // Lite mode (Firefox): lite/background-lite.js runs the job; the file lands in Firefox's download folder, so no
+  // folder button at the end. Without a size, the Discord preset: lite mode always encodes to fit a size.
+  let litePort = null;
+  function startLite() {
+    const job = readForm();
+    if (!job) return;
+    beginJob(true, "init");
+    const port = browser.runtime.connect({ name: "lite" });
+    litePort = port;
+    // Firefox suspends an idle event page even while a port is open: a message every 10 s keeps it alive (idle limit 30 s).
+    const keepAlive = setInterval(() => port.postMessage({ type: "ping" }), 10000);
+    const end = () => { clearInterval(keepAlive); litePort = null; };
+    port.onMessage.addListener((reply) => {
+      if (reply.type === "progress") return setLabel({ kind: "progress", reply: lib.liteProgress(reply) });
+      if (reply.type !== "completed" && reply.type !== "error") return;
+      end();
+      port.disconnect();
+      if (reply.type === "completed") finish("idle");
+      else fail(lib.liteErrorKey(reply.code));
+    });
+    port.onDisconnect.addListener(() => {
+      if (litePort !== port) return;
+      end();
+      fail(lib.liteErrorKey("internal_error"));
+    });
+    port.postMessage({ type: "start", url: pageUrl(), startSec: job.startTime, endSec: job.endTime, maxSizeMb: job.size ?? lib.DISCORD_SIZE_MB, name: nameInput.value.trim() });
   }
 
   function toggle() {
@@ -528,12 +583,14 @@
   form.addEventListener("input", resetResult);
   form.addEventListener("change", resetResult);
   side.addEventListener("click", () => {
-    if (sideMode === "cancel") request({ type: "cancel" }, () => {});
+    if (sideMode === "cancel" && litePort) litePort.postMessage({ type: "cancel" });
+    else if (sideMode === "cancel") request({ type: "cancel" }, () => {});
     else request({ type: "openFolder" }, (reply) => {
       if (reply.type === "error") say(lib.errorKey(reply.code), "error");
     });
   });
   download.addEventListener("click", start);
+  liteButton.addEventListener("click", startLite);
 
   setView("main"); // marks the settings card inert from the start
 
@@ -601,6 +658,7 @@
   // SPA navigation: these sites change the URL without reloading.
   function sync() {
     const visible = lib.isVideoPage(location.href);
+    liteBox.hidden = !lib.liteAvailable(location.href, browser.runtime.getManifest());
     syncButton();
     if (visible && !host.isConnected) document.documentElement.append(host);
     if (!visible && host.isConnected) host.remove();

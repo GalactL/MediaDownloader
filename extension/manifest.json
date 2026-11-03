@@ -10,6 +10,8 @@
     }
   },
   "permissions": ["nativeMessaging", "storage"],
+  "optional_permissions": ["<all_urls>", "webRequest", "webRequestBlocking", "cookies", "downloads"],
+  "content_security_policy": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';",
   "browser_action": {
     "default_title": "MediaDownloader",
     "default_icon": "icons/icon.svg",
@@ -17,7 +19,7 @@
   },
   "icons": { "48": "icons/icon.svg", "96": "icons/icon.svg" },
   "background": {
-    "scripts": ["background.js"],
+    "scripts": ["background.js", "i18n.js", "lib.js", "lite/background-lite.js"],
     "persistent": false
   },
   "content_scripts": [
