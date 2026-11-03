@@ -30,6 +30,24 @@ redistribué sous licence GPL. Sources et licence : https://github.com/BtbN/FFmp
 et https://ffmpeg.org/legal.html. yt-dlp est publié sous licence Unlicense
 (https://github.com/yt-dlp/yt-dlp).
 
+Mode léger de l'extension Firefox (Firefox uniquement, YouTube, TikTok et X) : mediadownloader.xpi embarque
+ffmpeg-core.wasm (@ffmpeg/core 0.12.10, FFmpeg compilé en WebAssembly avec des bibliothèques GPL, notamment
+x264 et x265, ainsi que libvpx, LAME, Theora, Vorbis, Opus, zlib, libwebp, FreeType, FriBidi, libass et zimg).
+Ce composant est distribué sous licence GPL (FFmpeg configuré avec --enable-gpl). Texte de la licence :
+https://www.gnu.org/licenses/old-licenses/gpl-2.0.html ; informations légales de FFmpeg : https://ffmpeg.org/legal.html.
+
+Offre de sources : le code source correspondant est fourni avec chaque version. L'archive
+MediaDownloader-sources-<version>.tar.gz de la page de release contient les sources de MediaDownloader et le script
+tools/fetch-lite-assets.mjs, qui fixe les adresses et les sommes SHA-256 exactes des composants embarqués. Les
+sources amont de ffmpeg-core.wasm sont celles de https://github.com/ffmpegwasm/ffmpeg.wasm au tag v0.12.10
+(scripts de compilation inclus) et des bibliothèques qu'il télécharge (FFmpeg, x264, x265, etc.), publiées sur
+leurs sites officiels. Pendant au moins trois ans après la dernière distribution de cette version, vous pouvez
+aussi en demander une copie en ouvrant une issue sur le dépôt GitHub du projet.
+
+Autres composants embarqués par le mode léger : Pyodide 314.0.7 (MPL-2.0, avec la bibliothèque standard CPython
+sous licence PSF), yt-dlp (Unlicense), yt-dlp-ejs (Unlicense, avec meriyah sous ISC et astring sous MIT) et
+QuickJS-ng 0.18.0 compilé en WASI (MIT).
+
 Opera, Chrome, Brave : l'installation enregistre aussi l'hôte natif. Décompressez mediadownloader-chromium.zip
 dans un dossier à conserver, ouvrez opera://extensions, chrome://extensions ou brave://extensions, activez le mode
 développeur, puis « Charger l'extension non empaquetée » et choisissez ce dossier. Non vérifié sur Opera sous Windows réel.

@@ -162,8 +162,9 @@ MediaDownloader reconnaît les domaines YouTube et ajoute silencieusement
 `--cookies-from-browser firefox`. Aucun choix de navigateur n'est présenté dans
 l'interface. Le programme ne lance pas Firefox et ne tente aucune reconnexion :
 une session Firefox valide doit déjà exister sur le compte Windows.
-Pour les autres sites (X, TikTok, Instagram…), aucun cookie n'est lu : une vidéo qui exige une connexion
-ne peut pas être téléchargée et l'extension affiche un message d'erreur clair.
+Pour les autres sites (X, TikTok, Instagram…), le moteur ne lit aucun cookie : une vidéo qui exige une connexion
+ne peut pas être téléchargée et l'extension affiche un message d'erreur clair. Seul le mode léger de l'extension
+(voir plus bas) lit les cookies du navigateur du site pris en charge, et seulement après que vous avez accepté ses permissions facultatives.
 
 Sans `--output`, les fichiers finaux sont placés dans le dossier **Vidéos** de
 Windows ou dans `~/Videos` sous Linux. Le dossier Windows est celui
@@ -213,6 +214,16 @@ L'extension ajoute un bouton (le logo de MediaDownloader) dans la page : avant l
 colonne d'actions des Shorts et de TikTok, dans la barre d'actions d'une publication X ou Instagram contenant une vidéo.
 Le même menu permet de choisir la qualité, la taille maximale et un extrait. Détails par site (pages concernées,
 permissions, sélecteurs de repli) : [extension/README.md](extension/README.md).
+
+### Mode léger (Firefox uniquement)
+
+Sur YouTube, TikTok et X (pas Instagram), le menu propose aussi « Télécharger (mode léger) » : le téléchargement
+(yt-dlp dans Pyodide) et l'encodage (FFmpeg en WebAssembly, x264) se font dans Firefox, sans le programme
+MediaDownloader. Il n'existe pas dans la version Chromium. À la première utilisation, Firefox demande des
+permissions facultatives, dont la lecture des cookies du navigateur pour le site de la vidéo : sans votre accord,
+aucun cookie n'est lu. Prévoir 0,8 à 1,2 Go de mémoire pendant le traitement. Le fichier MP4 est enregistré dans
+le dossier de téléchargement de Firefox : le réglage « Dossier de téléchargement » est ignoré. Le mode léger
+embarque ffmpeg-core.wasm sous licence GPL (voir la notice de l'archive et `docs/RELEASE_*.md`).
 
 ## Tests
 

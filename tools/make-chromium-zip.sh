@@ -6,6 +6,8 @@ rm -rf chromium-src out/mediadownloader-chromium.zip
 mkdir -p chromium-src out
 cp -r extension/. chromium-src/
 rm -rf chromium-src/test chromium-src/README.md chromium-src/manifest.json
+# Le mode léger (Pyodide, ffmpeg.wasm, GPL) est réservé à Firefox : ni lite/ ni ses binaires dans le zip Chromium.
+rm -rf chromium-src/lite
 mv chromium-src/manifest.chromium.json chromium-src/manifest.json
 # Valide le manifeste produit : MV3, clé publique (identifiant fixe) et fichiers référencés présents.
 node -e '
