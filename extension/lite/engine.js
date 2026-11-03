@@ -8,6 +8,9 @@
 // - Rejects with a LiteError { code, message } (French message, no URL path, no cookie): a LiteErrorCode of
 //   plan.js (size_unreachable, out_of_memory, extract_timeout, unsupported_site) or, like the native engine,
 //   invalid_arguments, download_failed, encode_failed, size_exceeded, cancelled, internal_error.
+// - cleanupLite(): sweeps orphaned `*.source` and `mediadownloader-lite-*.mp4` left in OPFS by killed jobs; a no-op
+//   while a job is queued or running. T3 must call it once when the background starts, before any saved output
+//   is pending (it deletes every lite MP4 not owned by a running job).
 // - Jobs run one at a time (queued). The MP4 is left at the OPFS root under `opfsName`; the caller saves it,
 //   e.g. getFile() of (await navigator.storage.getDirectory()).getFileHandle(opfsName), then removeEntry()s it.
 //
@@ -22,7 +25,9 @@
 //    - webRequest.onBeforeSendHeaders, ['blocking', 'requestHeaders'], { urls: ['<all_urls>'] }: only when the
 //      request has `x-mdl` AND details.originUrl starts with browser.runtime.getURL('') (never let a web page
 //      use the rewrite). Replace each `x-mdl-h-<name>` by `<name>`, drop every `x-mdl*` header, drop the
-//      browser's own Cookie and Origin (yt-dlp's jar is authoritative). Remember details.requestId.
+//      browser's own Cookie and Origin (yt-dlp's jar is authoritative). Remember details.requestId. On a redirect
+//      hop, keep the rewritten `Cookie` only if the hop's host equals the first request's host (the jar's domain):
+//      yt-dlp itself strips `Cookie` across origins, so the rewrite must not re-add it elsewhere.
 //    - webRequest.onHeadersReceived, ['blocking', 'responseHeaders']: for a remembered requestId, accumulate
 //      the Set-Cookie values over the whole redirect chain (Firefox joins several with '\n') and append the
 //      response header `x-mdl-set-cookie: encodeURIComponent(JSON.stringify(allSetCookieValues))`.
@@ -85,11 +90,28 @@ async function siteCookies(site) {
   return lists.flat().map(({ name, value, domain, path, secure, expirationDate }) => ({ name, value, domain, path, secure, expirationDate }));
 }
 
-// Intermediate files of a job killed with its worker (abort, crash, closed browser) are swept before the next.
-async function sweepSources(root) {
-  for await (const name of root.keys()) {
-    if (name.endsWith('.source')) await root.removeEntry(name).catch(() => {});
-  }
+const isSource = name => name.endsWith('.source');
+const isLiteOutput = name => /^mediadownloader-lite-\d+\.mp4$/.test(name);
+// Entries to sweep: always intermediates; finished outputs only when `outputs` (no job owns them).
+export const orphanNames = (names, outputs) => names.filter(n => isSource(n) || (outputs && isLiteOutput(n)));
+
+// The killed worker may still hold the sync access handle for a moment: retry once.
+async function removeEntry(root, name) {
+  try { await root.removeEntry(name); return; } catch {}
+  await new Promise(r => setTimeout(r, 250));
+  await root.removeEntry(name).catch(() => {});
+}
+
+async function sweep(root, outputs) {
+  const names = [];
+  for await (const name of root.keys()) names.push(name);
+  for (const name of orphanNames(names, outputs)) await removeEntry(root, name);
+}
+
+let pending = 0;
+export async function cleanupLite() {
+  if (pending > 0) return;
+  await sweep(await navigator.storage.getDirectory(), true);
 }
 
 async function runOne({ url, startSec = null, endSec = null, maxSizeMb, onProgress = () => {}, signal }) {
@@ -103,7 +125,7 @@ async function runOne({ url, startSec = null, endSec = null, maxSizeMb, onProgre
   if (signal?.aborted) throw cancelled();
 
   const root = await navigator.storage.getDirectory();
-  await sweepSources(root);
+  await sweep(root, false);
   const opfsName = `mediadownloader-lite-${Date.now()}.mp4`;
   const cookies = await siteCookies(site);
   const worker = new Worker(new URL('./worker.mjs', import.meta.url), { type: 'module' });
@@ -112,6 +134,7 @@ async function runOne({ url, startSec = null, endSec = null, maxSizeMb, onProgre
     const result = await new Promise((resolve, reject) => {
       onAbort = () => reject(cancelled());
       signal?.addEventListener('abort', onAbort, { once: true });
+      if (signal?.aborted) onAbort(); // aborted during the awaits above
       worker.onmessage = ({ data }) => {
         if (data.progress) onProgress(data.progress);
         else if (data.error) reject(new LiteError(data.error.code, data.error.message));
@@ -129,14 +152,15 @@ async function runOne({ url, startSec = null, endSec = null, maxSizeMb, onProgre
   } finally {
     signal?.removeEventListener('abort', onAbort);
     worker.terminate();
-    // The killed worker may still lock the intermediate: sweepSources() removes it before the next job.
-    if (!ok) for (const name of [opfsName, opfsName + '.source']) await root.removeEntry(name).catch(() => {});
+    // Still locked by the killed worker? removeEntry retries once; else cleanupLite()/the next job sweeps it.
+    if (!ok) for (const name of [opfsName, opfsName + '.source']) await removeEntry(root, name);
   }
 }
 
 let queue = Promise.resolve();
 export function runLite(options) {
+  pending++;
   const job = queue.then(() => runOne(options));
-  queue = job.catch(() => {});
+  queue = job.catch(() => {}).then(() => { pending--; });
   return job;
 }

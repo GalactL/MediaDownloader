@@ -47,3 +47,26 @@ test("runLite rejects unsupported sites before any work", async () => {
   await assert.rejects(runLite({ url: "https://x.com/a/status/1", maxSizeMb: 0 }), { code: "invalid_arguments" });
   await assert.rejects(runLite({ url: "https://x.com/a/status/1", maxSizeMb: 10, startSec: 5 }), { code: "invalid_arguments" });
 });
+
+test("orphanNames: sources always, lite outputs only when asked", async () => {
+  const { orphanNames } = await load();
+  const names = ["mediadownloader-lite-1.mp4", "mediadownloader-lite-1.mp4.source", "other.mp4", "x.source"];
+  assert.deepEqual(orphanNames(names, false), ["mediadownloader-lite-1.mp4.source", "x.source"]);
+  assert.deepEqual(orphanNames(names, true), ["mediadownloader-lite-1.mp4", "mediadownloader-lite-1.mp4.source", "x.source"]);
+});
+
+test("runLite: an abort during the setup awaits still cancels and terminates the worker", async () => {
+  const { runLite } = await load();
+  const ctrl = new AbortController();
+  const workers = [];
+  const root = { keys: async function* () {}, removeEntry: async () => {} };
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    // aborts while runOne is awaiting getDirectory(), after the early signal.aborted check
+    value: { storage: { getDirectory: async () => { ctrl.abort(); return root; } } },
+  });
+  globalThis.Worker = class { constructor() { this.terminated = false; workers.push(this); } postMessage() {} terminate() { this.terminated = true; } };
+  await assert.rejects(runLite({ url: "https://www.youtube.com/watch?v=x", maxSizeMb: 10, signal: ctrl.signal }), { code: "cancelled" });
+  assert.equal(workers.length, 1);
+  assert.ok(workers[0].terminated);
+});
