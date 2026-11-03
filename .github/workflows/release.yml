@@ -101,10 +101,10 @@ jobs:
           tools/make-chromium-zip.sh
           cp out/mediadownloader-chromium.zip "package/${{ matrix.artifact }}/mediadownloader-chromium.zip"
       - name: Archive des sources (GPL)
-        # Offre de sources de ffmpeg-core.wasm (GPL), jointe une seule fois à la release (voir docs/RELEASE_*.md).
+        # Sources de MediaDownloader seules (offre écrite de sources de ffmpeg-core.wasm GPL : voir docs/RELEASE_*.md), jointe une seule fois à la release.
         if: runner.os == 'Linux'
         shell: bash
-        run: git archive --format=tar.gz --prefix="MediaDownloader-${GITHUB_REF_NAME}/" -o "out/MediaDownloader-sources-${GITHUB_REF_NAME}.tar.gz" HEAD
+        run: git archive --format=tar.gz --prefix="MediaDownloader-${GITHUB_REF_NAME////-}/" -o "out/MediaDownloader-sources-${GITHUB_REF_NAME////-}.tar.gz" HEAD
       - name: Ajouter les scripts d'installation
         shell: bash
         run: |

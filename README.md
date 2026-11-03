@@ -165,6 +165,7 @@ une session Firefox valide doit déjà exister sur le compte Windows.
 Pour les autres sites (X, TikTok, Instagram…), le moteur ne lit aucun cookie : une vidéo qui exige une connexion
 ne peut pas être téléchargée et l'extension affiche un message d'erreur clair. Seul le mode léger de l'extension
 (voir plus bas) lit les cookies du navigateur du site pris en charge, et seulement après que vous avez accepté ses permissions facultatives.
+Ces permissions sont plus larges que les cookies (accès à tous les sites, interception des requêtes) : les cookies sont lus pour être passés à yt-dlp à l'intérieur du navigateur, et rien ne sort de l'ordinateur à part les requêtes vers les sites concernés.
 
 Sans `--output`, les fichiers finaux sont placés dans le dossier **Vidéos** de
 Windows ou dans `~/Videos` sous Linux. Le dossier Windows est celui

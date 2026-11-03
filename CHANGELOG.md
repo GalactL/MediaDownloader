@@ -3,7 +3,7 @@
 ## Non publié
 
 - Extension : mode léger (Firefox uniquement ; YouTube, TikTok et X), entrée « Télécharger (mode léger) » du menu qui fonctionne sans le programme MediaDownloader : yt-dlp dans Pyodide, QuickJS pour YouTube, FFmpeg en WebAssembly (x264, préréglage `superfast`, deux passes) pour tenir la taille demandée. Permissions facultatives (dont la lecture des cookies du navigateur du site de la vidéo) demandées au premier usage, après accord de l'utilisateur ; sans cet accord, aucun cookie n'est lu. Mémoire : 0,8 à 1,2 Go au pic ; le réglage « Dossier de téléchargement » est ignoré (dossier de téléchargement de Firefox). Absent de la version Chromium.
-- Distribution : le `.xpi` embarque `ffmpeg-core.wasm` (`@ffmpeg/core` 0.12.10, compilé avec des bibliothèques GPL dont x264 et x265) : avis GPL et offre de sources ajoutés aux notices `docs/RELEASE_*.md`. Le job `extension` récupère les composants épinglés avec `tools/fetch-lite-assets.mjs`, et la release joint `MediaDownloader-sources-<tag>.tar.gz` (sources du dépôt). `tools/make-chromium-zip.sh` exclut `lite/` du zip Chromium.
+- Distribution : le `.xpi` embarque `ffmpeg-core.wasm` (`@ffmpeg/core` 0.12.10, compilé avec des bibliothèques GPL dont x264 et x265) : avis GPL et offre écrite de sources (renvoi vers les sources amont de ffmpeg.wasm, FFmpeg, x264 et x265) ajoutés aux notices `docs/RELEASE_*.md` et au `.xpi` (`licenses/NOTICE-GPL.txt`). Le job `extension` récupère les composants épinglés avec `tools/fetch-lite-assets.mjs`, et la release joint `MediaDownloader-sources-<tag>.tar.gz` (sources de MediaDownloader seulement, sans celles de FFmpeg, x264 ni x265). `tools/make-chromium-zip.sh` exclut `lite/` et `licenses/` du zip Chromium.
 
 ## v0.6.0 (2026-11-02)
 
