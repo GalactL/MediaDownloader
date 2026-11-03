@@ -5,7 +5,7 @@
 import { loadPyodide } from './vendor/pyodide/pyodide.mjs';
 import createFFmpegCore from './vendor/ffmpeg/ffmpeg-core.js';
 import { runQjs } from './qjs.mjs';
-import { ENCODER, EXTRACT_RETRIES, MAX_HEIGHT, MEMORY_BUDGET_MB, X264_PRESET } from './config.js';
+import { EXTRACT_RETRIES, MAX_HEIGHT, MEMORY_BUDGET_MB, X264_PRESET } from './config.js';
 import { LiteError, OUT_OF_MEMORY_MESSAGE, checkMemory, isOomText, isTimeoutText, redactUrls, resolveClip } from './engine.js';
 
 const { checkFeasible, planEncode, LiteErrorCode } = globalThis.MDLitePlan;
@@ -151,55 +151,6 @@ function encodeX264(input, plan, seconds) {
   }
 }
 
-// Not qualified (spike #58): one pass, bitrate often under target, AAC still from ffmpeg.wasm. ffmpeg.wasm
-// decodes and scales to I420 by 4 s segments, VideoEncoder (H.264) encodes, ffmpeg.wasm muxes with the audio;
-// redone at a lower bitrate while the file is over the limit.
-// shortcut: frame timestamps assume a constant frame rate (-r), a VFR source may drift; measure before enabling.
-async function encodeWebCodecs(input, plan, seconds, maxBytes) {
-  const info = run(['-hide_banner', '-i', input]).stderr;
-  const m = /Video: .*?, (\d{2,5})x(\d{2,5})\b.*? ([\d.]+) fps/.exec(info);
-  if (!m) throw encodeError(info, 'flux vidéo introuvable');
-  const fps = +m[3], srcH = +m[2];
-  const h = 2 * Math.floor(Math.min(srcH, MAX_HEIGHT) / 2), w = 2 * Math.round(+m[1] * h / srcH / 2);
-  const frameBytes = w * h * 3 / 2, segment = 4;
-  let factor = 1;
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    const chunks = [];
-    let error = null, frames = 0;
-    const cfg = { codec: 'avc1.640028', width: w, height: h, bitrate: Math.round(plan.videoKbps * 1000 * factor), framerate: fps,
-      bitrateMode: 'constant', latencyMode: 'quality', hardwareAcceleration: 'prefer-software', avc: { format: 'annexb' } };
-    if (!(await VideoEncoder.isConfigSupported(cfg)).supported) throw encodeError('', 'configuration WebCodecs non prise en charge');
-    const enc = new VideoEncoder({ output: c => { const b = new Uint8Array(c.byteLength); c.copyTo(b); chunks.push(b); }, error: e => { error = String(e); } });
-    enc.configure(cfg);
-    for (let s = 0; s < seconds && !error; s += segment) {
-      progress({ phase: 'encode', pass: attempt, percent: Math.round(s / seconds * 100) });
-      const r = run(['-hide_banner', '-ss', String(s), '-t', String(segment), '-i', input, '-map', '0:v:0', '-an',
-        '-vf', `scale=${w}:${h},format=yuv420p`, '-r', String(fps), '-f', 'rawvideo', '/work/seg.yuv']);
-      if (r.code !== 0) throw encodeError(r.stderr, 'décodage');
-      const raw = core.FS.readFile('/work/seg.yuv');
-      core.FS.unlink('/work/seg.yuv');
-      for (let off = 0; off + frameBytes <= raw.length && !error; off += frameBytes) {
-        const frame = new VideoFrame(raw.subarray(off, off + frameBytes), { format: 'I420', codedWidth: w, codedHeight: h, timestamp: Math.round(frames * 1e6 / fps) });
-        enc.encode(frame, { keyFrame: frames % Math.round(fps * 4) === 0 });
-        frame.close();
-        frames++;
-        while (enc.encodeQueueSize > 8) await new Promise(res => setTimeout(res, 0));
-      }
-    }
-    await enc.flush().catch(e => { error = String(e); });
-    enc.close();
-    if (error) throw encodeError(error, 'WebCodecs');
-    core.FS.writeFile('/work/v.h264', new Uint8Array(await new Blob(chunks).arrayBuffer()));
-    const mux = run(['-hide_banner', '-y', '-f', 'h264', '-r', String(fps), '-i', '/work/v.h264', '-i', input, '-map', '0:v:0', '-map', '1:a:0?',
-      '-c:v', 'copy', '-c:a', 'aac', '-b:a', `${plan.audioKbps}k`, '-shortest', '-movflags', '+faststart', '/work/out.mp4']);
-    core.FS.unlink('/work/v.h264');
-    if (mux.code !== 0) throw encodeError(mux.stderr, 'multiplexage');
-    const bytes = core.FS.stat('/work/out.mp4').size;
-    if (bytes <= maxBytes) return;
-    factor *= 0.97 * maxBytes / bytes;
-  }
-}
-
 function encodeError(stderr, step) {
   return isOomText(stderr) ? new LiteError(LiteErrorCode.out_of_memory, OUT_OF_MEMORY_MESSAGE)
     : new LiteError('encode_failed', `L'encodage a échoué (${step}).`);
@@ -271,8 +222,7 @@ async function job({ url, startSec, endSec, maxSizeMb, cookies, opfsName }) {
     core.FS.unlink(dl.path);
     mountOpfs(source, sourceName);
     const maxBytes = Math.floor(maxSizeMb * 1024 * 1024);
-    if (ENCODER === 'webcodecs') await encodeWebCodecs('/opfs/' + sourceName, plan, seconds, maxBytes);
-    else encodeX264('/opfs/' + sourceName, plan, seconds);
+    encodeX264('/opfs/' + sourceName, plan, seconds);
     onFfmpegLog = null;
     const out = core.FS.readFile('/work/out.mp4');
     if (out.length > maxBytes) throw new LiteError('size_exceeded', 'Le fichier encodé dépasse encore la taille maximale demandée');

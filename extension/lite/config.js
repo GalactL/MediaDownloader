@@ -1,7 +1,7 @@
 // Lite mode settings (ES module, read by engine.js and worker.mjs).
-// 'x264' (2-pass, same arguments as the native engine) or 'webcodecs' (VideoEncoder, one pass; not qualified).
-export const ENCODER = 'x264';
-export const X264_PRESET = 'superfast'; // spike #58: only superfast keeps a 30 s clip near 1 min
+// Video: x264, 2 passes, same arguments as the native engine. WebCodecs was measured and rejected in #59 T4
+// (frames shifted/dropped, SSIM 0.025 to 0.18 under x264); the GPL ffmpeg-core.wasm is shipped either way.
+export const X264_PRESET = 'superfast'; // #59 T4: SSIM within 0.0005 of veryfast, encode 1.4 to 1.6x faster
 export const MAX_HEIGHT = 720; // format selection and scaling, like the native `quality` 720
 // Refused before download when 2 x the estimated source size exceeds this (the intermediate lives in the
 // wasm heap, capped at 2 GiB, while it is written). Peak measured in the spikes: 0.8 to 1.2 GB per process.
