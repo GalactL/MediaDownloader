@@ -57,7 +57,7 @@ d'aucune permission facultative.
   enregistrement ; annulation par le bouton × ; messages fr/en par code (`lib.liteErrorKey` : `lite.error.*`, sinon le
   `error.*` commun) pour permission refusée, vidéo trop longue pour la taille, mémoire insuffisante, délai d'extraction
   dépassé, site non pris en charge, échec de téléchargement, d'encodage ou d'enregistrement.
-- **Mémoire** : 0,8 à 1,2 Go au pic mesuré pendant un traitement ; au-delà du budget de `lite/config.js` (estimation
+- **Mémoire** : au pic mesuré (extrait YouTube de 30 s), jusqu'à environ 0,8 Go pour le processus de l'extension et environ 1,6 Go pour l'ensemble de Firefox ; prévoir au moins 4 Go de mémoire libre ; au-delà du budget de `lite/config.js` (estimation
   avant téléchargement), le travail est refusé avec « mémoire insuffisante ».
 - **Permissions à la première utilisation** : un script de contenu n'a pas accès à `permissions.request`, et la page de
   fond n'est pas « en train de traiter une action de l'utilisateur » quand elle reçoit un message. Le premier clic ouvre

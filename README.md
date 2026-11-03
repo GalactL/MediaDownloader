@@ -222,7 +222,7 @@ Sur YouTube, TikTok et X (pas Instagram), le menu propose aussi « Télécharger
 (yt-dlp dans Pyodide) et l'encodage (FFmpeg en WebAssembly, x264) se font dans Firefox, sans le programme
 MediaDownloader. Il n'existe pas dans la version Chromium. À la première utilisation, Firefox demande des
 permissions facultatives, dont la lecture des cookies du navigateur pour le site de la vidéo : sans votre accord,
-aucun cookie n'est lu. Prévoir 0,8 à 1,2 Go de mémoire pendant le traitement. Le fichier MP4 est enregistré dans
+aucun cookie n'est lu. Mémoire au pic mesuré : jusqu'à environ 0,8 Go pour le processus de l'extension et environ 1,6 Go pour l'ensemble de Firefox (extrait YouTube de 30 s) ; prévoir au moins 4 Go de mémoire libre. Le fichier MP4 est enregistré dans
 le dossier de téléchargement de Firefox : le réglage « Dossier de téléchargement » est ignoré. Le mode léger
 embarque ffmpeg-core.wasm sous licence GPL (voir la notice de l'archive et `docs/RELEASE_*.md`).
 
