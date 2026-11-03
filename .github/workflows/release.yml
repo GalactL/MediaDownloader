@@ -37,6 +37,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Récupérer les composants du mode léger
+        # Pyodide, yt-dlp, QuickJS et ffmpeg-core.wasm aux versions et sommes SHA-256 épinglées ; absents du dépôt, requis dans le .xpi.
+        run: node tools/fetch-lite-assets.mjs
       # Signe (ou vérifie) une seule fois ; chaque job build refait le .xpi lui-même (aucun artefact GitHub).
       - name: Signer l'extension
         shell: bash
@@ -76,6 +82,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Récupérer les composants du mode léger
+        shell: bash
+        run: node tools/fetch-lite-assets.mjs
       - name: Reconstruire l'extension Firefox
         # Déjà signée par le job extension : fetch-signed-xpi la retrouve, aucune seconde signature.
         shell: bash
@@ -91,6 +100,11 @@ jobs:
         run: |
           tools/make-chromium-zip.sh
           cp out/mediadownloader-chromium.zip "package/${{ matrix.artifact }}/mediadownloader-chromium.zip"
+      - name: Archive des sources (GPL)
+        # Sources de MediaDownloader seules (offre écrite de sources de ffmpeg-core.wasm GPL : voir docs/RELEASE_*.md), jointe une seule fois à la release.
+        if: runner.os == 'Linux'
+        shell: bash
+        run: git archive --format=tar.gz --prefix="MediaDownloader-${GITHUB_REF_NAME////-}/" -o "out/MediaDownloader-sources-${GITHUB_REF_NAME////-}.tar.gz" HEAD
       - name: Ajouter les scripts d'installation
         shell: bash
         run: |
@@ -164,3 +178,4 @@ jobs:
           files: |
             out/mediadownloader.xpi
             out/mediadownloader-chromium.zip
+            out/MediaDownloader-sources-*.tar.gz

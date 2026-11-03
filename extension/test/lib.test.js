@@ -162,7 +162,7 @@ test("i18n: catalogue completeness", () => {
 
 test("no visible string is hard-coded outside the catalogue", () => {
   // Source files may only contain accent-free technical strings; French text lives in i18n.js.
-  for (const file of ["content.js", "background.js", "lib.js"]) {
+  for (const file of ["content.js", "background.js", "lib.js", "lite/background-lite.js", "lite/consent.js", "lite/consent.html"]) {
     const code = fs.readFileSync(path.join(__dirname, "..", file), "utf8").split("\n").filter((line) => !/^\s*\/\//.test(line)).join("\n").replace(/\s\/\/.*$/gm, "");
     assert.doesNotMatch(code, /["'`][^"'`\n]*[àâçéèêëîïôûùüÿ«»][^"'`\n]*["'`]/i, file + " contains a French literal");
   }
@@ -247,4 +247,114 @@ test("timecode formats a duration as a placeholder example", () => {
   assert.equal(lib.timecode(10), "00:00:10");
   assert.equal(lib.timecode(3725.4), "01:02:05");
   for (const bad of [0, -5, NaN, undefined, "x"]) assert.equal(lib.timecode(bad), "00:00:00");
+});
+
+// Lite mode (Firefox only).
+const firefoxManifest = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "manifest.json"), "utf8"));
+const chromiumManifest = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "manifest.chromium.json"), "utf8"));
+const { createRewriter } = require("../lite/background-lite.js");
+
+test("lite: entry only on YouTube, TikTok and X, and only with the Firefox manifest", () => {
+  for (const href of ["https://www.youtube.com/watch?v=a", "https://m.youtube.com/shorts/a", "https://youtu.be/a",
+    "https://www.tiktok.com/@u/video/1", "https://x.com/u/status/1", "https://twitter.com/u/status/1"]) {
+    assert.ok(lib.liteAvailable(href, firefoxManifest), href);
+    assert.ok(!lib.liteAvailable(href, chromiumManifest), "chromium " + href);
+  }
+  for (const href of ["https://www.instagram.com/reel/a/", "https://www.instagram.com/p/a/", "https://youtube.com.evil.example/watch?v=a",
+    "https://notyoutube.com/watch?v=a", "https://evilx.com/u/status/1", "ftp://www.youtube.com/watch?v=a", "not a url"])
+    assert.ok(!lib.liteAvailable(href, firefoxManifest), href);
+  assert.ok(!lib.liteAvailable("https://www.youtube.com/watch?v=a", undefined));
+});
+
+test("lite: manifest asks only optional permissions, nothing new is mandatory", () => {
+  assert.deepEqual(firefoxManifest.permissions, ["nativeMessaging", "storage"]);
+  assert.deepEqual(chromiumManifest.permissions, ["nativeMessaging", "storage"]);
+  assert.ok(!("optional_permissions" in chromiumManifest));
+  assert.deepEqual(lib.litePermissions(firefoxManifest),
+    { permissions: ["webRequest", "webRequestBlocking", "cookies", "downloads"], origins: ["<all_urls>"] });
+  assert.ok(!firefoxManifest.optional_permissions.includes("tabs"));
+  // Nothing leaves the computer for the developer or a third party.
+  assert.deepEqual(firefoxManifest.browser_specific_settings.gecko.data_collection_permissions, { required: ["none"] });
+  assert.equal(firefoxManifest.content_security_policy, "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';");
+  assert.equal(firefoxManifest.background.persistent, false);
+  assert.deepEqual(firefoxManifest.background.scripts, ["background.js", "i18n.js", "lib.js", "lite/background-lite.js"]);
+  for (const file of [...firefoxManifest.background.scripts, "lite/engine.js", "lite/consent.html", "lite/consent.js"])
+    assert.ok(fs.existsSync(path.join(__dirname, "..", file)), file);
+});
+
+test("lite: every job error has its own text in every language", () => {
+  const codes = ["size_unreachable", "out_of_memory", "extract_timeout", "permission_denied", "unsupported_site", "invalid_arguments",
+    "download_failed", "encode_failed", "size_exceeded", "cancelled", "internal_error", "busy", "save_failed"];
+  for (const code of codes) {
+    const key = lib.liteErrorKey(code);
+    assert.notEqual(key, "error.generic", code);
+    for (const language of i18n.LANGUAGES) assert.ok(Object.hasOwn(i18n.MESSAGES[language], key), language + " " + key);
+  }
+  // Lite texts never claim that no cookie is read (lite mode reads the site's cookies).
+  assert.equal(lib.liteErrorKey("download_failed"), "lite.error.download_failed");
+  assert.doesNotMatch(i18n.translate("fr", lib.liteErrorKey("download_failed")), /cookie/i);
+  assert.equal(lib.liteErrorKey("cancelled"), "error.cancelled");
+  assert.equal(lib.liteErrorKey("no_such_code"), "error.generic");
+  assert.match(i18n.translate("fr", lib.liteErrorKey("permission_denied")), /refusées/);
+  assert.match(i18n.translate("fr", "lite.hint", { size: 20 }), /Dossier de téléchargement.*ignoré.*20 Mo/);
+  assert.match(i18n.translate("en", "lite.hint", { size: 20 }), /"Download folder" setting is ignored.*20 MB/);
+  for (const key of ["consent.title", "consent.intro", "consent.sites", "consent.headers", "consent.cookies", "consent.downloads", "consent.privacy", "consent.allow"])
+    assert.ok(i18n.hasKey(key), key);
+});
+
+test("lite: progress phases and the encode passes on one bar", () => {
+  for (const phase of ["permission", "init", "extract", "download", "encode", "save"])
+    assert.notEqual(lib.phaseLabel("fr", phase), "Traitement", phase);
+  assert.deepEqual(lib.liteProgress({ phase: "extract" }), { stage: "extract", pass: undefined, percent: null });
+  assert.equal(lib.liteProgress({ phase: "encode", pass: 1, percent: 100 }).percent, 50);
+  assert.equal(lib.liteProgress({ phase: "encode", pass: 2, percent: 0 }).percent, 50);
+  assert.equal(lib.liteProgress({ phase: "encode", pass: 2, percent: 100 }).percent, 100);
+  assert.equal(lib.liteProgress({ phase: "encode", pass: 3, percent: 0 }).pass, 2);
+  const view = lib.progressView("fr", lib.liteProgress({ phase: "encode", pass: 2, percent: 50 }), true);
+  assert.deepEqual(view, { text: "Encodage (passe 2/2)… 85 %", percent: 85 });
+});
+
+test("lite: file name for Firefox's download folder", () => {
+  assert.equal(lib.liteFileName("Mon clip"), "Mon clip.mp4");
+  assert.equal(lib.liteFileName(" a/b\\c:d*e?f\"g<h>i|j\u0001 "), "a b c d e f g h i j.mp4");
+  assert.equal(lib.liteFileName("..hidden.."), "hidden.mp4");
+  assert.equal(lib.liteFileName(""), "video.mp4");
+  assert.equal(lib.liteFileName(undefined), "video.mp4");
+  assert.equal(lib.liteFileName("x".repeat(300)).length, 124);
+});
+
+test("lite rewrite: only the extension's own marked requests, never a web page's", () => {
+  const own = "moz-extension://uuid/";
+  const worker = own + "lite/worker.mjs";
+  const r = createRewriter(own);
+  const headers = [{ name: "x-mdl", value: "1" }, { name: "x-mdl-h-cookie", value: "a=1" }, { name: "x-mdl-h-user-agent", value: "yt" },
+    { name: "User-Agent", value: "firefox" }, { name: "Cookie", value: "browser=1" }, { name: "Origin", value: "moz-extension://uuid" }];
+  // A page (or another extension) sending the marker gets nothing rewritten and no chain is remembered.
+  for (const originUrl of ["https://evil.example/", "moz-extension://other/", undefined, "https://www.youtube.com/" + own])
+    assert.deepEqual(r.beforeSendHeaders({ requestId: "p", url: "https://www.youtube.com/x", originUrl, requestHeaders: headers }), {});
+  assert.equal(r.chains.size, 0);
+  // Unmarked requests of the extension are left alone.
+  assert.deepEqual(r.beforeSendHeaders({ requestId: "u", url: "https://www.youtube.com/x", originUrl: worker, requestHeaders: [{ name: "Cookie", value: "b=1" }] }), {});
+  const out = r.beforeSendHeaders({ requestId: "1", url: "https://www.youtube.com/x", originUrl: worker, requestHeaders: headers }).requestHeaders;
+  assert.deepEqual(Object.fromEntries(out.map((h) => [h.name.toLowerCase(), h.value])), { "user-agent": "yt", cookie: "a=1" });
+  // Redirect to another host (headers copied from the rewritten hop, or marked again): no Cookie at all.
+  const hop = r.beforeSendHeaders({ requestId: "1", url: "https://rr1.googlevideo.com/v", originUrl: worker, requestHeaders: [...out, { name: "Cookie", value: "browser=2" }] });
+  assert.ok(!hop.requestHeaders.some((h) => h.name.toLowerCase() === "cookie"));
+  const marked = r.beforeSendHeaders({ requestId: "1", url: "https://rr1.googlevideo.com/v", originUrl: worker, requestHeaders: headers });
+  assert.ok(!marked.requestHeaders.some((h) => h.name.toLowerCase() === "cookie" || h.name.startsWith("x-mdl")));
+  // Back on the jar's host: yt-dlp's Cookie again, never the browser's.
+  const back = r.beforeSendHeaders({ requestId: "1", url: "https://www.youtube.com/y", originUrl: worker, requestHeaders: [{ name: "Cookie", value: "browser=3" }] });
+  assert.deepEqual(back.requestHeaders, [{ name: "Cookie", value: "a=1" }]);
+});
+
+test("lite rewrite: Set-Cookie collected over the redirect chain, then forgotten", () => {
+  const r = createRewriter("moz-extension://uuid/");
+  assert.deepEqual(r.headersReceived({ requestId: "x", responseHeaders: [{ name: "Set-Cookie", value: "s=1" }] }), {}); // not ours
+  r.beforeSendHeaders({ requestId: "1", url: "https://www.tiktok.com/v", originUrl: "moz-extension://uuid/lite/worker.mjs", requestHeaders: [{ name: "x-mdl", value: "1" }] });
+  assert.deepEqual(r.headersReceived({ requestId: "1", responseHeaders: [{ name: "Location", value: "/" }] }), {});
+  r.headersReceived({ requestId: "1", responseHeaders: [{ name: "Set-Cookie", value: "a=1\nb=2" }] });
+  const last = r.headersReceived({ requestId: "1", responseHeaders: [{ name: "set-cookie", value: "c=3" }] }).responseHeaders;
+  assert.deepEqual(JSON.parse(decodeURIComponent(last.find((h) => h.name === "x-mdl-set-cookie").value)), ["a=1", "b=2", "c=3"]);
+  r.forget({ requestId: "1" });
+  assert.equal(r.chains.size, 0);
 });

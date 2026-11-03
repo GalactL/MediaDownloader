@@ -24,9 +24,11 @@ Sur tous les sites, le bouton affiche le logo de l'extension (`icons/icon.svg`, 
 
 L'URL envoyée au moteur est toujours celle de la page (`lib.canonicalUrl` : sur YouTube sans `list=`/`index=`, ailleurs
 le chemin de la publication sans paramètres de suivi), jamais l'adresse d'un flux vidéo ; yt-dlp l'interprète.
-L'extension ne lit aucun cookie et ne demande aucun identifiant ; `cookiesFromBrowser` reste réservé à YouTube côté
-moteur. Une vidéo qui exige une connexion échoue donc dans yt-dlp, et l'extension affiche un message d'erreur clair
-(`error.probe_failed` / `error.download_failed`). Pendant une navigation sans rechargement (SPA), le bouton est
+En mode normal, l'extension ne lit aucun cookie et ne demande aucun identifiant ; `cookiesFromBrowser` reste réservé à
+YouTube côté moteur. Une vidéo qui exige une connexion échoue donc dans yt-dlp, et l'extension affiche un message d'erreur
+clair (`error.probe_failed` / `error.download_failed`). Le mode léger (ci-dessous), lui, lit les cookies du navigateur du
+site pris en charge de la vidéo (YouTube, TikTok ou X) pour les passer à yt-dlp, et seulement après que l'utilisateur a
+accepté ses permissions. Pendant une navigation sans rechargement (SPA), le bouton est
 réinséré ou retiré sans doublon, et une analyse en cours est annulée puis relancée pour la nouvelle page.
 
 Version Chromium (Opera, Chrome, Brave) : `manifest.chromium.json` (MV3, service worker `background.js`, clé publique `key`
@@ -35,6 +37,47 @@ qui fixe l'identifiant, à garder égal à `ChromiumExtensionId` de `src/Core.h`
 
 Firefox : manifest V2 avec page d'événements (`persistent: false`) : Firefox la garde active tant que
 le port `connectNative` est ouvert, et c'est le plus simple pour `runtime.connectNative`.
+
+## Mode léger (Firefox uniquement)
+
+Sur YouTube, TikTok et X (jamais Instagram, non couvert), le menu propose sous « Télécharger » un second choix,
+« Télécharger (mode léger) », qui fonctionne sans le programme MediaDownloader : yt-dlp tourne dans Pyodide et FFmpeg
+en WebAssembly dans un worker (`lite/engine.js`, binaires de `lite/vendor/` placés par `tools/fetch-lite-assets.mjs`).
+L'entrée n'existe que dans la version Firefox (`lib.liteAvailable` : le manifeste déclare la permission facultative
+`webRequestBlocking`, le manifeste Chromium n'en a aucune). Le chemin normal (hôte natif) ne change pas et n'a besoin
+d'aucune permission facultative.
+
+- **Taille** : le mode léger encode toujours pour tenir une taille ; c'est la « Taille maximale » du menu, ou, si elle est
+  vide, 20 Mo (`lib.DISCORD_SIZE_MB`). Le découpage (début/fin) est respecté ; la qualité est plafonnée à 720p.
+- **Sortie** : le fichier MP4 est enregistré par `downloads.download` dans le dossier de téléchargement de Firefox ;
+  le réglage « Dossier de téléchargement » est ignoré, et le menu le dit sous le bouton. Le fichier intermédiaire
+  (stockage privé OPFS de l'extension) et son URL `blob:` sont supprimés dès que Firefox a fini l'enregistrement, ou
+  après un échec ; ce qu'un arrêt brutal laisse est balayé au démarrage suivant de la page de fond (`cleanupLite()`).
+- **Progression et erreurs** : autorisation, préparation, extraction, téléchargement, encodage (passes 1 et 2),
+  enregistrement ; annulation par le bouton × ; messages fr/en par code (`lib.liteErrorKey` : `lite.error.*`, sinon le
+  `error.*` commun) pour permission refusée, vidéo trop longue pour la taille, mémoire insuffisante, délai d'extraction
+  dépassé, site non pris en charge, échec de téléchargement, d'encodage ou d'enregistrement.
+- **Mémoire** : au pic mesuré (extrait YouTube de 30 s), jusqu'à environ 0,8 Go pour le processus de l'extension et environ 1,6 Go pour l'ensemble de Firefox ; prévoir au moins 4 Go de mémoire libre ; au-delà du budget de `lite/config.js` (estimation
+  avant téléchargement), le travail est refusé avec « mémoire insuffisante ».
+- **Permissions à la première utilisation** : un script de contenu n'a pas accès à `permissions.request`, et la page de
+  fond n'est pas « en train de traiter une action de l'utilisateur » quand elle reçoit un message. Le premier clic ouvre
+  donc une petite fenêtre (`lite/consent.html`) qui explique chaque permission ; son bouton « Continuer » appelle
+  `permissions.request` et Firefox affiche son invite. Refus (ou fenêtre fermée) : message `lite.error.permission_denied`,
+  rien d'autre ne change.
+- **Page de fond** : `lite/background-lite.js` (chargé après `background.js`, `i18n.js` et `lib.js`) reçoit le travail
+  par un port `runtime.connect({ name: "lite" })`. Firefox suspend une page d'événements inactive même si un port reste
+  ouvert ; pendant un travail (15 s à 3 min), le script de contenu envoie donc un message `ping` toutes les 10 s sur ce
+  port, ce qui remet à zéro le délai d'inactivité (30 s). Fermer ou recharger l'onglet annule le travail.
+- **Réécriture des en-têtes** : les requêtes du worker portent `x-mdl` et leurs en-têtes interdits sous
+  `x-mdl-h-<nom>`. Les écouteurs `webRequest` (`onBeforeSendHeaders`, `onHeadersReceived`, `onCompleted`,
+  `onErrorOccurred`) ne sont posés que pendant un travail, après octroi, puis retirés : posés en permanence pour
+  `<all_urls>` dans une page d'événements, ils la réveilleraient à chaque requête du navigateur. Ils n'agissent que sur
+  les requêtes marquées dont `originUrl` est une page de l'extension (jamais une page web), remplacent le Cookie et
+  l'Origin du navigateur par ceux de yt-dlp, ne gardent ce Cookie que sur l'hôte de la première requête d'une chaîne de
+  redirections, et renvoient les `Set-Cookie` reçus dans `x-mdl-set-cookie` (`createRewriter`, testé dans
+  `test/lib.test.js`).
+- **CSP** : `script-src 'self' 'wasm-unsafe-eval'; object-src 'self';` (WebAssembly de Pyodide, FFmpeg et QuickJS) ;
+  tout le code est embarqué, rien n'est chargé à distance.
 
 ## Réglages
 
@@ -77,6 +120,20 @@ stockés avec `storage.local` et appliqués immédiatement sans recharger :
 - `nativeMessaging` : parler à l'hôte `media_downloader` (yt-dlp et FFmpeg tournent hors du navigateur).
 - `storage` : conserver les réglages dans `storage.local`.
 
+Permissions facultatives (Firefox, mode léger uniquement : demandées au premier clic sur « Télécharger (mode léger) »,
+jamais accordées d'office ; le mode normal fonctionne sans elles) :
+
+- `<all_urls>` : le worker télécharge la vidéo depuis le site et ses serveurs vidéo (dont les noms varient), sans
+  restriction CORS.
+- `webRequest` et `webRequestBlocking` : réécrire les en-têtes des seules requêtes du mode léger (voir plus haut),
+  uniquement pendant un travail.
+- `cookies` : lire les cookies du navigateur du site de la vidéo (YouTube, TikTok ou X) pour les passer à yt-dlp ; ils
+  ne sont envoyés qu'à ce site, jamais ailleurs ni journalisés.
+- `downloads` : enregistrer le fichier dans le dossier de téléchargement de Firefox.
+
+`data_collection_permissions` reste `none` : aucune donnée ne quitte le poste vers le développeur ou un tiers ; les
+seules requêtes du mode léger vont au site de la vidéo et à ses serveurs.
+
 ## Installation
 
 Release : voir l'étape 3 de l'installation dans le `README.md` racine (glisser
@@ -91,7 +148,8 @@ Release : voir l'étape 3 de l'installation dans le `README.md` racine (glisser
 3. « Charger un module complémentaire temporaire… » puis choisir `extension/manifest.json`.
 4. Ouvrir une vidéo YouTube (ou une publication X, TikTok ou Instagram avec vidéo) et cliquer sur le bouton à icône « Télécharger » avant le groupe « J'aime / Je n'aime pas ».
 
-Le chargement temporaire disparaît au redémarrage de Firefox.
+Le chargement temporaire disparaît au redémarrage de Firefox. Le mode léger exige en plus les binaires de
+`lite/vendor/` : lancer `node tools/fetch-lite-assets.mjs` avant l'étape 3.
 
 ## Tests
 

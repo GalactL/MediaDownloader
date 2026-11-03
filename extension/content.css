@@ -119,6 +119,15 @@ label.check input:disabled { opacity: 1; cursor: default; }
 }
 .secondary:hover { background: var(--hover); border-color: var(--accent); }
 .secondary svg { width: 21px; height: 21px; }
+/* « Télécharger (mode léger) »: a full-width outline button under the main actions, with its hint. */
+.lite-box { margin-top: 10px; }
+.lite {
+  width: 100%; height: 40px; border: 1px solid var(--field-border); border-radius: 7px;
+  background: var(--field-bg); color: var(--fg); font: 600 14px system-ui; cursor: pointer;
+}
+.lite:hover { background: var(--hover); border-color: var(--accent); }
+.lite:disabled { cursor: default; opacity: .6; }
+.lite-box .hint { margin: 8px 0 0; }
 /* Indeterminate phase (no percentage available): the whole bar is a slowly moving stripe, never a frozen 0 %. */
 .primary .fill.indeterminate {
   width: 100% !important; transition: none;

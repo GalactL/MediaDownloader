@@ -43,3 +43,6 @@ cookies-*.txt
 *.gz
 *.tmp
 *.bak
+
+# Mode léger : binaires téléchargés par tools/fetch-lite-assets.mjs
+extension/lite/vendor/
