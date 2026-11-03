@@ -197,7 +197,7 @@
   function liteProgress({ phase, pass, percent }) {
     const known = percent !== undefined && percent !== null && Number.isFinite(Number(percent));
     const encode = phase === "encode" && known && pass;
-    return { stage: phase, pass, percent: encode ? (Math.min(pass, 2) - 1) * 50 + Math.min(100, Math.max(0, Number(percent))) / 2 : known ? Number(percent) : null };
+    return { stage: phase, pass: pass && Math.min(pass, 2), percent: encode ? (Math.min(pass, 2) - 1) * 50 + Math.min(100, Math.max(0, Number(percent))) / 2 : known ? Number(percent) : null };
   }
 
   // File name for downloads.download (Firefox rejects path separators and characters Windows forbids).

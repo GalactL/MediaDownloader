@@ -49,6 +49,7 @@
     await module.cleanupLite().catch(() => {});
     return module;
   });
+  engine.catch(() => {}); // no unhandled rejection at start; `await engine` in run() still throws and reports internal_error
   let busy = false;
 
   // The listeners exist only during a job: registered for <all_urls> in an event page, they would otherwise
@@ -71,6 +72,7 @@
     if (await browser.permissions.contains(wanted)) return true;
     onAsk();
     const win = await browser.windows.create({ type: "popup", url: browser.runtime.getURL("lite/consent.html"), width: 560, height: 520 });
+    if (signal.aborted) { browser.windows.remove(win.id).catch(() => {}); return false; } // aborted while the window was opening
     await new Promise((resolve) => {
       const closed = (id) => { if (id === win.id) { browser.windows.onRemoved.removeListener(closed); resolve(); } };
       browser.windows.onRemoved.addListener(closed);

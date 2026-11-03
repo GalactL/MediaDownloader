@@ -309,6 +309,7 @@ test("lite: progress phases and the encode passes on one bar", () => {
   assert.equal(lib.liteProgress({ phase: "encode", pass: 1, percent: 100 }).percent, 50);
   assert.equal(lib.liteProgress({ phase: "encode", pass: 2, percent: 0 }).percent, 50);
   assert.equal(lib.liteProgress({ phase: "encode", pass: 2, percent: 100 }).percent, 100);
+  assert.equal(lib.liteProgress({ phase: "encode", pass: 3, percent: 0 }).pass, 2);
   const view = lib.progressView("fr", lib.liteProgress({ phase: "encode", pass: 2, percent: 50 }), true);
   assert.deepEqual(view, { text: "Encodage (passe 2/2)… 85 %", percent: 85 });
 });
