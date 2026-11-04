@@ -87,6 +87,9 @@ d'une phase sans pourcentage et peut être ignoré (détails dans [CLI_PROTOCOL.
 dossier, ou `{"type":"folderPicked","id":"…"}` sans champ `path` s'il annule (annuler = pas de chemin). Si aucun
 sélecteur n'est disponible ou s'il échoue, l'hôte répond l'erreur `pick_failed`. Le sélecteur est
 la boîte « Rechercher un dossier » de Windows (`FolderBrowserDialog`, lancée par PowerShell), `zenity` puis `kdialog` (Linux).
+Sous Windows, c'est donc la boîte classique en arborescence, plus lente à s'ouvrir que l'ancien sélecteur, et elle peut
+échouer avec `pick_failed` là où PowerShell tourne en mode de langage restreint (Constrained Language Mode) ; l'utilisateur
+peut toujours saisir le chemin à la main.
 
 La réponse `probe` est compacte :
 

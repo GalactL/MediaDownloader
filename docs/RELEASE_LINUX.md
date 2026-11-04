@@ -2,7 +2,12 @@ MediaDownloader v0.6.0 — Linux x64
 
 Cette archive est légère (moins de 1 Mo) et ne contient aucun programme tiers : install.sh télécharge
 Deno, yt-dlp et FFmpeg (environ 240 Mo au total) dans le dossier tools/bin. Il faut donc une connexion Internet
-pendant l'installation (curl ou wget, et unzip, python3 ou bsdtar, sont requis). Aucun droit administrateur n'est nécessaire.
+pendant l'installation. Aucun droit administrateur n'est nécessaire.
+
+Linux : testé en CI seulement (tests du moteur) ; installateur, lanceur et Firefox non vérifiés sur machine Linux réelle.
+Prérequis : curl ou wget ; unzip (ou python3, ou bsdtar) ; tar et xz (l'archive FFmpeg est un .tar.xz) ; sha256sum ou
+shasum ; un dossier temporaire où l'on peut exécuter des programmes (le binaire yt-dlp_linux se décompresse lui-même à
+l'exécution, un /tmp monté noexec le fait échouer).
 
 Contenu de l'archive :
 - MediaDownloader.Cli : CLI et hôte de messagerie native (lanceur du moteur TypeScript).
@@ -37,6 +42,11 @@ En cas de problème :
   proxy, définissez https_proxy / HTTPS_PROXY).
 - Seul Linux x86_64 est pris en charge.
 - Les outils téléchargés sont dans tools/bin ; vous pouvez les supprimer, install.sh les retélécharge.
+- Un échec à l'étape 2 peut laisser un deno déjà vérifié dans tools/bin. Si l'erreur cite tar ou xz, installez les
+  paquets tar et xz (xz-utils).
+- La commande « update » (yt-dlp -U) remplace le yt-dlp épinglé : une vérification ultérieure verra une autre somme
+  SHA-256 ; relancer install.sh restaure la version épinglée.
+- Appelants programmatiques : lancer tools/bin/deno avec un tableau d'arguments (voir docs/CLI_PROTOCOL.md).
 
 Opera, Chrome, Brave : l'installation enregistre aussi l'hôte natif. Décompressez mediadownloader-chromium.zip
 dans un dossier à conserver, ouvrez opera://extensions, chrome://extensions ou brave://extensions, activez le mode

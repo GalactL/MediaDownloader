@@ -37,6 +37,30 @@ arguments de FFmpeg et les événements sont exactement ceux d'avant. Le moteur 
 L'absence de `--output` sélectionne le dossier connu Windows `FOLDERID_Videos`,
 indexé par la médiathèque Windows.
 
+## Appel programmatique
+
+`MediaDownloader.Cli.exe` n'existe plus. Le lanceur `MediaDownloader.Cli.bat` convient à un humain et à Firefox, mais
+**aucune chaîne non fiable (URL, titre, chemin saisis par un tiers) ne doit transiter par le `.bat`** : `cmd.exe`
+interprète mal les guillemets doubles et le `&` (Deno échappe `"` en `\"`, ce que `cmd` ne comprend pas), ce qui permet
+une injection de commande ; Node 18.20+ et Rust refusent en plus de lancer un `.bat` sans shell.
+
+Une application appelante (HUB, script) lance donc Deno directement, avec un tableau d'arguments (jamais une chaîne
+de commande), depuis le dossier d'installation :
+
+```text
+tools\bin\deno.exe run --no-check --no-config --no-prompt
+  --allow-read --allow-write --allow-run --allow-sys=setPriority
+  --allow-env=PATH,HOME,SystemRoot,MEDIADOWNLOADER_YTDLP,MEDIADOWNLOADER_FFMPEG,MEDIADOWNLOADER_DENO,MEDIADOWNLOADER_NODE
+  engine\main.ts <arguments du CLI : download --url … >
+```
+
+Ces permissions sont exactement celles de `engine/permissions.ts` (et des lanceurs) ; les variables d'environnement
+`DENO_NO_UPDATE_CHECK=1` et `DENO_DIR=<dossier>\tools\deno-cache` sont à définir comme le font les lanceurs. Le code de
+sortie et la sortie standard sont ceux décrits ci-dessous.
+
+Sous Linux, le lanceur `MediaDownloader.Cli` utilise `exec "$@"` : il est sûr avec un tableau d'arguments, mais l'appel
+direct de `tools/bin/deno` reste équivalent.
+
 ## Événements
 
 | Type | Rôle | Champs principaux |

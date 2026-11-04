@@ -34,6 +34,16 @@ En cas de problème :
   texte, elle corrompt la communication avec Firefox : supprimez-la ou faites-la rester silencieuse. Non vérifié sur
   une machine qui en possède une.
 - Les outils téléchargés sont dans tools\bin ; vous pouvez les supprimer, Installer.bat les retélécharge.
+- L'étape 2 exige System32\tar.exe (Windows 10 1803 ou plus). Choisissez un dossier d'installation au chemin court :
+  l'extraction de FFmpeg peut dépasser la limite MAX_PATH.
+- Proxy : l'étape 1 utilise le proxy système de Windows ; seule l'étape 2 utilise la variable HTTPS_PROXY.
+- Un échec à l'étape 2 peut laisser un deno.exe déjà vérifié dans tools\bin ; relancer Installer.bat reprend.
+- La commande « update » (yt-dlp -U) remplace le yt-dlp épinglé : une vérification ultérieure verra une autre somme
+  SHA-256 ; relancer Installer.bat restaure la version épinglée.
+- Le sélecteur de dossier est la boîte classique en arborescence (PowerShell), plus lente à s'ouvrir, et peut échouer
+  (pick_failed) en mode de langage restreint ; le chemin reste saisissable à la main.
+- Appelants programmatiques : ne passez jamais de chaîne non fiable par le .bat ; lancez tools\bin\deno.exe avec un
+  tableau d'arguments (voir docs/CLI_PROTOCOL.md).
 
 Opera, Chrome, Brave : l'installation enregistre aussi l'hôte natif. Décompressez mediadownloader-chromium.zip
 dans un dossier à conserver, ouvrez opera://extensions, chrome://extensions ou brave://extensions, activez le mode

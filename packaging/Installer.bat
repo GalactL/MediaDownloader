@@ -53,7 +53,9 @@ if not defined MEDIADOWNLOADER_INSTALLER_TEST pause
 exit /b 1
 :fail
 echo.
-echo ECHEC de l'installation. Rien de partiel n'a ete laisse dans tools\bin.
-echo Verifiez la connexion (proxy : variable HTTPS_PROXY), l'espace disque et les droits sur ce dossier, puis relancez Installer.bat.
+echo ECHEC de l'installation. Si l'echec survient a l'etape 2, un deno.exe deja verifie peut rester dans tools\bin.
+echo Verifiez la connexion (etape 1 : proxy systeme Windows ; etape 2 : variable HTTPS_PROXY), l'espace disque et les droits sur ce dossier.
+echo L'etape 2 exige System32\tar.exe (Windows 10 1803 ou plus) et un dossier d'installation au chemin court (limite MAX_PATH).
+echo Puis relancez Installer.bat.
 if not defined MEDIADOWNLOADER_INSTALLER_TEST pause
 exit /b 1

@@ -10,8 +10,9 @@ FFmpeg afin de respecter une taille maximale (par exemple 10 Mo pour Discord).
 ## État du projet
 
 La version 0.6.0 fournit un CLI pour Windows et Linux, avec des événements JSON ligne par
-ligne exploitables par toute application appelante (l'utilisation depuis HUB est inchangée),
-ainsi que l'extension Firefox, l'extension Chromium et leur hôte natif. Les modifications non publiées
+ligne exploitables par toute application appelante. Le protocole de sortie est inchangé, mais le point d'entrée a changé :
+`MediaDownloader.Cli.exe` n'existe plus (changement incompatible pour les appelants du CLI, dont HUB, à adapter ; appel
+programmatique : voir [docs/CLI_PROTOCOL.md](docs/CLI_PROTOCOL.md)), ainsi que l'extension Firefox, l'extension Chromium et leur hôte natif. Les modifications non publiées
 (moteur TypeScript sur Deno, installateur qui télécharge les dépendances, macOS retiré) sont décrites dans le
 [CHANGELOG](CHANGELOG.md). L'extension ajoute un bouton de téléchargement sur
 YouTube (vidéos et Shorts), X (Twitter), TikTok et Instagram ; le CLI accepte toute URL HTTP(S). Ces sites sont pris en
@@ -22,6 +23,11 @@ où le contenu est accessible sans contourner de DRM.
 
 - Windows x64 et Linux x64 : CLI, hôte de messagerie native, extension Firefox et extension Chromium (Opera, Chrome, Brave).
 - macOS n'est plus pris en charge (ni moteur, ni archive, ni installateur).
+- Linux : testé en CI seulement (tests du moteur) ; installateur, lanceur et Firefox non vérifiés sur machine Linux réelle.
+  Prérequis : curl ou wget, unzip (ou python3 ou bsdtar), tar et xz (archive FFmpeg `.tar.xz`), sha256sum ou shasum, et un
+  dossier temporaire où l'on peut exécuter des programmes (le binaire `yt-dlp_linux` se décompresse lui-même à l'exécution).
+- Windows : l'installateur exige `System32\tar.exe` (Windows 10 1803 ou plus) et un dossier d'installation au chemin court
+  (limite MAX_PATH lors de l'extraction de FFmpeg).
 
 La release GitHub contient une archive et une notice distinctes pour chaque cible.
 
@@ -59,7 +65,13 @@ cache de Deno.
   rien modifier. Une racine de disque (`D:\`) est gérée par l'installateur.
 - Windows : une commande `AutoRun` de `cmd.exe` (clé de registre) qui affiche du texte corrompt la sortie du lanceur
   `.bat` et donc la communication avec Firefox. À supprimer ou à rendre silencieuse (non vérifié sur une machine qui en a une).
-- Échec du téléchargement : rien de partiel n'est laissé dans `tools/bin` ; vérifier la connexion et relancer.
+- Échec du téléchargement : un `deno` déjà vérifié peut rester dans `tools/bin` si l'échec survient à l'étape 2 ; vérifier la
+  connexion et relancer. Proxy : l'étape 1 de `Installer.bat` utilise le proxy système de Windows, seule l'étape 2
+  utilise `HTTPS_PROXY`.
+- `update` (`yt-dlp -U`) remplace le yt-dlp épinglé : l'installateur ou `deps --check` verront ensuite une autre somme
+  SHA-256 ; relancer l'installateur restaure la version épinglée.
+- Windows : le sélecteur de dossier est la boîte classique en arborescence (PowerShell `FolderBrowserDialog`), plus lente à
+  s'ouvrir, et peut échouer (`pick_failed`) en mode de langage restreint de PowerShell ; le chemin reste saisissable à la main.
 - Code de sortie 3 au lancement : `tools/bin` est incomplet, relancer l'installateur.
 
 ### Opera, Chrome et Brave

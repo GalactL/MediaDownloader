@@ -10,6 +10,10 @@ dist/
 .env
 .env.*
 tools/bin/
+tools/deno-cache/
+tools/.tmp-*/
+tools/restore-*/
+native-host/
 *.part
 *.ytdl
 

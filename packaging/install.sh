@@ -14,7 +14,7 @@ DENO_EXE_SHA256='368bca08999e02c6911b8f248167b582276b1f547db5712b6e736d7eda1dbda
 fail() {
   echo >&2
   echo "ÉCHEC de l'installation : $1" >&2
-  echo "Rien de partiel n'a été laissé dans tools/bin. Vérifiez la connexion (proxy : variables https_proxy / HTTPS_PROXY), l'espace disque et les droits sur ce dossier, puis relancez install.sh." >&2
+  echo "Si l'échec survient à l'étape 2, un deno déjà vérifié peut rester dans tools/bin. Vérifiez la connexion (proxy : variables https_proxy / HTTPS_PROXY), l'espace disque et les droits sur ce dossier, puis relancez install.sh." >&2
   exit 1
 }
 
@@ -84,7 +84,7 @@ fi
 echo
 echo "[2/3] yt-dlp et FFmpeg (plusieurs centaines de Mo : patientez)"
 export DENO_NO_UPDATE_CHECK=1 DENO_DIR="$DIR/tools/deno-cache"
-"$BIN/deno" run --no-check --no-config --no-prompt --allow-net --allow-read="$DIR" --allow-write="$DIR" --allow-run --allow-env=SystemRoot "$DIR/engine/deps.ts" --root "$DIR" || fail "téléchargement des dépendances impossible (voir ci-dessus)."
+"$BIN/deno" run --no-check --no-config --no-prompt --allow-net --allow-read="$DIR" --allow-write="$DIR" --allow-run --allow-env=SystemRoot "$DIR/engine/deps.ts" --root "$DIR" || fail "téléchargement des dépendances impossible (voir ci-dessus). Si le message cite tar ou xz, installez les paquets tar et xz (xz-utils), nécessaires pour extraire FFmpeg."
 
 if [ -z "${MEDIADOWNLOADER_INSTALLER_TEST:-}" ]; then
   echo
