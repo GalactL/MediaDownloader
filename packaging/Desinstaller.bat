@@ -2,7 +2,7 @@
 chcp 65001 >nul
 set "DIR=%~dp0"
 echo Desinstallation de MediaDownloader...
-"%DIR%MediaDownloader.Cli.exe" uninstall-host
+call "%DIR%MediaDownloader.Cli.bat" uninstall-host
 if errorlevel 1 (
   echo.
   echo Echec de la desinstallation de l'hote.

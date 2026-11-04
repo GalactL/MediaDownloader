@@ -1,0 +1,78 @@
+{
+  "schema": 1,
+  "_comment": "Versions pinned and verified by SHA-256. sha256/size: the downloaded file; fileSha256: the installed file (omitted when identical). Installer.bat and install.sh inline the deno entry (checked by engine/test/deps.test.ts).",
+  "platforms": {
+    "windows-x86_64": [
+      {
+        "name": "deno",
+        "version": "2.9.8",
+        "url": "https://github.com/denoland/deno/releases/download/v2.9.8/deno-x86_64-pc-windows-msvc.zip",
+        "size": 42917472,
+        "sha256": "cba84b26e0df5ae7f74fc66b86a95b866872a86292ebd84fa1e959927edd93bf",
+        "archive": "zip",
+        "member": "deno.exe",
+        "dest": "deno.exe",
+        "fileSha256": "924397800533d3eb0ed0c889b20ad70e18b970d93acd8135bc043f425e528266",
+        "smoke": ["--version"]
+      },
+      {
+        "name": "yt-dlp",
+        "version": "2026.10.26",
+        "url": "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp.exe",
+        "size": 23575744,
+        "sha256": "f5389d3698ecde4ef06f4e6b1ce0294fe9ac1396228c8990b8d3416d6d177a7d",
+        "archive": "none",
+        "dest": "yt-dlp.exe",
+        "smoke": ["--version"]
+      },
+      {
+        "name": "ffmpeg",
+        "version": "N-128352-gec887b13a8 (BtbN autobuild-2026-11-03-12-50, gpl)",
+        "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-11-03-12-50/ffmpeg-N-128352-gec887b13a8-win64-gpl.zip",
+        "size": 201857206,
+        "sha256": "19a2c9c8202dceb896ce7df9195f268c8d0f65300f76c3663f45c4dbaf8d10d6",
+        "archive": "zip",
+        "member": "ffmpeg-N-128352-gec887b13a8-win64-gpl/bin/ffmpeg.exe",
+        "dest": "ffmpeg.exe",
+        "fileSha256": "44c2d56a20b68dcd51c4f946d4ae4be192924b2a0df3249bc279ebacd133a443",
+        "smoke": ["-version"]
+      }
+    ],
+    "linux-x86_64": [
+      {
+        "name": "deno",
+        "version": "2.9.8",
+        "url": "https://github.com/denoland/deno/releases/download/v2.9.8/deno-x86_64-unknown-linux-gnu.zip",
+        "size": 41963064,
+        "sha256": "e890975bc2549807bbcc0b584ffafda72cc7c93349dd99c80483dd784f6c4609",
+        "archive": "zip",
+        "member": "deno",
+        "dest": "deno",
+        "fileSha256": "368bca08999e02c6911b8f248167b582276b1f547db5712b6e736d7eda1dbda7",
+        "smoke": ["--version"]
+      },
+      {
+        "name": "yt-dlp",
+        "version": "2026.10.26",
+        "url": "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp_linux",
+        "size": 41166968,
+        "sha256": "767ba9dce7052aa196f8b12652f433d76de128ba168966fa84b6394d5e6c6795",
+        "archive": "none",
+        "dest": "yt-dlp",
+        "smoke": ["--version"]
+      },
+      {
+        "name": "ffmpeg",
+        "version": "N-128352-gec887b13a8 (BtbN autobuild-2026-11-03-12-50, gpl)",
+        "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-11-03-12-50/ffmpeg-N-128352-gec887b13a8-linux64-gpl.tar.xz",
+        "size": 157480464,
+        "sha256": "bfc396512fdcc555e7314426015d0232a11a73e02cc3e93273731ebc8c444181",
+        "archive": "tar",
+        "member": "ffmpeg-N-128352-gec887b13a8-linux64-gpl/bin/ffmpeg",
+        "dest": "ffmpeg",
+        "fileSha256": "6b38f284fddd6b31d81886a5a812ffe8d00c351609d9dd5d41f39020ab6e1952",
+        "smoke": ["-version"]
+      }
+    ]
+  }
+}
