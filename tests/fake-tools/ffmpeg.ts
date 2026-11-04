@@ -11,7 +11,8 @@ if (args[0] === "-hide_banner" && args[1] === "-i") {
   console.log("At least one output file must be specified");
   Deno.exit(1);
 }
-const pass = args[args.lastIndexOf("-pass") + 1];
+if (args.includes("-pass")) { console.error("Error reading log file 'ffmpeg-pass-1.log' for pass-2 encoding (bare -pass; use -pass:v)"); Deno.exit(1); }
+const pass = args[args.lastIndexOf("-pass:v") + 1];
 const mode = env("FAKE_FFMPEG_MODE");
 if (mode === "fail") Deno.exit(1);
 if (mode === "hang") {

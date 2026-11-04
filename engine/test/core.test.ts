@@ -346,12 +346,12 @@ Deno.test("ffmpeg arguments", () => {
   const nullDevice = "/dev/null";
   const pass1 = buildEncodeArguments("/t/in.mp4", "/t/out.mp4", "/t/pass", 800, 96, "best", 1, false, "linux");
   const expected1 = ["-y", "-i", "/t/in.mp4", "-map", "0:v:0", "-c:v", "libx264", "-preset", "medium",
-    "-b:v", "800k", "-pass", "1", "-passlogfile", "/t/pass", "-progress", "pipe:1", "-nostats", "-an", "-f", "null", nullDevice];
+    "-b:v", "800k", "-pass:v", "1", "-passlogfile", "/t/pass", "-progress", "pipe:1", "-nostats", "-an", "-f", "null", nullDevice];
   assert.deepEqual(pass1, expected1);
   assert.equal(buildEncodeArguments("/t/in.mp4", "/t/out.mp4", "/t/pass", 800, 96, "best", 1, false, "windows").at(-1), "NUL");
   const pass2 = buildEncodeArguments("/t/in.mp4", "/t/out.mp4", "/t/pass", 800, 96, "720", 2, false, "linux");
   assert.deepEqual(pass2, ["-y", "-i", "/t/in.mp4", "-map", "0:v:0", "-vf", "scale=-2:min(ih\\,720)", "-c:v", "libx264",
-    "-preset", "medium", "-b:v", "800k", "-pass", "2", "-passlogfile", "/t/pass", "-progress", "pipe:1", "-nostats",
+    "-preset", "medium", "-b:v", "800k", "-pass:v", "2", "-passlogfile", "/t/pass", "-progress", "pipe:1", "-nostats",
     "-map", "0:a:0?", "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart", "/t/out.mp4"]);
   const low = buildEncodeArguments("/t/in.mp4", "/t/out.mp4", "/t/pass", 800, 96, "best", 1, true, "linux");
   const withThreads = [...pass1];

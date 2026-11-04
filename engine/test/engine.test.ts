@@ -251,7 +251,7 @@ Deno.test("yt-dlp arguments, cookies, clip range, encode arguments", async () =>
 
   r = await run(["download", "--url", url, "--output", out, "--max-size-mb", "10", "--quality", "720"]);
   assert.ok(r.argv.includes(`${ffmpeg} -y -i `) && r.argv.includes(" -vf scale=-2:min(ih\\,720) "), r.argv);
-  assert.ok(r.argv.includes(" -c:v libx264 ") && r.argv.includes(" -pass 1 ") && r.argv.includes(" -pass 2 "));
+  assert.ok(r.argv.includes(" -c:v libx264 ") && r.argv.includes(" -pass:v 1 ") && r.argv.includes(" -pass:v 2 "));
   r = await run(["download", "--url", url, "--output", out, "--max-size-mb", "10"]);
   assert.ok(!r.argv.includes("scale="));
 

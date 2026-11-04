@@ -329,7 +329,7 @@ export function buildEncodeArguments(
 ): string[] {
   const args = [
     "-y", "-i", source, "-map", "0:v:0", "-c:v", "libx264", "-preset", "medium",
-    "-b:v", `${videoKbps}k`, "-pass", String(pass), "-passlogfile", passLog,
+    "-b:v", `${videoKbps}k`, "-pass:v", String(pass), "-passlogfile", passLog,
   ];
   if (lowResources) args.push("-threads", "2");
   args.push("-progress", "pipe:1", "-nostats");

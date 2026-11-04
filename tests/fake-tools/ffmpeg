@@ -13,7 +13,8 @@ if [ "$1" = "-hide_banner" ] && [ "$2" = "-i" ]; then
   exit 1
 fi
 for a in "$@"; do
-  [ "$prev" = "-pass" ] && pass=$a
+  [ "$a" = "-pass" ] && { echo "Error reading log file 'ffmpeg-pass-1.log' for pass-2 encoding (bare -pass; use -pass:v)" >&2; exit 1; }
+  [ "$prev" = "-pass:v" ] && pass=$a
   prev=$a
   last=$a
 done
