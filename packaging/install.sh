@@ -27,6 +27,15 @@ if [ "$(uname -m)" != "x86_64" ]; then
   exit 1
 fi
 
+# Deno sépare --allow-read=/--allow-write= sur les virgules.
+case "$DIR" in
+  *,*)
+    echo "ÉCHEC : le chemin de ce dossier contient une virgule ($DIR), ce que Deno ne gère pas." >&2
+    echo "Déplacez le dossier vers un chemin sans virgule, puis relancez install.sh. Rien n'a été modifié." >&2
+    exit 1
+    ;;
+esac
+
 sha256() {
   if command -v sha256sum >/dev/null 2>&1; then
     sha256sum "$1" | cut -d' ' -f1

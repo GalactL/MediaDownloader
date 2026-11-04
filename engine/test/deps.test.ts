@@ -103,6 +103,8 @@ async function startServer(): Promise<Fixture> {
           }),
           { headers: { "content-length": String(plain.length) } },
         );
+      case "/oversize":
+        return new Response(concat(plain, new Uint8Array(100_000)));
       case "/flaky":
         return n < 3 ? new Response("busy", { status: 503 }) : new Response(plain);
       case "/redirect":
@@ -336,4 +338,58 @@ Deno.test("smoke test failure (file that does not run) installs nothing", async 
     );
     assert.deepEqual(await toolsLeft(root), []);
   });
+});
+
+Deno.test("a server streaming more than the pinned size is cut off at once, without retry", async () => {
+  await withFixture(async (fixture, root, options) => {
+    const e: Entry[] = [{ ...entries(fixture.base)[0], url: `${fixture.base}/oversize` }];
+    await rejectsWith(installDependencies(options(e)), /plus de données que prévu/);
+    assert.equal(fixture.hits.get("/oversize"), 1);
+    assert.deepEqual(await toolsLeft(root), []);
+  });
+});
+
+// Commit-step fault injection: the 3rd entry's final rename fails after the first two were swapped in.
+async function seedPrevious(root: string) {
+  const bin = join(root, "tools", "bin");
+  await Deno.mkdir(bin, { recursive: true });
+  await Deno.writeTextFile(join(bin, "plain-tool"), "previous plain");
+  await Deno.writeTextFile(join(bin, "zip-tool"), "previous zip");
+  return bin;
+}
+const failing = (when: (from: string, to: string) => boolean) => (from: string, to: string) =>
+  when(from, to) ? Promise.reject(new Error("injected")) : Deno.rename(from, to);
+
+Deno.test("a commit failure mid-way restores the previous files and removes the staging folder", async () => {
+  await withFixture(async (fixture, root, options) => {
+    const bin = await seedPrevious(root);
+    const rename = failing((_from, to) => to.endsWith("tar-tool"));
+    await assert.rejects(installDependencies({ ...options(entries(fixture.base)), rename }), /injected/);
+    assert.equal(await Deno.readTextFile(join(bin, "plain-tool")), "previous plain");
+    assert.equal(await Deno.readTextFile(join(bin, "zip-tool")), "previous zip");
+    assert.deepEqual([...Deno.readDirSync(bin)].map((i) => i.name).sort(), ["plain-tool", "zip-tool"]);
+    assert.deepEqual(await toolsLeft(root), ["bin"]);
+  });
+});
+
+Deno.test("when the rollback itself fails the backups are kept and their folder is reported", async () => {
+  await withFixture(async (fixture, root, options) => {
+    const bin = await seedPrevious(root);
+    const rename = failing((from, to) => to.endsWith("tar-tool") || (from.includes("old-plain") && to.endsWith("plain-tool")));
+    const error = await installDependencies({ ...options(entries(fixture.base)), rename }).then(() => null, (e) => e);
+    assert.ok(error instanceof DepsError);
+    const kept = /conservés dans (.+)$/.exec(error.message)?.[1];
+    assert.ok(kept, error.message);
+    assert.equal(await Deno.readTextFile(join(kept, "old-plain-tool")), "previous plain");
+    assert.equal(await Deno.readTextFile(join(bin, "zip-tool")), "previous zip"); // the other one was restored
+    assert.deepEqual((await toolsLeft(root)).sort(), ["bin", `restore-${Deno.pid}`]);
+  });
+});
+
+Deno.test("installers reject a comma in the folder path and handle a drive-root folder", async () => {
+  const bat = await Deno.readTextFile(join(repo, "packaging", "Installer.bat"));
+  const sh = await Deno.readTextFile(join(repo, "packaging", "install.sh"));
+  assert.match(bat, /if not "%MD_ROOT:,=%"=="%MD_ROOT%" goto comma/);
+  assert.match(bat, /if "%MD_ROOT:~-1%"=="\\" set "MD_ROOT=%MD_ROOT%."/);
+  assert.match(sh, /case "\$DIR" in\s+\*,\*\)/);
 });

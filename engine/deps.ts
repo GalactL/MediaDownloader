@@ -5,7 +5,7 @@
 // tools/.tmp-<pid>, tools/bin untouched on any failure. Exit codes: 0 ok, 1 failure or --check mismatch.
 import { createHash } from "node:crypto";
 import { chmodSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export interface Entry {
@@ -30,6 +30,7 @@ export interface Options {
   smoke?: boolean; // default true
   retries?: number; // default 3
   backoffMs?: number; // default 2000, multiplied by the attempt number
+  rename?: (from: string, to: string) => Promise<void>; // tests only: fault injection for the commit step
 }
 
 export class DepsError extends Error {
@@ -110,6 +111,9 @@ async function download(entry: Entry, target: string, options: Options, report: 
       hash.update(chunk);
       await file.write(chunk);
       received += chunk.length;
+      if (entry.size > 0 && received > entry.size) {
+        throw new DepsError(`le serveur envoie plus de données que prévu (plus de ${entry.size} octets)`);
+      }
       if (Date.now() - lastReport > 2000) {
         lastReport = Date.now();
         report(`  ${entry.name} : ${mb(received)} / ${mb(announced)}`);
@@ -132,19 +136,22 @@ async function download(entry: Entry, target: string, options: Options, report: 
   }
 }
 
-async function run(command: string, args: string[]) {
-  const result = await new Deno.Command(command, { args, stdout: "null", stderr: "piped" }).output();
+async function run(command: string, args: string[], cwd: string) {
+  const result = await new Deno.Command(command, { args, cwd, stdout: "null", stderr: "piped" }).output();
   if (!result.success) {
     throw new DepsError(`${command} a échoué : ${new TextDecoder().decode(result.stderr).trim().slice(0, 300)}`);
   }
 }
 
-// Extracts only `member`. Windows: the System32 tar (bsdtar, reads zip); Linux: unzip / tar (detects xz).
+// Extracts only `member`. Relative names with cwd = the staging folder: GNU tar takes "a:b" for a remote host.
+// Windows: the System32 tar (bsdtar, reads zip); Linux: unzip / tar (detects xz).
 async function extract(entry: Entry, archive: string, into: string) {
   const member = entry.member!;
-  if (entry.archive === "zip" && !windows) return await run("unzip", ["-q", "-o", archive, member, "-d", into]);
+  const cwd = dirname(archive);
+  const [file, dir] = [basename(archive), basename(into)];
+  if (entry.archive === "zip" && !windows) return await run("unzip", ["-q", "-o", file, member, "-d", dir], cwd);
   const tar = windows ? join(Deno.env.get("SystemRoot") ?? "C:\\Windows", "System32", "tar.exe") : "tar";
-  await run(tar, ["-xf", archive, "-C", into, member]);
+  await run(tar, ["-xf", file, "-C", dir, member], cwd);
 }
 
 async function sweepStale(tools: string, report: (line: string) => void) {
@@ -180,6 +187,8 @@ export async function installDependencies(options: Options): Promise<string[]> {
 
   const tmp = join(tools, `.tmp-${Deno.pid}`);
   const staged = new Map<Entry, string>();
+  const rename = options.rename ?? Deno.rename;
+  let keepTmp = false;
   try {
     await Deno.mkdir(tmp, { recursive: true });
     for (const entry of todo) {
@@ -235,23 +244,31 @@ export async function installDependencies(options: Options): Promise<string[]> {
         try {
           await Deno.stat(dest);
           backup = join(tmp, `old-${entry.dest}`);
-          await Deno.rename(dest, backup);
+          await rename(dest, backup);
         } catch (error) {
           if (!(error instanceof Deno.errors.NotFound)) throw error;
         }
         done.push({ dest, backup });
-        await Deno.rename(file, dest);
+        await rename(file, dest);
       }
     } catch (error) {
+      let stuck = false;
       for (const { dest, backup } of done.reverse()) {
         await Deno.remove(dest).catch(() => {});
-        if (backup) await Deno.rename(backup, dest).catch(() => {});
+        if (backup) await rename(backup, dest).catch(() => (stuck = true));
       }
-      throw error;
+      if (!stuck) throw error;
+      // A previous file could not be put back: keep the backups (outside the swept .tmp- names) and say where.
+      keepTmp = true;
+      const kept = join(tools, `restore-${Deno.pid}`);
+      await Deno.rename(tmp, kept).catch(() => {});
+      throw new DepsError(
+        `installation interrompue (${(error as Error).message}) et la restauration a échoué : les anciens fichiers sont conservés dans ${kept}`,
+      );
     }
     return todo.map((e) => e.name);
   } finally {
-    await Deno.remove(tmp, { recursive: true }).catch(() => {});
+    if (!keepTmp) await Deno.remove(tmp, { recursive: true }).catch(() => {});
   }
 }
 

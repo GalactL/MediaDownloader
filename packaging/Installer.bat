@@ -8,6 +8,9 @@ chcp 65001 >nul
 setlocal
 set "DIR=%~dp0"
 for %%I in ("%~dp0.") do set "MD_ROOT=%%~fI"
+rem Racine de disque (D:) : un antislash final casserait les arguments entre guillemets, on ajoute un point.
+if "%MD_ROOT:~-1%"=="\" set "MD_ROOT=%MD_ROOT%."
+if not "%MD_ROOT:,=%"=="%MD_ROOT%" goto comma
 set "DENO_VERSION=2.9.8"
 set "DENO_URL=https://github.com/denoland/deno/releases/download/v2.9.8/deno-x86_64-pc-windows-msvc.zip"
 set "DENO_SHA256=cba84b26e0df5ae7f74fc66b86a95b866872a86292ebd84fa1e959927edd93bf"
@@ -42,6 +45,12 @@ echo.
 echo Installation terminee. Ne deplacez pas ce dossier ensuite ; sinon relancez Installer.bat.
 if not defined MEDIADOWNLOADER_INSTALLER_TEST pause
 exit /b 0
+:comma
+echo.
+echo ECHEC : le chemin de ce dossier contient une virgule ^(%MD_ROOT%^), ce que Deno ne gere pas.
+echo Deplacez le dossier vers un chemin sans virgule, puis relancez Installer.bat. Rien n'a ete modifie.
+if not defined MEDIADOWNLOADER_INSTALLER_TEST pause
+exit /b 1
 :fail
 echo.
 echo ECHEC de l'installation. Rien de partiel n'a ete laisse dans tools\bin.
