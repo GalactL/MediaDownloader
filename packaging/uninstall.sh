@@ -1,6 +1,6 @@
 #!/bin/sh
 set -eu
-DIR=$(cd "$(dirname "$0")" && pwd)
+DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 echo "Désinstallation de MediaDownloader..."
 "$DIR/MediaDownloader.Cli" uninstall-host
 echo "Hôte retiré. Il reste à :"

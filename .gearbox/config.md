@@ -60,10 +60,9 @@ human_gate:
   - production_config
 ponytail: preferred
 test_commands:
-  - cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-  - cmake --build build --config Release --parallel
-  - ctest --test-dir build -C Release --output-on-failure
-  - node --test extension/test/lib.test.js
+  - deno check engine/*.ts engine/test/*.ts tests/fake-tools/*.ts
+  - deno test -A engine/test
+  - node --test extension/test/lib.test.js extension/test/sites.test.js extension/test/chromium.test.js
 check_commands:
   - for f in extension/*.js; do node --check "$f"; done
 ui_commands: []

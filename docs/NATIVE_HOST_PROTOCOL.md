@@ -7,9 +7,9 @@ dialogue par messages JSON encadrés sur stdin/stdout.
 ## Lancement par Firefox
 
 `MediaDownloader.Cli install-host` écrit le manifeste Firefox `media_downloader.json`
-(généré par le code, `path` = chemin absolu de l'exécutable en cours) :
+(généré par le code, `path` = chemin absolu du lanceur `MediaDownloader.Cli.bat` ou `MediaDownloader.Cli`) :
 
-- Windows : `<dossier de l'exe>\native-host\media_downloader.json`, et la valeur par
+- Windows : `<dossier du lanceur>\native-host\media_downloader.json`, et la valeur par
   défaut de `HKCU\Software\Mozilla\NativeMessagingHosts\media_downloader` pointe
   vers ce fichier ;
 - Linux : `~/.mozilla/native-messaging-hosts/media_downloader.json`.
@@ -17,10 +17,10 @@ dialogue par messages JSON encadrés sur stdin/stdout.
 Firefox ajoute à la ligne de commande le chemin du manifeste et l'identifiant de
 l'extension.
 
-`MediaDownloader.Cli` détecte lui-même le lancement par Firefox : si le premier
+Le moteur détecte lui-même le lancement par Firefox : si le premier
 argument n'est ni une commande ni une option mais un chemin de manifeste (`.json`)
 ou un identifiant d'extension (`nom@domaine` ou `{uuid}`), il passe en mode `host`.
-Le manifeste pointe directement vers l'exécutable. Toute autre commande inconnue renvoie toujours le code de sortie 2.
+Le manifeste pointe vers le lanceur, qui exécute le moteur avec Deno. Toute autre commande inconnue renvoie toujours le code de sortie 2.
 
 L'identifiant d'extension autorisé (`allowed_extensions`) est `mediadownloader@localhost`,
 celui de `extension/manifest.json`.
@@ -30,9 +30,9 @@ celui de `extension/manifest.json`.
 `install-host` écrit aussi un manifeste Chromium de même nom (`media_downloader`) : `allowed_origins`
 vaut `["chrome-extension://jjclljkpbmlceplpicnjkmkjifhhghne/"]` (pas d'`allowed_extensions`). Cet identifiant est
 fixé par la clé publique `key` de `extension/manifest.chromium.json` (la clé privée n'est pas conservée) ; il est
-la constante `ChromiumExtensionId` de `src/Core.h`, et un test (`extension/test/chromium.test.js`) vérifie qu'ils concordent.
+la constante `chromiumExtensionId` de `engine/core.ts`, et un test (`extension/test/chromium.test.js`) vérifie qu'ils concordent.
 
-- Windows : `<dossier de l'exe>\native-host\media_downloader.chromium.json`, et la valeur par défaut de
+- Windows : `<dossier du lanceur>\native-host\media_downloader.chromium.json`, et la valeur par défaut de
   `HKCU\Software\Google\Chrome\NativeMessagingHosts\media_downloader`,
   `HKCU\Software\BraveSoftware\Brave-Browser\NativeMessagingHosts\media_downloader` et
   `HKCU\Software\Opera Software\Opera Stable\NativeMessagingHosts\media_downloader` pointe vers ce fichier ;
@@ -40,8 +40,8 @@ la constante `ChromiumExtensionId` de `src/Core.h`, et un test (`extension/test/
   `~/.config/BraveSoftware/Brave-Browser/...` et `~/.config/opera/...` (mêmes noms de fichier).
 
 Les emplacements Opera (registre Windows) et Brave n'ont pas été vérifiés sur machine réelle ; c'est pourquoi tous les
-emplacements plausibles sont écrits. Chromium lance l'exécutable avec l'origine de l'extension
-(`chrome-extension://<id>/`) en premier argument (et `--parent-window=<n>` sous Windows) : `MediaDownloader.Cli` reconnaît cette
+emplacements plausibles sont écrits. Chromium lance le lanceur avec l'origine de l'extension
+(`chrome-extension://<id>/`) en premier argument (et `--parent-window=<n>` sous Windows) : le moteur reconnaît cette
 origine comme un lancement d'hôte, comme pour Firefox. `uninstall-host` supprime tous ces manifestes et clés.
 
 ## Encadrement
@@ -86,7 +86,10 @@ d'une phase sans pourcentage et peut être ignoré (détails dans [CLI_PROTOCOL.
 `pickFolder` répond `{"type":"folderPicked","id":"…","path":"<chemin absolu>"}` lorsque l'utilisateur choisit un
 dossier, ou `{"type":"folderPicked","id":"…"}` sans champ `path` s'il annule (annuler = pas de chemin). Si aucun
 sélecteur n'est disponible ou s'il échoue, l'hôte répond l'erreur `pick_failed`. Le sélecteur est
-`IFileOpenDialog` (Windows), `zenity` puis `kdialog` (Linux).
+la boîte « Rechercher un dossier » de Windows (`FolderBrowserDialog`, lancée par PowerShell), `zenity` puis `kdialog` (Linux).
+Sous Windows, c'est donc la boîte classique en arborescence, plus lente à s'ouvrir que l'ancien sélecteur, et elle peut
+échouer avec `pick_failed` là où PowerShell tourne en mode de langage restreint (Constrained Language Mode) ; l'utilisateur
+peut toujours saisir le chemin à la main.
 
 La réponse `probe` est compacte :
 
@@ -101,13 +104,14 @@ La réponse `probe` est compacte :
   l'erreur `cancelled`. Sans travail en cours, `cancel` est ignoré.
 - `pickFolder` ne bloque pas la lecture des requêtes. Il reçoit `busy` pendant un `probe` ou un `download`, ou
   pendant un autre `pickFolder` ; inversement `probe` et `download` reçoivent `busy` tant que le sélecteur est
-  ouvert. `cancel` ferme le sélecteur (sauf sous Windows) et la réponse est alors un `folderPicked` sans `path`.
+  ouvert. `cancel` ferme le sélecteur et la réponse est alors un `folderPicked` sans `path`.
 - `doctor` est traité immédiatement, même pendant un travail.
 - Une requête trop grande reçoit `message_too_large`, sans `id`.
 - Un `id` qui n'est pas une chaîne est ignoré.
 - Message mal formé ou de type inconnu : `invalid_message`.
 - Fin de stdin (EOF) : le travail éventuel est annulé et l'hôte se termine avec le
-  code `0`.
+  code `0` (code `1` si stdin se ferme au milieu d'un message). L'hôte lit stdin pendant tout travail, si bien
+  qu'un navigateur arrêté brutalement arrête aussi yt-dlp et FFmpeg.
 
 ## Codes d'erreur
 

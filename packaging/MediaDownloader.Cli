@@ -1,0 +1,11 @@
+#!/bin/sh
+# MediaDownloader launcher (Linux). In the release archive it sits at the root, next to engine/ (the TypeScript
+# engine) and tools/bin/ (deno, yt-dlp, ffmpeg); the release copies it there from packaging/.
+# The Deno permissions must stay equal to engine/permissions.ts (checked by engine/test/contract.test.ts).
+dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd) || exit 4
+if [ ! -x "$dir/tools/bin/deno" ]; then
+  echo "MediaDownloader : Deno est introuvable dans $dir/tools/bin. Relancez install.sh." >&2
+  exit 3
+fi
+export DENO_NO_UPDATE_CHECK=1 DENO_DIR="$dir/tools/deno-cache"
+exec "$dir/tools/bin/deno" run --no-check --no-config --no-prompt --allow-read --allow-write --allow-run --allow-sys=setPriority --allow-env=PATH,HOME,SystemRoot,MEDIADOWNLOADER_YTDLP,MEDIADOWNLOADER_FFMPEG,MEDIADOWNLOADER_DENO,MEDIADOWNLOADER_NODE "$dir/engine/main.ts" "$@"

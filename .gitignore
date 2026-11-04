@@ -10,20 +10,12 @@ dist/
 .env
 .env.*
 tools/bin/
+tools/deno-cache/
+tools/.tmp-*/
+tools/restore-*/
+native-host/
 *.part
 *.ytdl
-
-# Sorties C++ et CMake
-CMakeFiles/
-CMakeCache.txt
-cmake_install.cmake
-*.obj
-*.pdb
-*.ilk
-*.lib
-*.exp
-*.exe
-*.dll
 
 # Sessions, cookies et données locales sensibles
 cookies.txt

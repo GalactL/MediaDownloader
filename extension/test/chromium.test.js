@@ -29,8 +29,8 @@ test("Chromium extension id derived from the manifest key matches the host's all
   const der = Buffer.from(chromium.key, "base64");
   const id = [...crypto.createHash("sha256").update(der).digest("hex").slice(0, 32)]
     .map((c) => String.fromCharCode("a".charCodeAt(0) + parseInt(c, 16))).join("");
-  const core = fs.readFileSync(path.join(root, "..", "src", "Core.h"), "utf8");
-  assert.equal(core.match(/ChromiumExtensionId = "([a-p]{32})"/)[1], id);
+  const core = fs.readFileSync(path.join(root, "..", "engine", "core.ts"), "utf8");
+  assert.equal(core.match(/chromiumExtensionId = "([a-p]{32})"/)[1], id);
 });
 
 test("Chromium manifest is MV3 and shares the Firefox code base", () => {

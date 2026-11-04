@@ -9,25 +9,41 @@ permissions:
   contents: write
 
 env:
-  # Garder synchronisé avec tools/install-dependencies.ps1
-  DENO_VERSION: "2.5.6"
-  # Build FFmpeg statique GPL embarqué dans l'archive Linux (BtbN/FFmpeg-Builds)
-  FFMPEG_ASSET: ffmpeg-n8.1-latest-linux64-gpl-8.1.tar.xz
+  # Doit suivre la version du projet (voir CLAUDE.md) ; sert aux noms d'archives.
+  VERSION: v0.6.0
+  # Une archive ne contient aucun binaire tiers : l'installateur télécharge Deno, yt-dlp et FFmpeg (engine/deps.json).
+  MAX_ARCHIVE_BYTES: "1048576"
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
+      - name: Vérifier que le tag correspond à VERSION
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          if [ "$GITHUB_REF_NAME" != "$VERSION" ]; then
+            echo "::error::Le tag $GITHUB_REF_NAME ne correspond pas à VERSION ($VERSION) dans release.yml : mettre à jour VERSION avant de tagger."
+            exit 1
+          fi
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Configurer
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-      - name: Compiler
-        run: cmake --build build --config Release --parallel
-      - name: Tester
-        run: ctest --test-dir build -C Release --output-on-failure
+      - name: Lire la version de Deno épinglée
+        id: deno
+        run: node -e "console.log('version=' + require('./engine/deps.json').platforms['linux-x86_64'].find(e => e.name === 'deno').version)" >> "$GITHUB_OUTPUT"
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ steps.deno.outputs.version }}
+      - name: Vérifier les types
+        run: deno check engine/*.ts engine/test/*.ts tests/fake-tools/*.ts
+      - name: Tester le moteur
+        run: deno test -A engine/test
+      - name: Vérifier la syntaxe des scripts shell
+        run: |
+          sh -n packaging/install.sh
+          sh -n packaging/uninstall.sh
+          sh -n packaging/MediaDownloader.Cli
       - name: Tests de l'extension
         run: node --test extension/test/*.test.js tools/fetch-signed-xpi.test.mjs
 
@@ -37,7 +53,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      # Signe (ou vérifie) une seule fois ; chaque job build refait le .xpi lui-même (aucun artefact GitHub).
+      # Signe (ou vérifie) une seule fois ; le job package refait le .xpi lui-même (aucun artefact GitHub).
       - name: Signer l'extension
         shell: bash
         env:
@@ -45,34 +61,11 @@ jobs:
           WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
         run: tools/make-xpi.sh
 
-  build:
+  package:
     needs: extension
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            artifact: MediaDownloader-v0.6.0-Windows-x64
-            readme: docs/RELEASE_WINDOWS.md
-          - os: ubuntu-latest
-            artifact: MediaDownloader-v0.6.0-Linux-x64
-            deno: x86_64-unknown-linux-gnu
-            readme: docs/RELEASE_LINUX.md
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Télécharger les dépendances Windows
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: ./tools/install-dependencies.ps1
-      - name: Configurer
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-      - name: Compiler
-        run: cmake --build build --config Release --parallel
-      - name: Tester
-        run: ctest --test-dir build -C Release --output-on-failure
-      - name: Installer
-        run: cmake --install build --config Release --prefix package/${{ matrix.artifact }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -82,85 +75,58 @@ jobs:
         env:
           WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
           WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
-        run: |
-          tools/make-xpi.sh
-          cp out/mediadownloader.xpi "package/${{ matrix.artifact }}/mediadownloader.xpi"
+        run: tools/make-xpi.sh
       - name: Construire l'extension Chromium
         # Opera, Chrome et Brave : zip non signé à charger en mode développeur (README.txt), sans secret.
+        run: tools/make-chromium-zip.sh
+      - name: Assembler les archives
+        # Windows : .zip (les droits Unix n'y comptent pas). Linux : .tar.gz, qui conserve le bit exécutable des scripts.
         shell: bash
         run: |
-          tools/make-chromium-zip.sh
-          cp out/mediadownloader-chromium.zip "package/${{ matrix.artifact }}/mediadownloader-chromium.zip"
-      - name: Ajouter les scripts d'installation
+          set -euo pipefail
+          stage() { # nom, lanceur, notice, scripts d'installation...
+            local name="$1" launcher="$2" readme="$3"; shift 3
+            local dir="package/$name"
+            mkdir -p "$dir"
+            cp -r engine "$dir/engine"
+            rm -rf "$dir/engine/test"
+            cp "packaging/$launcher" "$dir/$launcher"
+            for f in "$@"; do cp "packaging/$f" "$dir/$f"; done
+            cp out/mediadownloader.xpi out/mediadownloader-chromium.zip "$dir/"
+            cp "$readme" "$dir/README.txt"
+          }
+          win="MediaDownloader-$VERSION-Windows-x64"
+          lin="MediaDownloader-$VERSION-Linux-x64"
+          stage "$win" MediaDownloader.Cli.bat docs/RELEASE_WINDOWS.md Installer.bat Desinstaller.bat
+          stage "$lin" MediaDownloader.Cli docs/RELEASE_LINUX.md install.sh uninstall.sh
+          chmod 755 "package/$lin/MediaDownloader.Cli" "package/$lin/install.sh" "package/$lin/uninstall.sh"
+          (cd package && zip -X -q -r "$win.zip" "$win")
+          tar -C package --owner=0 --group=0 --numeric-owner -czf "package/$lin.tar.gz" "$lin"
+          ls -l package/*.zip package/*.tar.gz
+          tar -tvzf "package/$lin.tar.gz"
+          unzip -l "package/$win.zip"
+      - name: Contrôler la taille et l'absence de binaire tiers
         shell: bash
         run: |
-          if [ "$RUNNER_OS" = Windows ]; then
-            cp packaging/Installer.bat packaging/Desinstaller.bat "package/${{ matrix.artifact }}/"
-          else
-            cp packaging/install.sh packaging/uninstall.sh "package/${{ matrix.artifact }}/"
-            chmod +x "package/${{ matrix.artifact }}/install.sh" "package/${{ matrix.artifact }}/uninstall.sh"
+          set -euo pipefail
+          for f in package/*.zip package/*.tar.gz; do
+            size=$(stat -c %s "$f")
+            echo "$f : $size octets"
+            if [ "$size" -ge "$MAX_ARCHIVE_BYTES" ]; then echo "::error::$f dépasse 1 Mio : un binaire s'y est glissé ?"; exit 1; fi
+          done
+          if tar -tzf "package/MediaDownloader-$VERSION-Linux-x64.tar.gz" | grep -E '(^|/)tools/'; then
+            echo "::error::l'archive Linux ne doit pas contenir tools/"; exit 1
           fi
-      - name: Ajouter la notice
-        shell: bash
-        run: cp "${{ matrix.readme }}" "package/${{ matrix.artifact }}/README.txt"
-      - name: Ajouter les outils Windows
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force "package/${{ matrix.artifact }}/tools" | Out-Null
-          Copy-Item -Recurse tools/bin "package/${{ matrix.artifact }}/tools/bin"
-      - name: Ajouter Deno
-        if: runner.os != 'Windows'
-        shell: bash
-        run: |
-          set -euo pipefail
-          asset="deno-${{ matrix.deno }}.zip"
-          url="https://github.com/denoland/deno/releases/download/v${DENO_VERSION}"
-          curl -fsSL -o "$RUNNER_TEMP/$asset" "$url/$asset"
-          curl -fsSL -o "$RUNNER_TEMP/$asset.sha256sum" "$url/$asset.sha256sum"
-          (cd "$RUNNER_TEMP" && shasum -a 256 -c "$asset.sha256sum")
-          mkdir -p "package/${{ matrix.artifact }}/tools/bin"
-          unzip -o "$RUNNER_TEMP/$asset" deno -d "package/${{ matrix.artifact }}/tools/bin"
-          chmod +x "package/${{ matrix.artifact }}/tools/bin/deno"
-      - name: Ajouter yt-dlp et FFmpeg (Linux)
-        if: runner.os == 'Linux'
-        shell: bash
-        run: |
-          set -euo pipefail
-          bin="package/${{ matrix.artifact }}/tools/bin"
-          mkdir -p "$bin"
-          # yt-dlp : binaire autonome officiel, vérifié via SHA2-256SUMS de la même release
-          ytdlp="https://github.com/yt-dlp/yt-dlp/releases/latest/download"
-          curl -fsSL -o "$RUNNER_TEMP/yt-dlp_linux" "$ytdlp/yt-dlp_linux"
-          curl -fsSL -o "$RUNNER_TEMP/SHA2-256SUMS" "$ytdlp/SHA2-256SUMS"
-          (cd "$RUNNER_TEMP" && grep -E ' yt-dlp_linux$' SHA2-256SUMS | sha256sum -c -)
-          install -m 755 "$RUNNER_TEMP/yt-dlp_linux" "$bin/yt-dlp"
-          # FFmpeg : build statique GPL (BtbN), branche stable n8.1
-          ff="https://github.com/BtbN/FFmpeg-Builds/releases/download/latest"
-          curl -fsSL -o "$RUNNER_TEMP/$FFMPEG_ASSET" "$ff/$FFMPEG_ASSET"
-          curl -fsSL -o "$RUNNER_TEMP/checksums.sha256" "$ff/checksums.sha256"
-          (cd "$RUNNER_TEMP" && grep -F "  $FFMPEG_ASSET" checksums.sha256 | sha256sum -c -)
-          tar -xJf "$RUNNER_TEMP/$FFMPEG_ASSET" -C "$bin" --strip-components=2 --wildcards '*/bin/ffmpeg'
-          chmod +x "$bin/ffmpeg"
-      - name: Archiver Windows
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: Compress-Archive -Path "package/${{ matrix.artifact }}/*" -DestinationPath "package/${{ matrix.artifact }}.zip"
-      - name: Archiver Unix
-        if: runner.os != 'Windows'
-        shell: bash
-        run: tar -C package -czf "package/${{ matrix.artifact }}.tar.gz" "${{ matrix.artifact }}"
-      # Pas d'artefacts GitHub (quota de stockage) : chaque job ajoute son archive à la release.
-      # Les deux jobs créent/complètent la même release en parallèle ; si la création concurrente échoue, relancer le job.
+          if unzip -Z1 "package/MediaDownloader-$VERSION-Windows-x64.zip" | grep -E '(^|/)tools/|\.(exe|dll)$'; then
+            echo "::error::l'archive Windows ne doit contenir ni tools/ ni exe/dll"; exit 1
+          fi
+      # Pas d'artefacts GitHub (quota de stockage) : un seul job publie tout sur la release.
       - uses: softprops/action-gh-release@v3
         if: startsWith(github.ref, 'refs/tags/')
         with:
           generate_release_notes: true
-          files: package/${{ matrix.artifact }}.*
-      # Le .xpi et le zip Chromium seuls ne sont joints que par une entrée de la matrice, pour éviter un conflit d'asset en double.
-      - uses: softprops/action-gh-release@v3
-        if: startsWith(github.ref, 'refs/tags/') && runner.os == 'Linux'
-        with:
           files: |
+            package/*.zip
+            package/*.tar.gz
             out/mediadownloader.xpi
             out/mediadownloader-chromium.zip
