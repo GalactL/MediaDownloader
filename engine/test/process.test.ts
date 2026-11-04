@@ -1,6 +1,7 @@
 // Port of tests/ProcessTests.cpp, made cross-platform with `deno eval` children. Run: deno test -A engine/test
 import assert from "node:assert/strict";
 import { join } from "node:path";
+import { enginePermissions } from "../permissions.ts";
 import { isProcessRunning, type ProcessResult, runProcess, systemDirectory } from "../process.ts";
 
 const windows = Deno.build.os === "windows";
@@ -54,6 +55,9 @@ Deno.test("working directory is applied; a missing program throws", async () => 
     const inDirectory = await runProcess({ command: deno, args: ["eval", "console.log(Deno.cwd())"], cwd: directory });
     assert.equal(Deno.realPathSync(inDirectory.output.trim()), Deno.realPathSync(directory));
     await assert.rejects(runProcess({ command: join(directory, "missing-tool"), args: [] }), /Impossible de lancer/);
+    // The C++ "failed chdir does not run the program" case.
+    const missingCwd = runProcess({ command: deno, args: ["eval", "console.log('ran')"], cwd: join(directory, "missing") });
+    await assert.rejects(missingCwd, /Impossible de lancer/);
   } finally {
     Deno.removeSync(directory, { recursive: true });
   }
@@ -64,28 +68,56 @@ Deno.test("child stdin is empty (null device)", async () => {
   assert.equal(result.output, "0\n");
 });
 
+// A child that starts a sleeping grandchild; the grandchild writes its pid to `pidFile` then prints "ready".
+// Windows: through cmd.exe, because a killed deno parent takes its own deno children down with it and would
+// hide a missing tree kill. POSIX: a deno child that starts the sleeper in the same process group.
+function processTree(directory: string, pidFile: string) {
+  const sleeper = join(directory, "sleeper.ts");
+  Deno.writeTextFileSync(
+    sleeper,
+    `await Deno.writeTextFile(${JSON.stringify(pidFile)}, String(Deno.pid)); console.log("ready");` +
+      "await new Promise((r) => setTimeout(r, 300000));",
+  );
+  return windows
+    ? { command: join(systemDirectory(), "cmd.exe"), args: ["/c", deno, "run", "-A", sleeper] }
+    : {
+      command: deno,
+      args: ["eval", `new Deno.Command(Deno.execPath(), { args: ["run", "-A", ${JSON.stringify(sleeper)}] }).spawn();
+        await new Promise((r) => setTimeout(r, 300000));`],
+    };
+}
+
+Deno.test("a throwing onLine kills the tree and rethrows the original error", async () => {
+  const directory = Deno.makeTempDirSync();
+  const pidFile = join(directory, "grandchild.pid");
+  try {
+    const failure = new Error("callback failed");
+    const started = Date.now();
+    await assert.rejects(
+      runProcess({
+        ...processTree(directory, pidFile),
+        onLine: (line) => {
+          if (line === "ready") throw failure;
+        },
+      }),
+      (error) => error === failure,
+    );
+    assert.ok(Date.now() - started < 8000);
+    const pid = Number(Deno.readTextFileSync(pidFile));
+    assert.ok(await waitUntil(() => !isProcessRunning(pid)), "grandchild is gone");
+  } finally {
+    Deno.removeSync(directory, { recursive: true });
+  }
+});
+
 Deno.test("cancel kills the whole process tree", async () => {
   const directory = Deno.makeTempDirSync();
   const pidFile = join(directory, "grandchild.pid");
   try {
     const controller = new AbortController();
     const started = Date.now();
-    const sleeper = join(directory, "sleeper.ts");
-    Deno.writeTextFileSync(
-      sleeper,
-      `await Deno.writeTextFile(${JSON.stringify(pidFile)}, String(Deno.pid)); console.log("ready");` +
-        "await new Promise((r) => setTimeout(r, 300000));",
-    );
-    // Windows: through cmd.exe, because a killed deno parent takes its own deno children down with it and
-    // would hide a missing tree kill. POSIX: a deno child that starts the sleeper in the same process group.
     const result = await runProcess({
-      ...(windows
-        ? { command: join(systemDirectory(), "cmd.exe"), args: ["/c", deno, "run", "-A", sleeper] }
-        : {
-          command: deno,
-          args: ["eval", `new Deno.Command(Deno.execPath(), { args: ["run", "-A", ${JSON.stringify(sleeper)}] }).spawn();
-            await new Promise((r) => setTimeout(r, 300000));`],
-        }),
+      ...processTree(directory, pidFile),
       onLine: (line) => line === "ready" && controller.abort(),
       signal: controller.signal,
     });
@@ -139,6 +171,36 @@ Deno.test("low priority runs at the lowest priority, normal keeps the parent's",
   const script = "await new Promise((r) => setTimeout(r, 300)); console.log((await import('node:os')).getPriority())";
   assert.equal((await runScript(script, undefined, undefined, true)).output.trim(), "19");
   assert.notEqual((await runScript(script)).output.trim(), "19");
+});
+
+// Runs the low-priority case in a separate deno with exactly the launcher permissions, so they cannot drift.
+Deno.test("low priority works with exactly the launcher permissions; a refusal is reported", async () => {
+  const directory = Deno.makeTempDirSync();
+  try {
+    const script = join(directory, "low.ts");
+    Deno.writeTextFileSync(
+      script,
+      `import { runProcess } from ${JSON.stringify(new URL("../process.ts", import.meta.url).href)};
+       const child = "await new Promise((r) => setTimeout(r, 300)); console.log((await import('node:os')).getPriority())";
+       const result = await runProcess({ command: Deno.execPath(), args: ["eval", child], lowPriority: true,
+         onWarning: (message) => console.log("warning: " + message) });
+       console.log(result.output.trim());`,
+    );
+    const run = async (permissions: string[]) => {
+      const result = await new Deno.Command(deno, {
+        args: ["run", "--no-config", "--no-prompt", ...permissions, script],
+        stdin: "null",
+      }).output();
+      return new TextDecoder().decode(result.stdout) + new TextDecoder().decode(result.stderr);
+    };
+    assert.equal((await run(enginePermissions)).trim(), "19");
+    if (windows) {
+      const withoutSys = await run(enginePermissions.filter((flag) => !flag.startsWith("--allow-sys")));
+      assert.match(withoutSys, /^warning: Impossible de passer le processus en priorité basse/);
+    }
+  } finally {
+    Deno.removeSync(directory, { recursive: true });
+  }
 });
 
 Deno.test("isProcessRunning", async () => {

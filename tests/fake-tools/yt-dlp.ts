@@ -27,7 +27,8 @@ if (args.includes("--dump-single-json")) {
   console.log(env("FAKE_YTDLP_PROBE_JSON") || '{"id":"abc","title":"Fake Title","duration":10}');
   Deno.exit(0);
 }
-const file = join(dirname(out), "Fake Title [abc].mp4");
+// Like yt-dlp, "%%" in the template is a literal "%".
+const file = join(dirname(out).replaceAll("%%", "%"), "Fake Title [abc].mp4");
 console.log(`[info] abc: Downloading 1 format(s)
 [download] Destination: ${file}
 __MD_DL__:abc

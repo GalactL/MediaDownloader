@@ -32,6 +32,10 @@ if [ -n "$probe" ]; then
   exit 0
 fi
 dir=${out%/*}
+# Like yt-dlp, %% in the template is a literal % (pure sh: some tests leave only head on PATH).
+rest=$dir; dir=
+while :; do case $rest in *%%*) dir=$dir${rest%%\%\%*}%; rest=${rest#*\%\%};; *) break;; esac; done
+dir=$dir$rest
 file="$dir/Fake Title [abc].mp4"
 # Same shapes as the --progress-template / --print templates passed by the engine (one stream, so 0-85 % overall).
 echo "[info] abc: Downloading 1 format(s)"

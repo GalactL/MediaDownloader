@@ -2,7 +2,7 @@
 // in-process against tests/fake-tools/: the POSIX sh fakes on Linux, their .cmd + .ts twins on Windows.
 // Never touches the network. Run: deno test -A engine/test
 import assert from "node:assert/strict";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { jsonEscape, parseArguments } from "../core.ts";
 import { Engine, type EngineEvent, serializeEvent } from "../engine.ts";
@@ -399,6 +399,29 @@ Deno.test("default output folder and fallback when --output is unusable", async 
     `"level":"warning","message":"Dossier de sortie inutilisable (${q(bad)}), enregistrement dans le dossier Vidéos : ${q(videos)}"`,
   ), r.out);
   assert.ok(has(r, `{"type":"started","outputDirectory":"${q(videos)}"}`));
+});
+
+Deno.test("relative tool paths from the environment are made absolute (tools run in the temp folder)", async () => {
+  const env = {
+    MEDIADOWNLOADER_YTDLP: relative(Deno.cwd(), tool("yt-dlp")),
+    MEDIADOWNLOADER_FFMPEG: relative(Deno.cwd(), tool("ffmpeg")),
+    FAKE_ENCODED_BYTES: "4096",
+  };
+  const doctor = await run(["doctor"], env);
+  assert.ok(has(doctor, `"yt-dlp":{"found":true,"path":"${q(tool("yt-dlp"))}"}`), doctor.out);
+  const out = newDir("out");
+  const r = await run(["download", "--url", url, "--output", out, "--max-size-mb", "10"], env);
+  assert.equal(r.code, 0, r.out);
+  assert.equal(r.lines.at(-1), `{"type":"completed","path":"${q(join(out, "Fake Title [abc].mp4"))}","bytes":4096}`);
+});
+
+Deno.test("an output folder containing % works (escaped in the yt-dlp template)", async () => {
+  const out = newDir("100% x");
+  const r = await run(["download", "--url", url, "--output", out]);
+  assert.equal(r.code, 0, r.out);
+  assert.ok(toolLine(r, tool("yt-dlp")).includes(` --output ${join(out, ".mediadownloader-").replaceAll("%", "%%")}`), r.argv);
+  assert.equal(r.lines.at(-1), `{"type":"completed","path":"${q(join(out, "Fake Title [abc].mp4"))}","bytes":2048}`);
+  assert.ok(noTempDirs(out) && countFiles(out) === 1);
 });
 
 Deno.test("update", async () => {

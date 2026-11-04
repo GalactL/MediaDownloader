@@ -199,7 +199,8 @@ export class Engine {
   #findTool(explicit: string | undefined, environmentName: string, filename: string): string | undefined {
     if (explicit && isFile(explicit)) return resolve(explicit);
     const fromEnvironment = Deno.env.get(environmentName);
-    if (fromEnvironment && isFile(fromEnvironment)) return fromEnvironment;
+    // Absolute, because tools run with another working directory.
+    if (fromEnvironment && isFile(fromEnvironment)) return resolve(fromEnvironment);
     for (const candidate of [join(this.#root, "tools", "bin", filename), join(this.#root, filename)]) {
       if (isFile(candidate)) return resolve(candidate);
     }
@@ -371,7 +372,8 @@ export class Engine {
       "--format", buildFormatSelector(options.quality),
       "--ffmpeg-location", dirname(ffmpeg),
       "--merge-output-format", options.format,
-      "--output", join(temporary, "%(title).180B [%(id)s].%(ext)s"),
+      // The folder is literal text inside a yt-dlp template, where % must be doubled.
+      "--output", join(temporary.replaceAll("%", "%%"), "%(title).180B [%(id)s].%(ext)s"),
       // --print implies --quiet, which also silences the progress lines: --progress brings them back and the
       // templates give them a stable, parseable shape (parseDownloadProgressLine / parsePostprocessorStart).
       "--progress",
@@ -519,6 +521,7 @@ export class Engine {
         cwd: dirname(source),
         signal: this.#signal,
         lowPriority: options.lowResources,
+        onWarning: (message) => this.#log("warning", message),
         onLine: (line) => {
           if (!line.startsWith("out_time_us=")) return;
           const microseconds = Number.parseFloat(line.slice(12));

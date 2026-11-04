@@ -18,6 +18,8 @@ export interface RunProcessOptions {
   signal?: AbortSignal;
   // Lowest scheduling priority (nice 19 / IDLE_PRIORITY_CLASS), inherited by the child's own children.
   lowPriority?: boolean;
+  // Non-fatal problems (the engine turns them into "warning" log events).
+  onWarning?: (message: string) => void;
 }
 
 const windows = Deno.build.os === "windows";
@@ -53,8 +55,10 @@ export async function runProcess(options: RunProcessOptions): Promise<ProcessRes
   // milliseconds at normal priority; children it creates afterwards inherit IDLE.
   if (options.lowPriority && windows) {
     try {
-      setPriority(child.pid, 19);
-    } catch { /* best effort, like the C++ */ }
+      setPriority(child.pid, 19); // needs --allow-sys=setPriority (see permissions.ts)
+    } catch (error) {
+      options.onWarning?.(`Impossible de passer le processus en priorité basse : ${(error as Error).message}`);
+    }
   }
 
   const lines: string[] = [];
@@ -76,7 +80,7 @@ export async function runProcess(options: RunProcessOptions): Promise<ProcessRes
 
   let exited = false;
   const status = child.status.finally(() => exited = true);
-  const finished = Promise.all([read(child.stdout), read(child.stderr), status]);
+  const tasks = [read(child.stdout), read(child.stderr), status] as const;
 
   let cancelled = false;
   let killTimer: ReturnType<typeof setTimeout> | undefined;
@@ -89,10 +93,9 @@ export async function runProcess(options: RunProcessOptions): Promise<ProcessRes
       } catch { /* already gone */ }
     }
   };
-  const cancel = async () => {
-    if (exited) return;
-    cancelled = true;
+  const terminate = async () => {
     if (windows) {
+      if (exited) return;
       // No job object without FFI: taskkill walks the tree from the (still running) child.
       try {
         await new Deno.Command(join(systemDirectory(), "taskkill.exe"), {
@@ -105,19 +108,33 @@ export async function runProcess(options: RunProcessOptions): Promise<ProcessRes
       try {
         child.kill("SIGKILL");
       } catch { /* already gone */ }
-    } else {
-      // SIGTERM to the whole group, grace period, then SIGKILL to the group.
+    } else if (killTimer === undefined) {
+      // SIGTERM to the whole group, grace period, then SIGKILL to the group. Also after the leader exited:
+      // descendants may still hold the pipes (the C++ keeps polling the group too).
       signalGroup("SIGTERM");
       killTimer = setTimeout(() => signalGroup("SIGKILL"), terminateGraceMs);
     }
   };
-  const onAbort = () => void cancel();
+  const onAbort = () => {
+    if (windows && exited) return;
+    cancelled = true;
+    void terminate();
+  };
   options.signal?.addEventListener("abort", onAbort, { once: true });
   try {
-    const [, , { code, signal }] = await finished;
-    if (killTimer !== undefined) {
-      clearTimeout(killTimer);
-      signalGroup("SIGKILL"); // group members that closed their pipes before the grace period ended
+    let code: number, signal: Deno.Signal | null;
+    try {
+      [, , { code, signal }] = await Promise.all(tasks);
+    } catch (error) {
+      // A throwing onLine must not leave the tree running (nor its files locked).
+      await terminate();
+      await Promise.allSettled(tasks);
+      throw error;
+    } finally {
+      if (killTimer !== undefined) {
+        clearTimeout(killTimer);
+        signalGroup("SIGKILL"); // group members that closed their pipes before the grace period ended
+      }
     }
     return { exitCode: signal ? 128 : code, output: lines.map((line) => line + "\n").join(""), cancelled };
   } finally {
