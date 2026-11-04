@@ -304,7 +304,7 @@ export class Engine {
     }
     const ffmpeg = this.#ffmpeg(options);
     if (!ffmpeg) {
-      this.#error("tool_missing", "ffmpeg.exe est requis pour assembler les flux vidéo et audio");
+      this.#error("tool_missing", "ffmpeg est requis pour assembler les flux vidéo et audio");
       return 3;
     }
 
