@@ -8,7 +8,7 @@ permissions:
   contents: read
 
 jobs:
-  native:
+  engine:
     strategy:
       fail-fast: false
       matrix:
@@ -16,16 +16,31 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
-      - name: Télécharger les dépendances Windows
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: ./tools/install-dependencies.ps1
-      - name: Configurer
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-      - name: Compiler
-        run: cmake --build build --config Release --parallel
-      - name: Tester
-        run: ctest --test-dir build -C Release --output-on-failure
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Lire la version de Deno épinglée
+        # Une seule source de vérité : engine/deps.json (Installer.bat et install.sh la recopient, deps.test.ts le vérifie).
+        id: deno
+        shell: bash
+        run: node -e "console.log('version=' + require('./engine/deps.json').platforms['linux-x86_64'].find(e => e.name === 'deno').version)" >> "$GITHUB_OUTPUT"
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ steps.deno.outputs.version }}
+      - name: Vérifier les types
+        shell: bash
+        run: deno check engine/*.ts engine/test/*.ts tests/fake-tools/*.ts
+      - name: Tester le moteur
+        # Aucun téléchargement : le manifeste de dépendances est testé hors ligne (engine/test/deps.test.ts).
+        run: deno test -A engine/test
+      - name: Vérifier la syntaxe des scripts shell
+        if: runner.os == 'Linux'
+        run: |
+          sh -n packaging/install.sh
+          sh -n packaging/uninstall.sh
+          sh -n packaging/MediaDownloader.Cli
+      - name: Tests de l'extension
+        run: node --test extension/test/*.test.js tools/fetch-signed-xpi.test.mjs
 
   extension:
     runs-on: ubuntu-latest

@@ -1,5 +1,16 @@
 # Changelog
 
+## Non publié
+
+- Moteur : réécrit en TypeScript et exécuté par Deno (`engine/`), à la place du moteur C++ (supprimé). Les protocoles du CLI et de l'hôte natif, les codes de sortie, le plan d'encodage et les invariants sont inchangés.
+- Distribution : l'archive ne contient plus aucun programme tiers et pèse moins de 1 Mo (contrôle de taille dans la release). `Installer.bat` / `install.sh` téléchargent Deno, yt-dlp et FFmpeg (environ 270 Mo) avec versions et sommes SHA-256 épinglées (`engine/deps.json`), sans droit administrateur ; rien de partiel n'est laissé en cas d'échec. Le CLI et l'hôte sont lancés par `MediaDownloader.Cli.bat` (Windows) ou `MediaDownloader.Cli` (Linux).
+- Distribution : version portable, tout reste dans le dossier d'installation (outils, cache de Deno) ; après un déplacement, relancer l'installateur.
+- Distribution : macOS n'est plus pris en charge ; seuls Windows x64 et Linux x64 le sont. Archives : `.zip` pour Windows, `.tar.gz` pour Linux (conserve le bit exécutable).
+- Licences : FFmpeg (build BtbN GPL) n'est plus embarqué dans l'archive Linux mais téléchargé à l'installation ; la notice indique les sources correspondantes.
+- Correction : un dossier d'installation contenant des espaces fonctionne ; les chemins avec virgule sont refusés clairement et la racine d'un disque est gérée.
+- Correction : un pourcentage (`%`) dans le dossier de sortie n'est plus mal interprété.
+- Développement : suppression de CMake, de `tools/build-native.mjs` et de `tools/install-dependencies.ps1` ; CI et release exécutent `deno check` et `deno test`.
+
 ## v0.6.0 (2026-11-02)
 
 - Extension : version Chromium (Opera, Chrome, Brave), manifeste MV3 `extension/manifest.chromium.json` (service worker, clé publique `key` qui fixe l'identifiant ; la clé privée n'est pas conservée) sur le même code que Firefox, avec une cale `extension/shim.js` (`browser` = `chrome`). Le manifeste Firefox ne change que de version. Livrée en `mediadownloader-chromium.zip` (`tools/make-chromium-zip.sh`) dans les archives Windows et Linux et jointe à la release ; à charger à la main en mode développeur (voir README). Non vérifiée sur Opera sous Windows réel.

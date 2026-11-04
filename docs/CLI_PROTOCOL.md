@@ -1,6 +1,6 @@
 # Protocole du CLI
 
-Une application appelante (par exemple HUB) lance `MediaDownloader.Cli.exe` comme processus enfant, lit sa sortie standard
+Une application appelante (par exemple HUB) lance `MediaDownloader.Cli.bat` (Windows) ou `MediaDownloader.Cli` (Linux) comme processus enfant, lit sa sortie standard
 ligne par ligne et analyse chaque ligne comme un objet JSON UTF-8. La sortie
 d'erreur est redirigée avec la sortie standard par le moteur lorsqu'il lance les
 outils externes ; l'appelant ne doit donc pas analyser directement les messages de
@@ -9,7 +9,7 @@ outils externes ; l'appelant ne doit donc pas analyser directement les messages 
 ## Lancement conseillé
 
 ```text
-MediaDownloader.Cli.exe download
+MediaDownloader.Cli.bat download
   --url <URL>
   --quality <best|hauteur>
   --format mp4

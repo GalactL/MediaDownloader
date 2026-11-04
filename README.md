@@ -19,27 +19,46 @@ où le contenu est accessible sans contourner de DRM.
 ## Plateformes de la v0.6.0
 
 - Windows x64 et Linux x64 : CLI, hôte de messagerie native, extension Firefox et extension Chromium (Opera, Chrome, Brave).
+- macOS n'est plus pris en charge (ni moteur, ni archive, ni installateur).
 
 La release GitHub contient une archive et une notice distinctes pour chaque cible.
 
 ## Installation (release)
 
-1. Décompresser l'archive.
+L'archive pèse moins de 1 Mo et ne contient aucun programme tiers : l'installateur télécharge Deno, yt-dlp et FFmpeg
+(environ 270 Mo, versions et sommes SHA-256 épinglées dans `engine/deps.json`) dans `tools/bin`. Il faut donc une
+connexion Internet (proxy : variables `https_proxy` / `HTTPS_PROXY` sous Linux). Aucun droit administrateur n'est requis.
+
+1. Décompresser l'archive dans un dossier à conserver.
 2. Windows : double-cliquer sur `Installer.bat`. Linux : exécuter `./install.sh`.
 3. Firefox s'ouvre sur `mediadownloader.xpi` : accepter l'installation de l'extension.
 
-Désinstallation : `Desinstaller.bat` (Windows) ou `./uninstall.sh`, puis supprimer l'extension dans `about:addons` et le dossier.
+Le dossier est portable : tout reste dedans. Si vous le déplacez, relancez l'installateur (le manifeste de l'hôte natif
+contient son chemin). Désinstallation : `Desinstaller.bat` (Windows) ou `./uninstall.sh`, puis supprimer l'extension dans
+`about:addons` et le dossier.
 
 Contenu de l'archive :
 
 ```text
-MediaDownloader.Cli(.exe)
+MediaDownloader.Cli.bat (Windows) ou MediaDownloader.Cli (Linux) : lanceur
+engine/   le moteur TypeScript
 Installer.bat, Desinstaller.bat (Windows) ; install.sh, uninstall.sh (Linux)
 mediadownloader.xpi
 mediadownloader-chromium.zip
-tools/bin/   yt-dlp, ffmpeg, deno (Windows, Linux)
 README.txt
 ```
+
+Après l'installation, `tools/bin/` contient `deno`, `yt-dlp` et `ffmpeg` (`.exe` sous Windows) et `tools/deno-cache/` le
+cache de Deno.
+
+### Dépannage
+
+- Chemin du dossier : pas de virgule (Deno la traite comme séparateur de permissions) ; l'installateur le refuse avant de
+  rien modifier. Une racine de disque (`D:\`) est gérée par l'installateur.
+- Windows : une commande `AutoRun` de `cmd.exe` (clé de registre) qui affiche du texte corrompt la sortie du lanceur
+  `.bat` et donc la communication avec Firefox. À supprimer ou à rendre silencieuse (non vérifié sur une machine qui en a une).
+- Échec du téléchargement : rien de partiel n'est laissé dans `tools/bin` ; vérifier la connexion et relancer.
+- Code de sortie 3 au lancement : `tools/bin` est incomplet, relancer l'installateur.
 
 ### Opera, Chrome et Brave
 
@@ -54,59 +73,41 @@ L'identifiant de l'extension est fixe (clé publique dans le manifeste), ce qui 
 **Non vérifié** : le chargement et l'hôte natif n'ont pas encore été testés sur Opera sous Windows réel ; les emplacements
 du manifeste et de la clé de registre pour Opera et Brave restent à confirmer (tous les emplacements plausibles sont écrits).
 
-Sous Linux, l'archive est autonome : `yt-dlp`, `ffmpeg` (build statique GPL de BtbN/FFmpeg-Builds, redistribué sous licence GPL ; sources et licence : https://github.com/BtbN/FFmpeg-Builds et https://ffmpeg.org/legal.html) et `deno` sont dans `tools/bin`.
-Sous Windows, ne pas déplacer le dossier après l'installation : le manifeste
-contient son chemin. Signature de l'extension : [docs/EXTENSION_SIGNATURE.md](docs/EXTENSION_SIGNATURE.md).
+Signature de l'extension : [docs/EXTENSION_SIGNATURE.md](docs/EXTENSION_SIGNATURE.md).
 
-## Prérequis
+### Licences
 
-- compilateur C++20 et CMake 3.24+ pour compiler depuis les sources
-- `yt-dlp` et `ffmpeg` (extensions `.exe` sous Windows)
-- Node.js 22 ou plus récent, ou Deno 2.3+, pour résoudre les challenges JavaScript YouTube
+FFmpeg (build BtbN gpl, GPLv3 ou ultérieure) est téléchargé à l'installation, non redistribué dans l'archive ; sources et
+recette : voir `docs/RELEASE_LINUX.md` (reprise dans `README.txt`). yt-dlp : Unlicense. Deno : MIT.
+
+## Prérequis et développement
+
+Utilisateur : aucun, l'installateur fournit tout. Développeur : Deno (version de `engine/deps.json`) et Node.js 22+ pour
+les tests de l'extension. Pour récupérer les outils dans une copie du dépôt (équivalent de l'installateur, vers `tools/bin`) :
+
+```bash
+deno run --no-check --allow-net --allow-read --allow-write --allow-run --allow-env=SystemRoot engine/deps.ts
+```
 
 Les outils sont recherchés, dans cet ordre :
 
 1. chemins fournis avec `--yt-dlp` et `--ffmpeg` (`--ffprobe` est accepté et ignoré) ;
 2. variables `MEDIADOWNLOADER_YTDLP` et `MEDIADOWNLOADER_FFMPEG` ;
-3. dossier `tools/bin` voisin du projet ou de l'exécutable ;
+3. dossier `tools/bin` voisin du lanceur ;
 4. `PATH`.
 
-Pour les installer uniquement dans le projet :
-
-```powershell
-powershell -ExecutionPolicy Bypass -File tools/install-dependencies.ps1
-```
-
-## Compilation Windows
-
-```powershell
-node tools/build-native.mjs
-```
-
-Le script nettoie également le doublon `Path`/`PATH` que certains environnements
-d'automatisation transmettent à MSBuild. Une compilation CMake classique reste
-possible depuis un terminal développeur Visual Studio.
-
-La compilation génère :
-
-- `build/Release/MediaDownloader.Cli.exe` : moteur en ligne de commande et hôte de messagerie native.
+Un runtime JavaScript (Deno, fourni, ou Node.js 22+) sert à résoudre les challenges YouTube.
 
 L'extension (`extension/`, JavaScript pur) ne se compile pas : voir [extension/README.md](extension/README.md). `tools/make-chromium-zip.sh` produit `out/mediadownloader-chromium.zip`.
 
-Sous Linux :
-
-```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel
-ctest --test-dir build --output-on-failure
-```
-
 ## Commandes
+
+Sous Linux, le lanceur s'appelle `MediaDownloader.Cli` (`./MediaDownloader.Cli doctor`) ; les exemples utilisent le nom Windows.
 
 Diagnostic des dépendances :
 
 ```powershell
-MediaDownloader.Cli.exe doctor
+MediaDownloader.Cli.bat doctor
 ```
 
 `doctor` n'exige un runtime JavaScript que pour une URL YouTube (`doctor --url URL`).
@@ -114,31 +115,31 @@ MediaDownloader.Cli.exe doctor
 Mise à jour de yt-dlp (`yt-dlp -U`, sortie relayée en événements `log`) :
 
 ```powershell
-MediaDownloader.Cli.exe update
+MediaDownloader.Cli.bat update
 ```
 
 Inspection d'un lien :
 
 ```powershell
-MediaDownloader.Cli.exe probe --url "https://www.youtube.com/watch?v=..."
+MediaDownloader.Cli.bat probe --url "https://www.youtube.com/watch?v=..."
 ```
 
 Téléchargement en 1080p maximum :
 
 ```powershell
-MediaDownloader.Cli.exe download --url "https://..." --quality 1080
+MediaDownloader.Cli.bat download --url "https://..." --quality 1080
 ```
 
 Téléchargement limité à 10 Mo :
 
 ```powershell
-MediaDownloader.Cli.exe download --url "https://..." --quality 1080 --max-size-mb 10
+MediaDownloader.Cli.bat download --url "https://..." --quality 1080 --max-size-mb 10
 ```
 
 Téléchargement d'un extrait de 30 à 95,5 secondes :
 
 ```powershell
-MediaDownloader.Cli.exe download --url "https://..." --start-time 30 --end-time 95.5
+MediaDownloader.Cli.bat download --url "https://..." --start-time 30 --end-time 95.5
 ```
 
 Les deux bornes doivent être fournies ensemble. La compression et la limite de
@@ -150,7 +151,7 @@ rien ne change).
 Titre personnalisé et session YouTube connectée :
 
 ```powershell
-MediaDownloader.Cli.exe download --url "https://..." --title "Mon titre" --cookies-from-browser edge
+MediaDownloader.Cli.bat download --url "https://..." --title "Mon titre" --cookies-from-browser edge
 ```
 
 Pour une vidéo YouTube réservée aux adultes, le compte ouvert dans le navigateur
@@ -196,11 +197,12 @@ Contrat complet : [docs/CLI_PROTOCOL.md](docs/CLI_PROTOCOL.md).
 (messages JSON préfixés par leur longueur). Protocole :
 [docs/NATIVE_HOST_PROTOCOL.md](docs/NATIVE_HOST_PROTOCOL.md).
 
-Firefox lance directement l'exécutable : `MediaDownloader.Cli` reconnaît ce lancement
-(chemin du manifeste ou identifiant d'extension en premier argument) et passe en mode `host`.
+Firefox lance le lanceur (`MediaDownloader.Cli.bat` sous Windows, `MediaDownloader.Cli` sous Linux), qui exécute le moteur
+avec Deno : le moteur reconnaît ce lancement (chemin du manifeste ou identifiant d'extension en premier argument) et
+passe en mode `host`.
 
 `MediaDownloader.Cli install-host` écrit le manifeste pour Firefox et, avec `allowed_origins`, pour Opera, Chrome et Brave (sous Windows, il
-enregistre aussi les clés de registre `HKCU`). Il se relance après un déplacement de l'exécutable.
+enregistre aussi les clés de registre `HKCU`). À relancer après un déplacement du dossier.
 
 ```text
 MediaDownloader.Cli install-host
@@ -217,6 +219,7 @@ permissions, sélecteurs de repli) : [extension/README.md](extension/README.md).
 ## Tests
 
 ```powershell
-ctest --test-dir build -C Release --output-on-failure
+deno check engine/*.ts engine/test/*.ts tests/fake-tools/*.ts
+deno test -A engine/test
 node --test extension/test/*.test.js
 ```
