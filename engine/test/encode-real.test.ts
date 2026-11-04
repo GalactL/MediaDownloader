@@ -21,21 +21,28 @@ Deno.test({
       const output = join(dir, "out.mp4");
       const run = (args: string[]) => runProcess({ command: ffmpeg!, args, cwd: dir });
       const gen = await run([
-        "-y", "-f", "lavfi", "-i", "testsrc2=size=640x360:rate=25:duration=3",
+        "-y", "-f", "lavfi", "-i", "testsrc2=size=1280x1080:rate=25:duration=3",
         "-f", "lavfi", "-i", "sine=frequency=440:duration=3", "-c:v", "libx264", "-c:a", "aac", "-shortest", input,
       ]);
       assert.equal(gen.exitCode, 0, gen.output);
-      const plan = calculateEncodePlan(3, 1)!;
-      const passLog = join(dir, "ffmpeg-pass");
-      for (const pass of [1, 2] as const) {
-        const args = buildEncodeArguments(input, output, passLog, plan.videoKbps, plan.audioKbps, "best", pass, false);
-        const r = await run(args);
-        assert.equal(r.exitCode, 0, `pass ${pass}: ${r.output}`);
+      const plan = calculateEncodePlan(3, 3)!;
+      for (const [quality, lowResources] of [["best", false], ["720", false], ["720", true]] as const) {
+        const output = join(dir, `out-${quality}-${lowResources}.mp4`);
+        const passLog = join(dir, `pass-${quality}-${lowResources}`);
+        for (const pass of [1, 2] as const) {
+          const args = buildEncodeArguments(input, output, passLog, plan.videoKbps, plan.audioKbps, quality, pass, lowResources);
+          const r = await run(args);
+          assert.equal(r.exitCode, 0, `${quality}/${lowResources} pass ${pass}: ${r.output}`);
+        }
+        // 10 % slack: x264 rate control is only approximate on a 3 s clip (the 3 % container reserve covers long ones).
+        assert.ok(Deno.statSync(output).size <= plan.targetBytes * 1.1, `${quality}/${lowResources}: ${Deno.statSync(output).size} > ${plan.targetBytes}`);
+        const info = await run(["-hide_banner", "-i", output]); // exits 1 (no output file) but lists the streams
+        const video = info.output.match(/Stream #0:\d.*: Video.*?, (\d+)x(\d+)/);
+        assert.ok(video, info.output);
+        assert.match(info.output, /Stream #0:\d.*: Audio/);
+        if (quality === "720") assert.ok(Number(video[2]) <= 720, `height ${video[2]}`);
+        else assert.equal(Number(video[2]), 1080);
       }
-      assert.ok(Deno.statSync(output).size <= plan.targetBytes, "output within the planned target");
-      const info = await run(["-hide_banner", "-i", output]); // exits 1 (no output file) but lists the streams
-      assert.match(info.output, /Stream #0:\d.*: Video/);
-      assert.match(info.output, /Stream #0:\d.*: Audio/);
     } finally {
       await Deno.remove(dir, { recursive: true });
     }
