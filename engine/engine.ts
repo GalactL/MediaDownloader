@@ -1,5 +1,5 @@
-// Download pipeline: port of src/Engine.cpp (doctor, probe, download, update) and of the event serializer of
-// src/Host.cpp. install-host/uninstall-host and the host protocol live elsewhere.
+// Download pipeline (doctor, probe, download, update) and the event serializer shared with the host.
+// install-host/uninstall-host and the host protocol live elsewhere.
 import { basename, delimiter, dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {

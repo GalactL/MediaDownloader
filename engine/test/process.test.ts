@@ -1,4 +1,4 @@
-// Port of tests/ProcessTests.cpp, made cross-platform with `deno eval` children. Run: deno test -A engine/test
+// Child process tests, cross-platform with `deno eval` children. Run: deno test -A engine/test
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { enginePermissions } from "../permissions.ts";
@@ -55,7 +55,7 @@ Deno.test("working directory is applied; a missing program throws", async () => 
     const inDirectory = await runProcess({ command: deno, args: ["eval", "console.log(Deno.cwd())"], cwd: directory });
     assert.equal(Deno.realPathSync(inDirectory.output.trim()), Deno.realPathSync(directory));
     await assert.rejects(runProcess({ command: join(directory, "missing-tool"), args: [] }), /Impossible de lancer/);
-    // The C++ "failed chdir does not run the program" case.
+    // A failed chdir must not run the program.
     const missingCwd = runProcess({ command: deno, args: ["eval", "console.log('ran')"], cwd: join(directory, "missing") });
     await assert.rejects(missingCwd, /Impossible de lancer/);
   } finally {

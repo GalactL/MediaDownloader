@@ -13,18 +13,6 @@ tools/bin/
 *.part
 *.ytdl
 
-# Sorties C++ et CMake
-CMakeFiles/
-CMakeCache.txt
-cmake_install.cmake
-*.obj
-*.pdb
-*.ilk
-*.lib
-*.exp
-*.exe
-*.dll
-
 # Sessions, cookies et données locales sensibles
 cookies.txt
 cookies-*.txt

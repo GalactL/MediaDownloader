@@ -1,4 +1,4 @@
-// Native messaging host: port of src/Host.cpp (docs/NATIVE_HOST_PROTOCOL.md). On stdin and stdout every message is a
+// Native messaging host (docs/NATIVE_HOST_PROTOCOL.md). On stdin and stdout every message is a
 // 4-byte native-endian length followed by that many bytes of UTF-8 JSON; stdout carries nothing else.
 import { dirname, join } from "node:path";
 import { jsonEscape, type Options, parseArguments } from "./core.ts";
@@ -31,7 +31,7 @@ export function parseRequest(body: Uint8Array): unknown {
   }
 }
 
-// Like C++ setprecision(15).
+// 15 significant digits, shortest text (keeps the wire format of the former C++ engine).
 const formatNumber = (value: number) => String(Number(value.toPrecision(15)));
 
 // Keeps the probe response far below the 1 MiB native messaging limit.

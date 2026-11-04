@@ -18,6 +18,13 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
+      - name: Vérifier que le tag correspond à VERSION
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          if [ "$GITHUB_REF_NAME" != "$VERSION" ]; then
+            echo "::error::Le tag $GITHUB_REF_NAME ne correspond pas à VERSION ($VERSION) dans release.yml : mettre à jour VERSION avant de tagger."
+            exit 1
+          fi
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v4
         with:

@@ -1,4 +1,4 @@
-// CLI entry point: port of src/Main.cpp. stdout is the CLI protocol (docs/CLI_PROTOCOL.md): one JSON object per
+// CLI entry point. stdout is the CLI protocol (docs/CLI_PROTOCOL.md): one JSON object per
 // line, except the help text. Exit codes: 0 ok, 2 bad arguments, 3 missing tool, 4 failure or cancellation.
 import { isNativeHostLaunch, jsonEscape, parseArguments } from "./core.ts";
 import { Engine, serializeEvent } from "./engine.ts";
@@ -37,8 +37,8 @@ Options:
   --output DOSSIER           Dossier cible (Videos par defaut)
   --overwrite                Remplacer un fichier homonyme
   --low-resources            FFmpeg en priorite basse, 2 threads
-  --yt-dlp CHEMIN            Chemin de yt-dlp.exe
-  --ffmpeg CHEMIN            Chemin de ffmpeg.exe
+  --yt-dlp CHEMIN            Chemin de yt-dlp
+  --ffmpeg CHEMIN            Chemin de ffmpeg
   --ffprobe CHEMIN           Ignore (compatibilite)
 `;
 

@@ -1,4 +1,4 @@
-// CLI part of tests/ContractTests.cpp: runs `main.ts` as a subprocess (exactly the launcher's Deno permissions)
+// CLI contract: runs `main.ts` as a subprocess (exactly the launcher's Deno permissions)
 // against tests/fake-tools/, and checks the launchers in packaging/. Never touches the network.
 // The engine pipeline itself is covered in-process by engine.test.ts. Run: deno test -A engine/test
 import assert from "node:assert/strict";

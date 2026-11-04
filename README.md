@@ -9,9 +9,11 @@ FFmpeg afin de respecter une taille maximale (par exemple 10 Mo pour Discord).
 
 ## État du projet
 
-La version 0.4 fournit un CLI pour Windows et Linux, avec des événements JSON ligne par
+La version 0.6.0 fournit un CLI pour Windows et Linux, avec des événements JSON ligne par
 ligne exploitables par toute application appelante (l'utilisation depuis HUB est inchangée),
-ainsi que l'extension Firefox et son hôte natif. L'extension ajoute un bouton de téléchargement sur
+ainsi que l'extension Firefox, l'extension Chromium et leur hôte natif. Les modifications non publiées
+(moteur TypeScript sur Deno, installateur qui télécharge les dépendances, macOS retiré) sont décrites dans le
+[CHANGELOG](CHANGELOG.md). L'extension ajoute un bouton de téléchargement sur
 YouTube (vidéos et Shorts), X (Twitter), TikTok et Instagram ; le CLI accepte toute URL HTTP(S). Ces sites sont pris en
 charge dans la mesure où la version installée de `yt-dlp` les prend en charge et
 où le contenu est accessible sans contourner de DRM.
@@ -78,7 +80,7 @@ Signature de l'extension : [docs/EXTENSION_SIGNATURE.md](docs/EXTENSION_SIGNATUR
 ### Licences
 
 FFmpeg (build BtbN gpl, GPLv3 ou ultérieure) est téléchargé à l'installation, non redistribué dans l'archive ; sources et
-recette : voir `docs/RELEASE_LINUX.md` (reprise dans `README.txt`). yt-dlp : Unlicense. Deno : MIT.
+recette : voir `docs/RELEASE_LINUX.md` (reprise dans `README.txt`). yt-dlp : Unlicense. Licence de Deno : non vérifiée ici (voir la notice).
 
 ## Prérequis et développement
 
@@ -221,5 +223,6 @@ permissions, sélecteurs de repli) : [extension/README.md](extension/README.md).
 ```powershell
 deno check engine/*.ts engine/test/*.ts tests/fake-tools/*.ts
 deno test -A engine/test
-node --test extension/test/*.test.js
+node --test extension/test/*.test.js tools/fetch-signed-xpi.test.mjs
+sh -n packaging/install.sh packaging/uninstall.sh packaging/MediaDownloader.Cli   # Linux
 ```

@@ -52,6 +52,6 @@ avec une somme SHA-256 épinglée (engine/deps.json).
   commit ec887b13a88afbaf44fb28c3045bda5d434da8dc de https://github.com/FFmpeg/FFmpeg ; recette de compilation :
   https://github.com/BtbN/FFmpeg-Builds au même tag autobuild-2026-11-03-12-50.
 - yt-dlp 2026.10.26 : licence Unlicense (https://github.com/yt-dlp/yt-dlp).
-- Deno 2.9.8 : licence MIT (https://github.com/denoland/deno).
+- Deno 2.9.8 : téléchargé depuis https://github.com/denoland/deno/releases ; sa licence n'a pas été vérifiée ici.
 Non vérifié : les licences des bibliothèques tierces intégrées au build de FFmpeg ; consultez
 https://ffmpeg.org/legal.html et le dépôt BtbN/FFmpeg-Builds.

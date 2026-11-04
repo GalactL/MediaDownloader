@@ -1,4 +1,4 @@
-// Port of tests/HostTests.cpp: drives `main.ts host` over real stdin/stdout pipes with framed messages, against
+// Drives `main.ts host` over real stdin/stdout pipes with framed messages, against
 // tests/fake-tools/ (POSIX sh fakes on Linux, .cmd + .ts twins on Windows). Never touches the network.
 // Run: deno test -A engine/test
 import assert from "node:assert/strict";

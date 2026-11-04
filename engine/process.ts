@@ -1,4 +1,4 @@
-// Child processes: port of src/Process.cpp (Windows) and src/ProcessPosix.cpp (Linux).
+// Child processes (Windows and Linux): cancellation, process-tree kill, merged output lines.
 import { setPriority } from "node:os";
 import { join } from "node:path";
 
@@ -27,12 +27,12 @@ const terminateGraceMs = 3000;
 
 export const systemDirectory = () => join(Deno.env.get("SystemRoot") ?? "C:\\Windows", "System32");
 
-// Two pipes instead of the C++ single merged pipe (Deno cannot merge them): lines stay whole and keep
+// Two pipes, stdout and stderr (Deno cannot merge them into one): lines stay whole and keep
 // their arrival order, but two writes a few microseconds apart on different streams may swap.
 export async function runProcess(options: RunProcessOptions): Promise<ProcessResult> {
   if (options.signal?.aborted) return { exitCode: 1, output: "", cancelled: true };
   let { command, args } = options;
-  // Like setpriority(19) before exec in the C++: nice applies to every thread from the start.
+  // nice -n 19 before exec: it applies to every thread from the start.
   if (options.lowPriority && !windows) [command, args] = ["nice", ["-n", "19", command, ...args]];
 
   let child: Deno.ChildProcess;
@@ -110,7 +110,7 @@ export async function runProcess(options: RunProcessOptions): Promise<ProcessRes
       } catch { /* already gone */ }
     } else if (killTimer === undefined) {
       // SIGTERM to the whole group, grace period, then SIGKILL to the group. Also after the leader exited:
-      // descendants may still hold the pipes (the C++ keeps polling the group too).
+      // descendants may still hold the pipes (keep polling the group).
       signalGroup("SIGTERM");
       killTimer = setTimeout(() => signalGroup("SIGKILL"), terminateGraceMs);
     }

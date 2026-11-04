@@ -1,4 +1,4 @@
-// Engine part of tests/ContractTests.cpp (help, argument errors and install-host stay with the CLI tests), run
+// Engine pipeline tests (help, argument errors and install-host stay with the CLI tests), run
 // in-process against tests/fake-tools/: the POSIX sh fakes on Linux, their .cmd + .ts twins on Windows.
 // Never touches the network. Run: deno test -A engine/test
 import assert from "node:assert/strict";
@@ -481,7 +481,7 @@ Deno.test("cancel during encode: exit 4 cancelled, ffmpeg killed, nothing left",
   assert.ok(noTempDirs(out) && countFiles(out) === 0, r.out);
 });
 
-Deno.test("serializeEvent formats numbers like the C++", () => {
+Deno.test("serializeEvent number formatting", () => {
   assert.equal(serializeEvent({ type: "progress", stage: "download", percent: 42.5 }), '{"type":"progress","stage":"download","percent":42.5}');
   assert.equal(serializeEvent({ type: "progress", stage: "encode", percent: 0, pass: 1 }), '{"type":"progress","stage":"encode","percent":0.0,"pass":1}');
   assert.equal(

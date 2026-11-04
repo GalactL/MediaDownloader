@@ -1,4 +1,4 @@
-// install-host / uninstall-host: port of Engine::InstallHost / Engine::UninstallHost (src/Engine.cpp).
+// install-host / uninstall-host (docs/NATIVE_HOST_PROTOCOL.md).
 // The manifests point at the launcher (MediaDownloader.Cli.bat / MediaDownloader.Cli) next to engine/.
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";

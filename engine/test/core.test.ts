@@ -1,4 +1,4 @@
-// Port of tests/CoreTests.cpp plus edge cases. Run: deno test engine/test/core.test.ts
+// Pure core tests. Run: deno test engine/test/core.test.ts
 // (add -A, or --allow-read --allow-write, to also run the real-filesystem tests).
 import assert from "node:assert/strict";
 import { join } from "node:path";
@@ -191,7 +191,7 @@ Deno.test("arguments: commands and options", () => {
   assert.equal(ok("doctor").command, "doctor");
   assert.equal(ok("host", "extra", "argv").command, "host");
   assert.match(parseArguments(["nope"]).error, /^Commande inconnue : nope$/);
-  assert.equal(parseArguments(["HELP"]).options, undefined, "help is case-sensitive, like the C++");
+  assert.equal(parseArguments(["HELP"]).options, undefined, "help is case-sensitive");
   assert.match(parseArguments(["probe"]).error, /--url est obligatoire/);
   assert.match(parseArguments(["download", "--url"]).error, /^Valeur manquante après --url$/);
   assert.match(parseArguments(["download", "--bogus", "x"]).error, /^Option inconnue : --bogus$/);

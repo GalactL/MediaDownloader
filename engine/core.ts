@@ -1,4 +1,4 @@
-// Pure core of the engine: port of src/Core.cpp and src/TemporaryFiles.cpp.
+// Pure core of the engine: argument parsing, URL checks, format selector, encode plan, manifests, temp dir cleanup.
 // User-facing strings stay in French (they are part of the CLI/host contract).
 import { join, posix, resolve, win32 } from "node:path";
 
@@ -45,8 +45,7 @@ export interface EncodePlan {
 
 const lower = (value: string) => value.toLowerCase();
 
-// Strict decimal number (what std::stod accepts minus hex floats/inf/nan, which
-// the C++ rejected afterwards anyway). Overflow gives Infinity -> rejected.
+// Strict decimal number (no hex floats, inf or nan). Overflow gives Infinity -> rejected.
 function parseFinite(value: string): number | undefined {
   if (!/^\s*[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(value)) return undefined;
   const parsed = Number(value);
@@ -234,7 +233,7 @@ export function parseFfmpegDuration(output: string): number | undefined {
   const key = "Duration:";
   const at = output.indexOf(key);
   if (at < 0) return undefined;
-  const text = output.slice(at + key.length, at + key.length + 16); // same 16-char window as the C++
+  const text = output.slice(at + key.length, at + key.length + 16); // 16-char window after the key
   const match = /^\s*(\d+):(\d+):(\d+(?:\.\d*)?|\.\d+)/.exec(text);
   if (!match) return undefined;
   const total = Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]);
@@ -246,7 +245,7 @@ export function buildFormatSelector(quality: string): string {
   return `bestvideo[height<=${quality}]+bestaudio/best[height<=${quality}]/best`;
 }
 
-// yt-dlp --download-sections value. Shortest round-trip number text (C++ printed 17 significant digits).
+// yt-dlp --download-sections value. Shortest round-trip number text (the former C++ engine printed 17 significant digits).
 export function buildDownloadSection(startTimeSeconds: number, endTimeSeconds: number): string {
   return `*${startTimeSeconds}-${endTimeSeconds}`;
 }

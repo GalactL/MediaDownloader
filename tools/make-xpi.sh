@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Produit out/mediadownloader.xpi : réutilise la version déjà signée par AMO, la signe sinon,
-# ou (sans secrets AMO) produit un zip non signé. Lancé par les jobs extension et build de release.yml.
+# ou (sans secrets AMO) produit un zip non signé. Lancé par les jobs extension et package de release.yml.
 set -euo pipefail
 mkdir -p ext-src out
 cp -r extension/. ext-src/
