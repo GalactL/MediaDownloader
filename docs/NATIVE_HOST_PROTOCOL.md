@@ -86,7 +86,7 @@ d'une phase sans pourcentage et peut être ignoré (détails dans [CLI_PROTOCOL.
 `pickFolder` répond `{"type":"folderPicked","id":"…","path":"<chemin absolu>"}` lorsque l'utilisateur choisit un
 dossier, ou `{"type":"folderPicked","id":"…"}` sans champ `path` s'il annule (annuler = pas de chemin). Si aucun
 sélecteur n'est disponible ou s'il échoue, l'hôte répond l'erreur `pick_failed`. Le sélecteur est
-`IFileOpenDialog` (Windows), `zenity` puis `kdialog` (Linux).
+la boîte « Rechercher un dossier » de Windows (`FolderBrowserDialog`, lancée par PowerShell), `zenity` puis `kdialog` (Linux).
 
 La réponse `probe` est compacte :
 
@@ -101,13 +101,14 @@ La réponse `probe` est compacte :
   l'erreur `cancelled`. Sans travail en cours, `cancel` est ignoré.
 - `pickFolder` ne bloque pas la lecture des requêtes. Il reçoit `busy` pendant un `probe` ou un `download`, ou
   pendant un autre `pickFolder` ; inversement `probe` et `download` reçoivent `busy` tant que le sélecteur est
-  ouvert. `cancel` ferme le sélecteur (sauf sous Windows) et la réponse est alors un `folderPicked` sans `path`.
+  ouvert. `cancel` ferme le sélecteur et la réponse est alors un `folderPicked` sans `path`.
 - `doctor` est traité immédiatement, même pendant un travail.
 - Une requête trop grande reçoit `message_too_large`, sans `id`.
 - Un `id` qui n'est pas une chaîne est ignoré.
 - Message mal formé ou de type inconnu : `invalid_message`.
 - Fin de stdin (EOF) : le travail éventuel est annulé et l'hôte se termine avec le
-  code `0`.
+  code `0` (code `1` si stdin se ferme au milieu d'un message). L'hôte lit stdin pendant tout travail, si bien
+  qu'un navigateur arrêté brutalement arrête aussi yt-dlp et FFmpeg.
 
 ## Codes d'erreur
 

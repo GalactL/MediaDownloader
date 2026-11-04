@@ -1,0 +1,6 @@
+# Launchers and shell scripts must keep their native line endings whatever core.autocrlf says.
+*.bat text eol=crlf
+*.sh text eol=lf
+packaging/MediaDownloader.Cli text eol=lf
+tests/fake-tools/* text eol=lf
+*.cmd text eol=crlf
